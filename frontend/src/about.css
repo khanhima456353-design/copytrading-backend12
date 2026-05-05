@@ -1,0 +1,199 @@
+.about-page {
+  background: #0b0e11;
+  color: #e6edf3;
+  overflow-x: hidden;
+}
+
+/* HERO */
+.about-hero {
+  text-align: center;
+  padding: 100px 20px;
+}
+
+.about-hero h1 {
+  font-size: 80px;
+  margin-bottom: 20px;
+}
+
+.about-hero p {
+  color: #9ca3af;
+  max-width: 700px;
+  margin: auto;
+  line-height: 1.6;
+}
+
+/* STATS */
+.about-stats {
+  display: flex;
+  justify-content: space-around;
+  padding: 60px 20px;
+  text-align: center;
+  gap: 20px;
+  flex-wrap: wrap; /* 👈 important for mobile */
+}
+
+.about-stats h2 {
+  color: #fcd535;
+}
+
+/* SECTIONS */
+.about-section {
+  padding: 80px 20px;
+  max-width: 1100px;
+  margin: auto;
+}
+
+.about-section h2 {
+  margin-bottom: 25px;
+  font-size: 28px;
+}
+
+.about-section p {
+  line-height: 1.7;
+  color: #9ca3af;
+}
+
+/* GRID */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 25px;
+}
+
+.card {
+  background: #11161c;
+  padding: 25px;
+  border-radius: 10px;
+  transition: 0.3s;
+}
+
+.card:hover {
+  background: #1a2430;
+  transform: translateY(-5px);
+}
+
+.details-box.inside {
+  margin-top: 15px;
+  padding: 15px;
+
+  background: #0f141a;
+  border-radius: 8px;
+  border-top: 1px solid #1f2a36;
+
+  max-height: 300px;
+  overflow-y: auto;
+
+  line-height: 1.7;
+}
+
+
+/* active card grows */
+.card.active {
+  grid-column: span 2;
+}
+
+/* nicer scrollbar */
+.details-box::-webkit-scrollbar {
+  width: 6px;
+}
+
+.details-box::-webkit-scrollbar-thumb {
+  background: #2b3642;
+  border-radius: 10px;
+}
+
+.details-box::-webkit-scrollbar-thumb:hover {
+  background: #3b4a5a;
+}
+.details-section {
+  margin-top: 60px;
+  padding: 30px;
+  background: #11161c;
+  border-radius: 12px;
+  border: 1px solid #1f2a36;
+  line-height: 1.7;
+
+  /* 🔥 prevents navbar overlap */
+  scroll-margin-top: 100px;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ========================= */
+/* 📱 TABLET (≤ 1024px) */
+/* ========================= */
+@media (max-width: 1024px) {
+
+  .about-hero h1 {
+    font-size: 36px;
+  }
+
+  .about-stats {
+    justify-content: center;
+  }
+
+  .grid {
+    grid-template-columns: repeat(2, 1fr); /* 👈 2 columns */
+  }
+
+  .about-section {
+    padding: 60px 20px;
+  }
+}
+
+/* ========================= */
+/* 📱 MOBILE (≤ 768px) */
+/* ========================= */
+@media (max-width: 768px) {
+
+  .about-hero {
+    padding: 70px 20px;
+  }
+
+  .about-hero h1 {
+    font-size: 28px;
+  }
+
+  .about-hero p {
+    font-size: 14px;
+  }
+
+  .about-stats {
+    flex-direction: column; /* 👈 stack vertically */
+    gap: 25px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr; /* 👈 single column */
+  }
+
+  .about-section {
+    padding: 50px 15px;
+  }
+
+  .card {
+    padding: 20px;
+  }
+}
+
+/* ========================= */
+/* 📱 SMALL MOBILE (≤ 480px) */
+/* ========================= */
+@media (max-width: 480px) {
+
+  .about-hero h1 {
+    font-size: 24px;
+  }
+
+  .about-section h2 {
+    font-size: 22px;
+  }
+
+  .card {
+    padding: 18px;
+  }
+}

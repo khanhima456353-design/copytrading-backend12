@@ -1,0 +1,559 @@
+{
+  "en": {
+    "translation": {
+      "welcome": "Welcome to SwanCore",
+      "login": "Login",
+      "continue": "Continue",
+      "email": "Enter email or phone",
+      "agree": "I agree to Terms",
+      "google": "Continue with Google",
+      "apple": "Continue with Apple",
+      "or": "or",
+      "verify": "Verify OTP",
+      "price": "Price",
+      "balance": "Balance",
+      "history": "Trade History",
+      "buy": "BUY",
+      "sell": "SELL"
+    }
+  },
+  "hi": {
+    "translation": {
+      "welcome": "स्वानकोर में आपका स्वागत है",
+      "login": "लॉगिन",
+      "continue": "जारी रखें",
+      "email": "ईमेल या फोन दर्ज करें",
+      "agree": "मैं शर्तों से सहमत हूँ",
+      "google": "Google से जारी रखें",
+      "apple": "Apple से जारी रखें",
+      "or": "या",
+      "verify": "OTP सत्यापित करें",
+      "price": "कीमत",
+      "balance": "बैलेंस",
+      "history": "ट्रेड इतिहास",
+      "buy": "खरीदें",
+      "sell": "बेचें"
+    }
+  },
+  "ja": {
+    "translation": {
+      "welcome": "SwanCoreへようこそ",
+      "login": "ログイン",
+      "continue": "続行",
+      "email": "メールまたは電話を入力",
+      "agree": "利用規約に同意します",
+      "google": "Googleで続行",
+      "apple": "Appleで続行",
+      "or": "または",
+      "verify": "OTPを確認",
+      "price": "価格",
+      "balance": "残高",
+      "history": "取引履歴",
+      "buy": "購入",
+      "sell": "売却"
+    }
+  },
+  "zh": {
+    "translation": {
+      "welcome": "欢迎来到 SwanCore",
+      "login": "登录",
+      "continue": "继续",
+      "email": "输入邮箱或手机号",
+      "agree": "我同意条款",
+      "google": "使用 Google 继续",
+      "apple": "使用 Apple 继续",
+      "or": "或",
+      "verify": "验证 OTP",
+      "price": "价格",
+      "balance": "余额",
+      "history": "交易记录",
+      "buy": "买入",
+      "sell": "卖出"
+    }
+  },
+  "es": {
+    "translation": {
+      "welcome": "Bienvenido a SwanCore",
+      "login": "Iniciar sesión",
+      "continue": "Continuar",
+      "email": "Ingrese correo o teléfono",
+      "agree": "Acepto los términos",
+      "google": "Continuar con Google",
+      "apple": "Continuar con Apple",
+      "or": "o",
+      "verify": "Verificar OTP",
+      "price": "Precio",
+      "balance": "Saldo",
+      "history": "Historial de operaciones",
+      "buy": "COMPRAR",
+      "sell": "VENDER"
+    }
+  },
+  "fr": {
+    "translation": {
+      "welcome": "Bienvenue sur SwanCore",
+      "login": "Connexion",
+      "continue": "Continuer",
+      "email": "Entrez email ou téléphone",
+      "agree": "J'accepte les conditions",
+      "google": "Continuer avec Google",
+      "apple": "Continuer avec Apple",
+      "or": "ou",
+      "verify": "Vérifier OTP",
+      "price": "Prix",
+      "balance": "Solde",
+      "history": "Historique des trades",
+      "buy": "ACHETER",
+      "sell": "VENDRE"
+    }
+  },
+
+  "de": {
+    "translation": {
+      "welcome": "Willkommen bei SwanCore",
+      "login": "Anmelden",
+      "continue": "Weiter",
+      "email": "E-Mail oder Telefon eingeben",
+      "agree": "Ich stimme den Bedingungen zu",
+      "google": "Mit Google fortfahren",
+      "apple": "Mit Apple fortfahren",
+      "or": "oder",
+      "verify": "OTP bestätigen",
+      "price": "Preis",
+      "balance": "Kontostand",
+      "history": "Handelsverlauf",
+      "buy": "KAUFEN",
+      "sell": "VERKAUFEN"
+    }
+  },
+
+  "ru": {
+  "translation": {
+    "welcome": "Добро пожаловать в SwanCore",
+    "login": "Войти",
+    "continue": "Продолжить",
+    "email": "Введите email или телефон",
+    "agree": "Я согласен с условиями",
+    "google": "Продолжить с Google",
+    "apple": "Продолжить с Apple",
+    "or": "или",
+    "verify": "Подтвердить OTP",
+    "price": "Цена",
+    "balance": "Баланс",
+    "history": "История сделок",
+    "buy": "КУПИТЬ",
+    "sell": "ПРОДАТЬ"
+  }
+},
+  "ar": {
+  "translation": {
+    "welcome": "مرحبًا بك في SwanCore",
+    "login": "تسجيل الدخول",
+    "continue": "متابعة",
+    "email": "أدخل البريد الإلكتروني أو رقم الهاتف",
+    "agree": "أوافق على الشروط",
+    "google": "المتابعة باستخدام Google",
+    "apple": "المتابعة باستخدام Apple",
+    "or": "أو",
+    "verify": "تأكيد رمز OTP",
+    "price": "السعر",
+    "balance": "الرصيد",
+    "history": "سجل التداول",
+    "buy": "شراء",
+    "sell": "بيع"
+  }
+},
+  "pt": {
+  "translation": {
+    "welcome": "Bem-vindo ao SwanCore",
+    "login": "Entrar",
+    "continue": "Continuar",
+    "email": "Digite e-mail ou telefone",
+    "agree": "Concordo com os termos",
+    "google": "Continuar com Google",
+    "apple": "Continuar com Apple",
+    "or": "ou",
+    "verify": "Verificar OTP",
+    "price": "Preço",
+    "balance": "Saldo",
+    "history": "Histórico de negociações",
+    "buy": "COMPRAR",
+    "sell": "VENDER"
+  }
+},
+  "tr": {
+  "translation": {
+    "welcome": "SwanCore'a Hoş Geldiniz",
+    "login": "Giriş Yap",
+    "continue": "Devam Et",
+    "email": "E-posta veya telefon girin",
+    "agree": "Şartları kabul ediyorum",
+    "google": "Google ile devam et",
+    "apple": "Apple ile devam et",
+    "or": "veya",
+    "verify": "OTP'yi doğrula",
+    "price": "Fiyat",
+    "balance": "Bakiye",
+    "history": "İşlem Geçmişi",
+    "buy": "SATIN AL",
+    "sell": "SAT"
+  }
+},
+  "ko": {
+  "translation": {
+    "welcome": "SwanCore에 오신 것을 환영합니다",
+    "login": "로그인",
+    "continue": "계속하기",
+    "email": "이메일 또는 전화번호를 입력하세요",
+    "agree": "약관에 동의합니다",
+    "google": "Google로 계속하기",
+    "apple": "Apple로 계속하기",
+    "or": "또는",
+    "verify": "OTP 확인",
+    "price": "가격",
+    "balance": "잔액",
+    "history": "거래 내역",
+    "buy": "구매",
+    "sell": "판매"
+  }
+},
+  "it": {
+  "translation": {
+    "welcome": "Benvenuto su SwanCore",
+    "login": "Accedi",
+    "continue": "Continua",
+    "email": "Inserisci email o telefono",
+    "agree": "Accetto i termini",
+    "google": "Continua con Google",
+    "apple": "Continua con Apple",
+    "or": "oppure",
+    "verify": "Verifica OTP",
+    "price": "Prezzo",
+    "balance": "Saldo",
+    "history": "Storico delle operazioni",
+    "buy": "ACQUISTA",
+    "sell": "VENDI"
+  }
+},
+  "nl": {
+  "translation": {
+    "welcome": "Welkom bij SwanCore",
+    "login": "Inloggen",
+    "continue": "Doorgaan",
+    "email": "Voer e-mail of telefoon in",
+    "agree": "Ik ga akkoord met de voorwaarden",
+    "google": "Doorgaan met Google",
+    "apple": "Doorgaan met Apple",
+    "or": "of",
+    "verify": "OTP verifiëren",
+    "price": "Prijs",
+    "balance": "Saldo",
+    "history": "Transactiegeschiedenis",
+    "buy": "KOPEN",
+    "sell": "VERKOPEN"
+  }
+},
+  "pl": {
+  "translation": {
+    "welcome": "Witamy w SwanCore",
+    "login": "Zaloguj się",
+    "continue": "Kontynuuj",
+    "email": "Wprowadź e-mail lub telefon",
+    "agree": "Akceptuję warunki",
+    "google": "Kontynuuj z Google",
+    "apple": "Kontynuuj z Apple",
+    "or": "lub",
+    "verify": "Zweryfikuj OTP",
+    "price": "Cena",
+    "balance": "Saldo",
+    "history": "Historia transakcji",
+    "buy": "KUP",
+    "sell": "SPRZEDAJ"
+  }
+},
+
+"uk": {
+  "translation": {
+    "welcome": "Ласкаво просимо до SwanCore",
+    "login": "Увійти",
+    "continue": "Продовжити",
+    "email": "Введіть email або телефон",
+    "agree": "Я погоджуюсь з умовами",
+    "google": "Продовжити з Google",
+    "apple": "Продовжити з Apple",
+    "or": "або",
+    "verify": "Підтвердити OTP",
+    "price": "Ціна",
+    "balance": "Баланс",
+    "history": "Історія торгів",
+    "buy": "КУПИТИ",
+    "sell": "ПРОДАТИ"
+  }
+},
+
+"th": {
+  "translation": {
+    "welcome": "ยินดีต้อนรับสู่ SwanCore",
+    "login": "เข้าสู่ระบบ",
+    "continue": "ดำเนินการต่อ",
+    "email": "กรอกอีเมลหรือเบอร์โทร",
+    "agree": "ฉันยอมรับเงื่อนไข",
+    "google": "ดำเนินการต่อด้วย Google",
+    "apple": "ดำเนินการต่อด้วย Apple",
+    "or": "หรือ",
+    "verify": "ยืนยัน OTP",
+    "price": "ราคา",
+    "balance": "ยอดคงเหลือ",
+    "history": "ประวัติการเทรด",
+    "buy": "ซื้อ",
+    "sell": "ขาย"
+  }
+},
+
+"vi": {
+  "translation": {
+    "welcome": "Chào mừng đến với SwanCore",
+    "login": "Đăng nhập",
+    "continue": "Tiếp tục",
+    "email": "Nhập email hoặc số điện thoại",
+    "agree": "Tôi đồng ý với điều khoản",
+    "google": "Tiếp tục với Google",
+    "apple": "Tiếp tục với Apple",
+    "or": "hoặc",
+    "verify": "Xác minh OTP",
+    "price": "Giá",
+    "balance": "Số dư",
+    "history": "Lịch sử giao dịch",
+    "buy": "MUA",
+    "sell": "BÁN"
+  }
+},
+
+"id": {
+  "translation": {
+    "welcome": "Selamat datang di SwanCore",
+    "login": "Masuk",
+    "continue": "Lanjutkan",
+    "email": "Masukkan email atau nomor telepon",
+    "agree": "Saya setuju dengan syarat",
+    "google": "Lanjutkan dengan Google",
+    "apple": "Lanjutkan dengan Apple",
+    "or": "atau",
+    "verify": "Verifikasi OTP",
+    "price": "Harga",
+    "balance": "Saldo",
+    "history": "Riwayat transaksi",
+    "buy": "BELI",
+    "sell": "JUAL"
+  }
+},
+
+"ms": {
+  "translation": {
+    "welcome": "Selamat datang ke SwanCore",
+    "login": "Log masuk",
+    "continue": "Teruskan",
+    "email": "Masukkan e-mel atau telefon",
+    "agree": "Saya bersetuju dengan terma",
+    "google": "Teruskan dengan Google",
+    "apple": "Teruskan dengan Apple",
+    "or": "atau",
+    "verify": "Sahkan OTP",
+    "price": "Harga",
+    "balance": "Baki",
+    "history": "Sejarah dagangan",
+    "buy": "BELI",
+    "sell": "JUAL"
+  }
+},
+
+"tl": {
+  "translation": {
+    "welcome": "Maligayang pagdating sa SwanCore",
+    "login": "Mag-login",
+    "continue": "Magpatuloy",
+    "email": "Ilagay ang email o telepono",
+    "agree": "Sumasang-ayon ako sa mga tuntunin",
+    "google": "Magpatuloy gamit ang Google",
+    "apple": "Magpatuloy gamit ang Apple",
+    "or": "o",
+    "verify": "I-verify ang OTP",
+    "price": "Presyo",
+    "balance": "Balanse",
+    "history": "Kasaysayan ng kalakalan",
+    "buy": "BUMILI",
+    "sell": "MAGBENTA"
+  }
+},
+
+"cs": {
+  "translation": {
+    "welcome": "Vítejte ve SwanCore",
+    "login": "Přihlásit se",
+    "continue": "Pokračovat",
+    "email": "Zadejte e-mail nebo telefon",
+    "agree": "Souhlasím s podmínkami",
+    "google": "Pokračovat s Google",
+    "apple": "Pokračovat s Apple",
+    "or": "nebo",
+    "verify": "Ověřit OTP",
+    "price": "Cena",
+    "balance": "Zůstatek",
+    "history": "Historie obchodů",
+    "buy": "KOUPIT",
+    "sell": "PRODAT"
+  }
+},
+
+"hu": {
+  "translation": {
+    "welcome": "Üdvözöljük a SwanCore-ban",
+    "login": "Bejelentkezés",
+    "continue": "Folytatás",
+    "email": "Adja meg az e-mailt vagy telefonszámot",
+    "agree": "Elfogadom a feltételeket",
+    "google": "Folytatás Google-lel",
+    "apple": "Folytatás Apple-lel",
+    "or": "vagy",
+    "verify": "OTP ellenőrzése",
+    "price": "Ár",
+    "balance": "Egyenleg",
+    "history": "Kereskedési előzmények",
+    "buy": "VÉTEL",
+    "sell": "ELADÁS"
+  }
+},
+
+"ro": {
+  "translation": {
+    "welcome": "Bine ai venit la SwanCore",
+    "login": "Autentificare",
+    "continue": "Continuă",
+    "email": "Introdu email sau telefon",
+    "agree": "Sunt de acord cu termenii",
+    "google": "Continuă cu Google",
+    "apple": "Continuă cu Apple",
+    "or": "sau",
+    "verify": "Verifică OTP",
+    "price": "Preț",
+    "balance": "Sold",
+    "history": "Istoric tranzacții",
+    "buy": "CUMPĂRĂ",
+    "sell": "VINDE"
+  }
+},
+
+"sv": {
+  "translation": {
+    "welcome": "Välkommen till SwanCore",
+    "login": "Logga in",
+    "continue": "Fortsätt",
+    "email": "Ange e-post eller telefon",
+    "agree": "Jag godkänner villkoren",
+    "google": "Fortsätt med Google",
+    "apple": "Fortsätt med Apple",
+    "or": "eller",
+    "verify": "Verifiera OTP",
+    "price": "Pris",
+    "balance": "Saldo",
+    "history": "Handelshistorik",
+    "buy": "KÖP",
+    "sell": "SÄLJ"
+  }
+},
+
+"da": {
+  "translation": {
+    "welcome": "Velkommen til SwanCore",
+    "login": "Log ind",
+    "continue": "Fortsæt",
+    "email": "Indtast e-mail eller telefon",
+    "agree": "Jeg accepterer vilkårene",
+    "google": "Fortsæt med Google",
+    "apple": "Fortsæt med Apple",
+    "or": "eller",
+    "verify": "Bekræft OTP",
+    "price": "Pris",
+    "balance": "Saldo",
+    "history": "Handelshistorik",
+    "buy": "KØB",
+    "sell": "SÆLG"
+  }
+},
+
+"fi": {
+  "translation": {
+    "welcome": "Tervetuloa SwanCoreen",
+    "login": "Kirjaudu sisään",
+    "continue": "Jatka",
+    "email": "Syötä sähköposti tai puhelin",
+    "agree": "Hyväksyn ehdot",
+    "google": "Jatka Googlen kanssa",
+    "apple": "Jatka Applen kanssa",
+    "or": "tai",
+    "verify": "Vahvista OTP",
+    "price": "Hinta",
+    "balance": "Saldo",
+    "history": "Kauppahistoria",
+    "buy": "OSTA",
+    "sell": "MYY"
+  }
+},
+
+"no": {
+  "translation": {
+    "welcome": "Velkommen til SwanCore",
+    "login": "Logg inn",
+    "continue": "Fortsett",
+    "email": "Skriv inn e-post eller telefon",
+    "agree": "Jeg godtar vilkårene",
+    "google": "Fortsett med Google",
+    "apple": "Fortsett med Apple",
+    "or": "eller",
+    "verify": "Bekreft OTP",
+    "price": "Pris",
+    "balance": "Saldo",
+    "history": "Handelshistorikk",
+    "buy": "KJØP",
+    "sell": "SELG"
+  }
+},
+
+"el": {
+  "translation": {
+    "welcome": "Καλώς ήρθατε στο SwanCore",
+    "login": "Σύνδεση",
+    "continue": "Συνέχεια",
+    "email": "Εισαγάγετε email ή τηλέφωνο",
+    "agree": "Συμφωνώ με τους όρους",
+    "google": "Συνέχεια με Google",
+    "apple": "Συνέχεια με Apple",
+    "or": "ή",
+    "verify": "Επαλήθευση OTP",
+    "price": "Τιμή",
+    "balance": "Υπόλοιπο",
+    "history": "Ιστορικό συναλλαγών",
+    "buy": "ΑΓΟΡΑ",
+    "sell": "ΠΩΛΗΣΗ"
+  }
+},
+
+  "he": {
+    "translation": {
+      "welcome": "ברוכים הבאים ל-SwanCore",
+      "login": "התחברות",
+      "continue": "המשך",
+      "email": "הזן אימייל או טלפון",
+      "agree": "אני מסכים לתנאים",
+      "google": "המשך עם Google",
+      "apple": "המשך עם Apple",
+      "or": "או",
+      "verify": "אמת OTP",
+      "price": "מחיר",
+      "balance": "יתרה",
+      "history": "היסטוריית מסחר",
+      "buy": "קנה",
+      "sell": "מכור"
+    }
+  }
+}

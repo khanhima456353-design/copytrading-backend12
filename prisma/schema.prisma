@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String    @id @default(uuid())
+  email     String    @unique
+  password  String
+  balance   Float     @default(0)
+  createdAt DateTime  @default(now())
+
+  trades    Trade[]
+  deposits  Deposit[]
+
+  followers  Follow[] @relation("Following")
+  following  Follow[] @relation("Follower")
+}
+
+model Trade {
+  id        String   @id @default(uuid())
+  userId    String
+  pair      String
+  amount    Float
+  profit    Float
+  status    String
+  createdAt DateTime @default(now())
+
+  user      User @relation(fields: [userId], references: [id])
+}
+
+model Deposit {
+  id        String   @id @default(uuid())
+  userId    String
+  amount    Float
+  createdAt DateTime @default(now())
+
+  user      User @relation(fields: [userId], references: [id])
+}
+
+model Follow {
+  id          String   @id @default(uuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower    User @relation("Follower", fields: [followerId], references: [id])
+  following   User @relation("Following", fields: [followingId], references: [id])
+}

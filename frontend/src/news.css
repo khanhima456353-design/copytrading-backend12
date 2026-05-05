@@ -1,0 +1,327 @@
+/* GLOBAL */
+body {
+  margin: 0;
+  background: #0b0e11;
+  color: white;
+  font-family: Arial;
+}
+
+/* TOP BAR */
+.topbar {
+  height: 60px;
+  background: #0b0e11;
+  border-bottom: 1px solid #222;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 20px;
+}
+
+.top-left {
+  display: flex;
+  align-items: center;
+  gap: -5px;
+}
+
+.logo {
+  width: 28px;
+  margin-top: 38px;
+}
+
+.brand {
+  color: #fcd535;
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: 0.5px;
+}
+
+.top-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.top-right button {
+  padding: 10px 10px;
+  font-size: 14px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+}
+
+.login-btn {
+  background: #1e2329;
+  color: white;
+}
+
+.signup-btn {
+  background: #fcd535;
+  color: black;
+}
+
+/* MAIN */
+.square-layout {
+  display: flex;
+  max-width: 1300px;
+  margin: auto;
+  padding-top: 20px;
+}
+
+/* SIDEBAR */
+.sidebar {
+  width: 220px;
+}
+
+.menu {
+  padding: 12px;
+  color: #aaa;
+  cursor: pointer;
+}
+
+.menu.active {
+  background: #1e2329;
+  color: white;
+  border-radius: 8px;
+}
+
+/* FEED */
+.feed {
+  flex: 1;
+  padding: 0 20px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* 👈 centers cards */
+}
+
+.feed-title {
+  margin-bottom: 20px;
+}
+
+/* NEWS WRAPPER */
+.news-wrapper {
+  margin-bottom: 12px;
+}
+
+/* OUTSIDE HEADER */
+.outside-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  padding: 0 4px;
+}
+
+/* LEFT SIDE (logo + text in SAME LINE) */
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* LOGO */
+.avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* TEXT */
+.source {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f0b90b;
+  line-height: 1;
+}
+
+/* TIME RIGHT SIDE */
+.time {
+  font-size: 12px;
+  color: #888;
+}
+
+/* CARD */
+.card {
+  background: #1e2329;
+  border-radius: 20px;
+  margin-bottom: 20px;
+  height: auto;
+  width: 650px;
+  max-width: 100%;
+}
+
+/* IMAGE */
+.card-img {
+  width: 100%;
+  height: 210px;
+  object-fit: cover;
+
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+}
+.card-content {
+  padding: 12px;
+}
+
+/* TEXT */
+.title {
+  display: block;
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  text-decoration: none;
+}
+.desc {
+  color: #aaa;
+  font-size: 14px;
+  padding-bottom: 4px;
+}
+
+/* RIGHT PANEL */
+.right-panel {
+  width: 300px;
+}
+
+.search {
+  width: 100%;
+  padding: 10px;
+  background: #1e2329;
+  border: none;
+  border-radius: 8px;
+  color: white;
+}
+
+.box {
+  background: #1e2329;
+  padding: 15px;
+  margin-top: 15px;
+  border-radius: 10px;
+}
+
+.read-more {
+  color: #fcd535;
+  font-size: 13px;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+.read-more:hover {
+  color: #f0b90b;
+}
+
+.expanded {
+  margin-top: 10px;
+  padding: 12px;
+  background: #111;
+  border-radius: 8px;
+  line-height: 1.6;
+  font-size: 14px;
+  color: #ddd;
+}
+.expanded-scroll {
+  max-height: 300px; 
+  overflow-y: auto;     
+  padding-bottom: 65px; 
+}
+
+.expanded-scroll .read-more {
+  position: sticky;
+  bottom: 0;
+  background: inherit;
+  padding: 10px;
+  text-align: center;
+  margin-top: -15px;
+  cursor: pointer;
+}
+
+
+/* ================= RESPONSIVE ================= */
+
+/* TABLET */
+@media (max-width: 1024px) {
+  .card {
+    width: 90%;
+  }
+
+  .square-layout {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .sidebar {
+    width: 100%;
+    display: flex;
+    justify-content: space-around;
+  }
+
+  .right-panel {
+    width: 100%;
+  }
+}
+@media (max-width: 768px) {
+
+  .topbar {
+    flex-direction: column;
+    height: auto;
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .logo {
+    margin-top: 0;
+  }
+
+  .card-img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+}
+
+  .card-img {
+    height: 200px;
+  }
+
+  .feed {
+    padding: 0 10px;
+  }
+
+  .feed-title {
+    font-size: 18px;
+  }
+
+  .title {
+    font-size: 14px;
+  }
+
+  .desc {
+    font-size: 13px;
+  }
+}
+@media (max-width: 480px) {
+
+  @media (max-width: 480px) {
+  .card-img {
+    height: 140px;
+  }
+}
+
+  .card {
+    width: 100%;
+    border-radius: 14px;
+  }
+
+  .top-right button {
+    font-size: 12px;
+    padding: 8px;
+  }
+
+  .source {
+    font-size: 11px;
+  }
+
+  .time {
+    font-size: 10px;
+  }
+}

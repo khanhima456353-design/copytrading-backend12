@@ -1,0 +1,77 @@
+.trust-page {
+  background: #0b0e11;
+  color: #eaecef;
+  min-height: 100vh;
+  padding: 60px;
+  font-family: Arial, sans-serif;
+}
+
+/* HERO */
+.trust-hero {
+  text-align: center;
+  margin-bottom: 50px;
+}
+
+.trust-hero h1 {
+  font-size: 42px;
+  color: #fcd535; /* Binance yellow */
+  margin-bottom: 10px;
+}
+
+.trust-hero p {
+  max-width: 800px;
+  margin: auto;
+  font-size: 16px;
+  color: #b7bdc6;
+}
+
+/* GRID */
+.trust-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+/* CARDS */
+.trust-card {
+  background: #1e2329;
+  border: 1px solid #2b3139;
+  padding: 25px;
+  border-radius: 12px;
+  transition: 0.3s;
+}
+
+.trust-card:hover {
+  border-color: #fcd535;
+  transform: translateY(-4px);
+}
+
+.trust-card h3 {
+  color: #fcd535;
+  margin-bottom: 10px;
+}
+
+.trust-card p {
+  color: #b7bdc6;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* FOOTER NOTE */
+.trust-footer {
+  margin-top: 50px;
+  text-align: center;
+  color: #848e9c;
+  font-size: 14px;
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .trust-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .trust-page {
+    padding: 30px;
+  }
+}

@@ -1,0 +1,108 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  height: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  background-color: #0b0e11; /* 🔥 Binance dark */
+  color: white;
+}
+
+/* ROOT APP LAYOUT */
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* GLOBAL SCROLLBAR (PRO UI) */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2b3139;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3b82f6;
+}
+
+/* TEXT */
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+/* LINKS RESET */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* BUTTON RESET */
+button {
+  cursor: pointer;
+  border: none;
+  outline: none;
+}
+
+/* INPUT RESET */
+input {
+  outline: none;
+  border: none;
+}
+
+/* FLEX HELPERS (use anywhere) */
+.flex {
+  display: flex;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.space-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* 🚀 SLIDE RIGHT PANEL (LANGUAGE) */
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* 🚀 SLIDE UP PANEL (COOKIES) */
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* SMOOTH TRANSITIONS */
+* {
+  box-sizing: border-box;
+  transition: background 0.2s, color 0.2s;
+}

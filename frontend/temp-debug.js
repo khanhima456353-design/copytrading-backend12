@@ -1,0 +1,13 @@
+const { JSDOM } = require('jsdom');
+const dom = new JSDOM('<!doctype html><html><body><div id="chart"></div></body></html>', { pretendToBeVisual: true, url: 'http://localhost/' });
+global.window = dom.window;
+global.document = dom.window.document;
+global.navigator = dom.window.navigator;
+global.location = dom.window.location;
+global.HTMLElement = dom.window.HTMLElement;
+const { createChart } = require('lightweight-charts');
+console.log('createChart type', typeof createChart);
+const div = document.getElementById('chart');
+const chart = createChart(div, { width: 400, height: 300 });
+console.log('chart keys', Object.keys(chart).slice(0,20));
+console.log('has addCandlestickSeries', typeof chart.addCandlestickSeries);

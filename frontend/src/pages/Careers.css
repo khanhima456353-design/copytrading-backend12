@@ -1,0 +1,115 @@
+body {
+  margin: 0;
+}
+
+.careers {
+  background: #0b0e11;
+  color: #eaecef;
+  padding: 40px 20px;
+  font-family: Arial;
+  
+}
+
+/* HERO1 */
+.hero1 {
+  text-align: center;
+  margin-bottom: 40px;
+  margin-top: px;
+  justify-content: center;
+}
+
+.hero1 h1 {
+  font-size: 48px;
+  color: #fcd535;
+}
+
+.hero1 p {
+  font-size: 30px;
+  color: #aaa;
+}
+/* IMAGE */
+.hero1 img {
+  max-width: 180px;
+  height: auto;
+}
+
+/* SECTION */
+.card-section {
+  background: #1e2329;
+  padding: 20px;
+  border-radius: 10px;
+  margin-bottom: 30px;
+}
+
+/* VALUES */
+.values .grid,
+.work .grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+.box {
+  background: #1e2329;
+  padding: 20px;
+  border-radius: 10px;
+}
+
+/* STATS */
+.stats {
+  display: flex;
+  justify-content: space-around;
+  margin: 50px 0;
+  text-align: center;
+}
+
+.stats h2 {
+  color: #fcd535;
+}
+
+/* TEAMS */
+.team-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.team-card {
+  background: #1e2329;
+  padding: 10px 15px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* BENEFITS */
+.grid3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+ul {
+  padding-left: 20px;
+}
+
+/* HIRING */
+.steps {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 30px;
+  text-align: center;
+}
+
+.steps div {
+  background: #1e2329;
+  padding: 15px;
+  border-radius: 8px;
+  width: 22%;
+}
+
+@media (max-width: 768px) {
+  .hero1-content {
+    flex-direction: column;
+    text-align: center;
+  }
+}

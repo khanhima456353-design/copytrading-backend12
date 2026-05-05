@@ -1,0 +1,296 @@
+.privacy-page {
+  background: #0b0e11;
+  color: white;
+  min-height: 100vh;
+  padding: 40px;
+}
+
+/* TITLE */
+.title {
+  font-size: 36px;
+  margin-bottom: 30px;
+}
+
+/* TABLE */
+.table {
+  border: 1px solid #2b3139;
+}
+
+/* ROW BASE */
+.row {
+  border-bottom: 1px solid #2b3139;
+  padding: 18px;
+  text-align: center;
+}
+
+/* GLOBAL HEADER */
+.row.header {
+  color: #fcd535;
+  font-weight: 600;
+}
+
+/* SECTION (APAC, Europe, etc) */
+.row.section {
+  color: #b7bdc6;
+  font-weight: 500;
+}
+
+/* GRID (2 columns) */
+.row.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+/* CELLS */
+.row.grid div {
+  padding: 12px;
+  border-right: 1px solid #2b3139;
+}
+
+/* REMOVE LAST BORDER */
+.row.grid div:last-child {
+  border-right: none;
+}
+
+/* HOVER EFFECT */
+.row.grid div:hover {
+  color: #fcd535;
+  cursor: pointer;
+}
+
+/* ================= PRINCIPLES ================= */
+
+.principles-title {
+  font-size: 32px;
+  margin-top: 60px;
+  margin-bottom: 30px;
+}
+
+/* GRID */
+.principles-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+}
+
+/* CARD */
+.card {
+  background: transparent;
+  border: 1px solid #2b3139;
+  padding: 20px;
+  border-radius: 8px;
+  transition: 0.3s;
+}
+
+.card h3 {
+  margin-bottom: 10px;
+}
+
+.card p {
+  color: #b7bdc6;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+/* HOVER */
+.card:hover {
+  border-color: #fcd535;
+}
+
+/* 📱 MOBILE FIX */
+@media (max-width: 900px) {
+  .principles-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ========================= */
+/* 🔥 DATA USAGE SECTION */
+/* ========================= */
+
+.data-section {
+  max-width: 1100px;
+  margin: 80px auto;
+  padding: 20px;
+}
+
+.data-section h1 {
+  font-size: 32px;
+  margin-bottom: 30px;
+}
+
+/* TABS */
+.tabs {
+  display: flex;
+  gap: 20px;
+  border-bottom: 1px solid #2b3139;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+}
+
+.tabs span {
+  cursor: pointer;
+  color: #848e9c;
+  padding-bottom: 10px;
+  transition: 0.2s;
+}
+
+.tabs span:hover {
+  color: white;
+}
+
+.tabs .active {
+  color: white;
+  border-bottom: 2px solid #fcd535;
+}
+
+/* CONTENT */
+.tab-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 40px;
+}
+
+/* BOX */
+.tab-box {
+  max-width: 600px;
+}
+
+.tab-box h2 {
+  font-size: 24px;
+  margin-bottom: 10px;
+}
+
+.tab-box p {
+  color: #b7bdc6;
+  line-height: 24px;
+}
+
+/* MOBILE FIX */
+@media (max-width: 900px) {
+  .tab-content {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .tabs {
+    justify-content: center;
+  }
+}
+
+/* ========================= */
+/* 🔥 HERO SECTION */
+/* ========================= */
+
+.privacy-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  max-width: 1200px;
+  margin: 80px auto 40px;
+  padding: 20px;
+  gap: 40px;
+}
+
+/* TEXT */
+.hero-text {
+  flex: 1;
+}
+
+.hero-text h1 {
+  font-size: 42px;
+  margin-bottom: 10px;
+}
+
+.hero-text h3 {
+  color: #fcd535;
+  margin-bottom: 20px;
+  font-weight: 500;
+}
+
+.hero-text p {
+  color: #b7bdc6;
+  line-height: 26px;
+  font-size: 15px;
+}
+
+/* IMAGE */
+.hero-image {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.hero-image img {
+  width: 260px;
+  opacity: 0.9;
+}
+
+/* MOBILE */
+@media (max-width: 900px) {
+  .privacy-hero {
+    flex-direction: column;
+    text-align: center;
+    margin: 40px auto;
+  }
+
+  .hero-image img {
+    width: 200px;
+  }
+
+  .hero-text h1 {
+    font-size: 28px;
+  }
+}
+
+/* ========================= */
+/* 🔥 REGION TABLE */
+/* ========================= */
+
+.region-container {
+  margin-top: 40px;
+}
+
+.region-table {
+  border: 1px solid #2a2f3a;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 1px solid #2a2f3a;
+}
+
+.row.full {
+  grid-template-columns: 1fr;
+  text-align: center;
+  font-weight: bold;
+  color: #f0b90b;
+  padding: 14px;
+}
+
+.row.section {
+  color: #ccc;
+  background: #11161c;
+}
+
+.row.highlight {
+  background: #2a2f3a;
+}
+
+.cell {
+  padding: 16px;
+  border-right: 1px solid #2a2f3a;
+  text-align: center;
+  color: #f0b90b;
+}
+
+.cell:last-child {
+  border-right: none;
+}
+
+.cell.wide {
+  text-align: left;
+}

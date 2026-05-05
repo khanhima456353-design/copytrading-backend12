@@ -1,0 +1,18 @@
+import { JSDOM } from 'jsdom';
+import * as lw from 'lightweight-charts';
+const dom = new JSDOM('<!doctype html><div id=chart></div>', { url: 'http://localhost' });
+const win = dom.window;
+win.requestAnimationFrame = (cb) => setTimeout(cb, 0);
+win.cancelAnimationFrame = (id) => clearTimeout(id);
+win.HTMLElement = win.HTMLElement;
+global.window = win;
+global.document = win.document;
+global.HTMLElement = win.HTMLElement;
+console.log('window.requestAnimationFrame', typeof window.requestAnimationFrame);
+console.log('createChart', typeof lw.createChart);
+const el = document.getElementById('chart');
+const chart = lw.createChart(el, { width: 400, height: 300 });
+console.log('chart keys', Object.keys(chart).filter((k) => typeof chart[k] === 'function').sort());
+console.log('chart.addCandlestickSeries', typeof chart.addCandlestickSeries);
+console.log('chart.addLineSeries', typeof chart.addLineSeries);
+console.log('chart.addAreaSeries', typeof chart.addAreaSeries);

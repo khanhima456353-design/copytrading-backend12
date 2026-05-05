@@ -1,0 +1,204 @@
+/* ================= GLOBAL STYLES ================= */
+.markets-container {
+  background-color: #0b0e11;
+  color: #ffffff;
+  min-height: 100vh;
+  padding: 20px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  line-height: 1.6;
+}
+
+/* ================= HEADER ================= */
+.markets-header h1 {
+  font-size: 28px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: #ffffff;
+}
+
+/* ================= TOP CARDS ================= */
+.top-cards {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 25px;
+  flex-wrap: wrap;
+}
+
+.card {
+  background-color: #1e2329;
+  border: 1px solid #2b3139;
+  padding: 15px;
+  border-radius: 12px;
+  flex: 1;
+  min-width: 220px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  background-color: #232a31;
+  border-color: #fcd535;
+  box-shadow: 0 4px 16px rgba(252, 213, 53, 0.2);
+}
+
+.card-title {
+  font-size: 12px;
+  color: #aaaaaa;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Mini Row */
+.mini-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* ================= COLORS ================= */
+.green {
+  color: #0ecb81;
+}
+
+.red {
+  color: #f6465d;
+}
+
+/* ================= TABLE ================= */
+.table-header,
+.row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+  align-items: center;
+  padding: 12px 0;
+}
+
+.cell {
+  padding: 10px 8px;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.right {
+  justify-content: flex-end;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.name {
+  gap: 10px;
+}
+
+.row > .cell {
+  min-width: 0;
+}
+
+/* Table Header */
+.table-header {
+  background-color: #1e2329;
+  border-bottom: 2px solid #2b3139;
+  font-weight: 600;
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 12px;
+}
+
+/* Table Rows */
+.row {
+  border-bottom: 1px solid #1e2329;
+  transition: background-color 0.2s ease;
+}
+
+.row:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+/* ================= NAME COLUMN ================= */
+.name img {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+}
+
+.symbol {
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.fullname {
+  font-size: 12px;
+  color: #888888;
+}
+
+/* ================= NUMERIC FORMATTING ================= */
+.price,
+.marketcap,
+.right {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* ================= RESPONSIVE DESIGN ================= */
+@media (max-width: 768px) {
+  .markets-container {
+    padding: 12px;
+  }
+
+  .markets-header h1 {
+    font-size: 22px;
+  }
+
+  .top-cards {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .card {
+    min-width: 100%;
+  }
+
+  .table-header,
+  .row {
+    grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr;
+    font-size: 12px;
+  }
+
+  .name img {
+    width: 25px;
+    height: 25px;
+  }
+
+  .symbol {
+    font-size: 13px;
+  }
+
+  .fullname {
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 480px) {
+  .table-header,
+  .row {
+    grid-template-columns: 1.8fr 1fr 1fr 1fr 1fr;
+  }
+
+  .price,
+  .marketcap {
+    font-size: 12px;
+  }
+
+  .card-title {
+    font-size: 11px;
+  }
+}
