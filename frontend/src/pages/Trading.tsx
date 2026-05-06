@@ -64,7 +64,7 @@ type TradeHistoryItem = {
 const timeframeOptions = ["1m", "5m", "15m", "1h", "4h", "1d"];
 const formatTradingViewSymbol = (pair: string) => {
   const [base, quote] = pair.split("/");
-  return `BINANCE:${base}${quote ?? ""}`;
+  return `${base}${quote ?? ""}`;
 };
 
 const formatTime = (time: number) =>
@@ -324,7 +324,7 @@ export default function Trading() {
   const [showRSI, setShowRSI] = useState(false);
   const [showBollinger, setShowBollinger] = useState(false);
   const [showMACD, setShowMACD] = useState(false);
-  const [showTradingView, setShowTradingView] = useState(false);
+  const [activeChartTab, setActiveChartTab] = useState<"original" | "tradingview" | "depth">("original");
   const [orderType, setOrderType] = useState<UserOrder["type"]>("market");
   const [orderSide, setOrderSide] = useState<"buy" | "sell">("buy");
   const [stopLoss, setStopLoss] = useState<string>("");
@@ -339,13 +339,18 @@ export default function Trading() {
 
   const chartContainerRef = useRef<HTMLDivElement | null>(null);
   const depthContainerRef = useRef<HTMLDivElement | null>(null);
+  const tradingViewContainerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<any>(null);
+  const tradingViewChartRef = useRef<any>(null);
   const candleSeriesRef = useRef<any>(null);
   const smaSeriesRef = useRef<any>(null);
   const emaSeriesRef = useRef<any>(null);
   const bbUpperSeriesRef = useRef<any>(null);
   const bbMiddleSeriesRef = useRef<any>(null);
   const bbLowerSeriesRef = useRef<any>(null);
+  const tvCandleSeriesRef = useRef<any>(null);
+  const tvSmaSeriesRef = useRef<any>(null);
+  const tvEmaSeriesRef = useRef<any>(null);
   const depthChartRef = useRef<any>(null);
   const bidsSeriesRef = useRef<any>(null);
   const asksSeriesRef = useRef<any>(null);
@@ -467,6 +472,48 @@ export default function Trading() {
     }
   };
 
+  const createTradingViewChart = () => {
+    if (!tradingViewContainerRef.current || tradingViewChartRef.current) return;
+
+    try {
+      const containerWidth = tradingViewContainerRef.current.clientWidth;
+      const containerHeight = tradingViewContainerRef.current.clientHeight || 500;
+
+      const chart: any = createChart(tradingViewContainerRef.current, {
+        width: containerWidth,
+        height: Math.max(containerHeight, 480),
+        layout: {
+          background: { color: "#07101f" },
+          textColor: "#cbd5e1",
+        },
+        grid: {
+          vertLines: { color: "#1b2738" },
+          horzLines: { color: "#1b2738" },
+        },
+        rightPriceScale: { borderColor: "#1f2a3d" },
+        timeScale: {
+          borderColor: "#1f2a3d",
+          timeVisible: true,
+        },
+        crosshair: { mode: 1 },
+      });
+
+      tvCandleSeriesRef.current = chart.addCandlestickSeries({
+        upColor: "#10b981",
+        downColor: "#ef4444",
+        wickVisible: true,
+        borderVisible: false,
+      });
+
+      tvSmaSeriesRef.current = chart.addLineSeries({ color: "#f8e71c", lineWidth: 2 });
+      tvEmaSeriesRef.current = chart.addLineSeries({ color: "#22c55e", lineWidth: 2 });
+
+      tradingViewChartRef.current = chart;
+    } catch (error) {
+      console.error("Failed to create TradingView chart:", error);
+    }
+  };
+
   const resizeCharts = () => {
     try {
       const chartWidth = chartContainerRef.current?.clientWidth ?? 0;
@@ -475,6 +522,15 @@ export default function Trading() {
         chartRef.current.applyOptions({ 
           width: chartWidth,
           height: Math.max(chartHeight, 380)
+        });
+      }
+
+      const tvWidth = tradingViewContainerRef.current?.clientWidth ?? 0;
+      const tvHeight = tradingViewContainerRef.current?.clientHeight ?? 500;
+      if (tradingViewChartRef.current && tvWidth) {
+        tradingViewChartRef.current.applyOptions({
+          width: tvWidth,
+          height: Math.max(tvHeight, 480)
         });
       }
 
@@ -627,8 +683,22 @@ try {
     }))
   );
 
+  // Also update TradingView chart
+  if (tvCandleSeriesRef.current) {
+    tvCandleSeriesRef.current.setData(
+      cleaned.map((candle) => ({
+        time: candle.time,
+        open: candle.open,
+        high: candle.high,
+        low: candle.low,
+        close: candle.close,
+      }))
+    );
+  }
+
   updateIndicatorLines(cleaned);
   chartRef.current?.timeScale().fitContent();
+  tradingViewChartRef.current?.timeScale().fitContent();
 } catch (err) {
   console.error("Error setting chart data:", err);
 }
@@ -666,8 +736,23 @@ try {
             close: candle.close,
           }))
         );
+        
+        // Also update TradingView chart
+        if (tvCandleSeriesRef.current) {
+          tvCandleSeriesRef.current?.setData(
+            sorted.map((candle) => ({
+              time: candle.time,
+              open: candle.open,
+              high: candle.high,
+              low: candle.low,
+              close: candle.close,
+            }))
+          );
+        }
+        
         updateIndicatorLines(sorted);
         chartRef.current?.timeScale().fitContent();
+        tradingViewChartRef.current?.timeScale().fitContent();
       } catch (err) {
         console.error("Error setting fallback chart data:", err);
       }
@@ -680,6 +765,7 @@ try {
       try {
         createChartInstances();
         createDepthChart();
+        createTradingViewChart();
         resizeCharts();
       } catch (error) {
         console.error("Chart initialization failed:", error);
@@ -699,6 +785,7 @@ try {
       try {
         chartRef.current?.remove();
         depthChartRef.current?.remove();
+        tradingViewChartRef.current?.remove();
       } catch (e) {
         console.error("Error cleaning up charts:", e);
       }
@@ -1069,61 +1156,90 @@ try {
           </div>
 
           <div className="chart-actions">
-            <div className="timeframe-tabs">
-              {timeframeOptions.map((frame) => (
-                <button
-                  key={frame}
-                  className={`timeframe-btn ${timeframe === frame ? "active" : ""}`}
-                  onClick={() => setTimeframe(frame)}
-                >
-                  {frame}
-                </button>
-              ))}
-            </div>
-            <div className="indicator-controls">
-              <label>
-                <input type="checkbox" checked={showSMA} onChange={() => setShowSMA((prev) => !prev)} />
-                SMA 20
-              </label>
-              <label>
-                <input type="checkbox" checked={showEMA} onChange={() => setShowEMA((prev) => !prev)} />
-                EMA 50
-              </label>
-              <label>
-                <input type="checkbox" checked={showBollinger} onChange={() => setShowBollinger((prev) => !prev)} />
-                Bollinger
-              </label>
-            </div>
-            <div className="indicator-controls">
-              <button className={`timeframe-btn ${showTradingView ? "active" : ""}`} onClick={() => setShowTradingView((prev) => !prev)}>
-                {showTradingView ? "Chart" : "TradingView"}
+            <div className="chart-tabs">
+              <button
+                className={`chart-tab-btn ${activeChartTab === "original" ? "active" : ""}`}
+                onClick={() => setActiveChartTab("original")}
+              >
+                Original
+              </button>
+              <button
+                className={`chart-tab-btn ${activeChartTab === "tradingview" ? "active" : ""}`}
+                onClick={() => setActiveChartTab("tradingview")}
+              >
+                Trading View
+              </button>
+              <button
+                className={`chart-tab-btn ${activeChartTab === "depth" ? "active" : ""}`}
+                onClick={() => setActiveChartTab("depth")}
+              >
+                Depth
               </button>
             </div>
+
+            {activeChartTab === "original" && (
+              <>
+                <div className="timeframe-tabs">
+                  {timeframeOptions.map((frame) => (
+                    <button
+                      key={frame}
+                      className={`timeframe-btn ${timeframe === frame ? "active" : ""}`}
+                      onClick={() => setTimeframe(frame)}
+                    >
+                      {frame}
+                    </button>
+                  ))}
+                </div>
+                <div className="indicator-controls">
+                  <label>
+                    <input type="checkbox" checked={showSMA} onChange={() => setShowSMA((prev) => !prev)} />
+                    SMA 20
+                  </label>
+                  <label>
+                    <input type="checkbox" checked={showEMA} onChange={() => setShowEMA((prev) => !prev)} />
+                    EMA 50
+                  </label>
+                  <label>
+                    <input type="checkbox" checked={showBollinger} onChange={() => setShowBollinger((prev) => !prev)} />
+                    Bollinger
+                  </label>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
         <div className="chart-and-depth-container">
-          {showTradingView ? (
-            <div className="tradingview-wrapper">
-              <iframe
-                title="TradingView"
-                src={`https://s.tradingview.com/widgetembed/?symbol=${formatTradingViewSymbol(symbol)}&theme=dark&interval=${timeframe}&hidetoptoolbar=1&timezone=Etc/UTC`}
-                frameBorder="0"
-                className="tradingview-iframe"
-              />
-            </div>
-          ) : (
-            <div className="chart-wrapper" ref={chartContainerRef} />
+          {activeChartTab === "original" && (
+            <>
+              <div className="chart-wrapper" ref={chartContainerRef} />
+              <div className="depth-panel integrated-depth">
+                <div className="section-title compact">
+                  <span>Depth</span>
+                  <strong>Chart</strong>
+                </div>
+                {renderPriceBlock()}
+                <div className="depth-chart-wrapper" ref={depthContainerRef} />
+              </div>
+            </>
           )}
-          
-          <div className="depth-panel integrated-depth">
-            <div className="section-title compact">
-              <span>Depth</span>
-              <strong>Chart</strong>
+
+          {activeChartTab === "tradingview" && (
+            <div className="tradingview-container">
+              <div className="chart-wrapper tradingview-full" ref={tradingViewContainerRef} />
             </div>
-            {renderPriceBlock()}
-            <div className="depth-chart-wrapper" ref={depthContainerRef} />
-          </div>
+          )}
+
+          {activeChartTab === "depth" && (
+            <div className="depth-panel full-depth-panel">
+              <div className="section-title compact">
+                <span>Market</span>
+                <strong>Depth Chart</strong>
+              </div>
+              {renderPriceBlock()}
+              <div className="full-depth-chart-wrapper" ref={depthContainerRef} />
+            </div>
+          )}
         </div>
 
         <div className="central-orderbook card-panel">
@@ -1314,7 +1430,10 @@ try {
         </div>
         <div className="trades-list market-trades">
           {trades.slice(0, 20).map((trade, index) => (
-            <div className={`trade-row ${trade.side === "sell" ? "price-down" : "price-up"}`} key={`trade-${index}`}>
+            <div
+              className={`trade-row ${trade.side === "sell" ? "price-down" : "price-up"}`}
+              key={`trade-${trade.time}-${trade.price}-${trade.amount}-${index}`}
+            >
               <strong>${trade.price.toFixed(2)}</strong>
               <span>{trade.amount.toFixed(4)}</span>
               <span>{formatTime(trade.time)}</span>
@@ -1327,8 +1446,11 @@ try {
           <strong>My Trades</strong>
         </div>
         <div className="trade-history-list scrollable">
-          {tradeHistory.slice(0, 7).map((item) => (
-            <div key={`${item.pair}-${item.time}`} className="history-row">
+          {tradeHistory.slice(0, 7).map((item, index) => (
+            <div
+              key={`history-${item.pair}-${item.time}-${item.price}-${item.quantity}-${index}`} 
+              className="history-row"
+            >
               <div>
                 <strong>{item.pair}</strong>
                 <span>{item.type}</span>

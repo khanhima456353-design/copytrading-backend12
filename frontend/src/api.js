@@ -117,10 +117,17 @@ let socketBaseURL = null;
 export async function getSocket() {
   if (!socket) {
     socketBaseURL = await getAPI();
-    socket = io(socketBaseURL, {
+
+    const socketOptions = {
       transports: ["websocket", "polling"],
       withCredentials: true,
-    });
+    };
+
+    if (typeof window !== "undefined" && window.location.hostname.includes("app.github.dev")) {
+      socketOptions.transports = ["polling"];
+    }
+
+    socket = io(socketBaseURL, socketOptions);
 
     socket.on("connect_error", async (err) => {
       console.warn("Socket connect error:", err);
@@ -128,10 +135,7 @@ export async function getSocket() {
         console.warn("Falling back to local API socket at", LOCAL_URL);
         socket.disconnect();
         socketBaseURL = LOCAL_URL;
-        socket = io(LOCAL_URL, {
-          transports: ["websocket", "polling"],
-          withCredentials: true,
-        });
+        socket = io(LOCAL_URL, socketOptions);
       }
     });
   }
