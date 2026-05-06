@@ -9,6 +9,7 @@ type Trade = {
   price: number;
   amount: number;
   side: "buy" | "sell";
+  pair?: string;
 };
 
 type Candle = {
@@ -26,7 +27,70 @@ type Order = {
   total?: number;
 };
 
+type AssetHolding = {
+  asset: string;
+  amount: number;
+  value: number;
+};
+
+type AccountSummary = {
+  available: number;
+  locked: number;
+  holdings: AssetHolding[];
+};
+
+type UserOrder = {
+  id: string;
+  pair: string;
+  type: "market" | "limit" | "stop-loss" | "take-profit" | "oco";
+  side: "buy" | "sell";
+  price: number;
+  amount: number;
+  status: "open" | "filled" | "cancelled";
+  stopLoss?: number;
+  takeProfit?: number;
+  createdAt: number;
+};
+
+type TradeHistoryItem = {
+  time: number;
+  price: number;
+  quantity: number;
+  side: "buy" | "sell";
+  pair: string;
+  type: "market" | "limit";
+};
+
 const timeframeOptions = ["1m", "5m", "15m", "1h", "4h", "1d"];
+const formatTradingViewSymbol = (pair: string) => {
+  const [base, quote] = pair.split("/");
+  return `BINANCE:${base}${quote ?? ""}`;
+};
+
+const formatTime = (time: number) =>
+  new Date(time * 1000).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+
+const generateSyntheticPairs = (available: string[]) => {
+  if (available.length > 1) return available;
+  const bases = ["BTC", "ETH", "SOL", "LTC", "ADA", "XRP", "DOGE", "AVAX", "DOT", "LINK", "MATIC"];
+  const quotes = ["USDT", "USD", "BTC", "ETH", "EUR"];
+  const symbols = new Set<string>(available);
+
+  for (const base of bases) {
+    for (const quote of quotes) {
+      if (symbols.size >= 120) break;
+      if (base === quote) continue;
+      symbols.add(`${base}/${quote}`);
+    }
+    if (symbols.size >= 120) break;
+  }
+
+  return Array.from(symbols).sort();
+};
 
 const calculateSMA = (candles: Candle[], period: number) => {
   const sma: Array<{ time: number; value: number }> = [];
@@ -40,32 +104,105 @@ const calculateSMA = (candles: Candle[], period: number) => {
   return sma;
 };
 
-const calculateEMA = (candles: Candle[], period: number) => {
+const calculateEMA = <T extends { time: number }>(items: T[], period: number, accessor: (item: T) => number) => {
   const ema: Array<{ time: number; value: number }> = [];
   const k = 2 / (period + 1);
-  let prevEma = candles.length ? candles[0].close : 0;
+  let prevEma = items.length ? accessor(items[0]) : 0;
 
-  candles.forEach((candle, index) => {
+  items.forEach((item, index) => {
     if (index === 0) {
-      prevEma = candle.close;
-      ema.push({ time: candle.time, value: prevEma });
+      prevEma = accessor(item);
+      ema.push({ time: item.time, value: prevEma });
       return;
     }
 
-    prevEma = Number((candle.close * k + prevEma * (1 - k)).toFixed(2));
+    const value = accessor(item);
+    prevEma = Number((value * k + prevEma * (1 - k)).toFixed(2));
     if (index + 1 >= period) {
-      ema.push({ time: candle.time, value: prevEma });
+      ema.push({ time: item.time, value: prevEma });
     }
   });
 
   return ema;
 };
 
+const calculateRSI = (candles: Candle[], period: number) => {
+  const changes = candles.map((c, index) => {
+    if (index === 0) return 0;
+    return c.close - candles[index - 1].close;
+  });
+
+  let gains = 0;
+  let losses = 0;
+  const rsi: Array<{ time: number; value: number }> = [];
+
+  for (let i = 1; i < changes.length; i++) {
+    const change = changes[i];
+    gains = gains * (period - 1) / period + Math.max(change, 0) / period;
+    losses = losses * (period - 1) / period + Math.max(-change, 0) / period;
+
+    if (i >= period) {
+      const rs = losses === 0 ? 100 : gains / losses;
+      rsi.push({ time: candles[i].time, value: Number((100 - 100 / (1 + rs)).toFixed(2)) });
+    }
+  }
+
+  return rsi;
+};
+
+const calculateBollingerBands = (candles: Candle[], period: number, multiplier: number) => {
+  const upper: Array<{ time: number; value: number }> = [];
+  const middle: Array<{ time: number; value: number }> = [];
+  const lower: Array<{ time: number; value: number }> = [];
+
+  for (let i = 0; i < candles.length; i++) {
+    if (i + 1 >= period) {
+      const window = candles.slice(i + 1 - period, i + 1);
+      const mean = window.reduce((sum, candle) => sum + candle.close, 0) / period;
+      const variance = window.reduce((sum, candle) => sum + Math.pow(candle.close - mean, 2), 0) / period;
+      const stdev = Math.sqrt(variance);
+      middle.push({ time: candles[i].time, value: Number(mean.toFixed(2)) });
+      upper.push({ time: candles[i].time, value: Number((mean + multiplier * stdev).toFixed(2)) });
+      lower.push({ time: candles[i].time, value: Number((mean - multiplier * stdev).toFixed(2)) });
+    }
+  }
+
+  return { upper, middle, lower };
+};
+
+const calculateMACD = (candles: Candle[], fast = 12, slow = 26, signal = 9) => {
+  const fastEMA = calculateEMA(candles, fast, (item) => item.close);
+  const slowEMA = calculateEMA(candles, slow, (item) => item.close);
+  const macd: Array<{ time: number; value: number }> = [];
+
+  for (const fastPoint of fastEMA) {
+    const slowPoint = slowEMA.find((point) => point.time === fastPoint.time);
+    if (slowPoint) {
+      macd.push({ time: fastPoint.time, value: Number((fastPoint.value - slowPoint.value).toFixed(2)) });
+    }
+  }
+
+  const signalLine = calculateEMA(macd, signal, (item) => item.value);
+  const histogram = macd
+    .slice(signalLine.length * -1)
+    .map((point, index) => ({
+      time: point.time,
+      value: Number((point.value - (signalLine[index]?.value ?? point.value)).toFixed(2)),
+    }));
+
+  return {
+    macd,
+    signalLine,
+    histogram,
+    latest: histogram.length ? histogram[histogram.length - 1] : { time: 0, value: 0 },
+  };
+};
+
 const buildDepthData = (orderbook: { buy: Order[]; sell: Order[] }) => {
   let cumulativeBid = 0;
   const bids = orderbook.buy
     .slice()
-    .sort((a, b) => b.price - a.price)
+    .sort((a, b) => a.price - b.price)
     .map((order) => {
       cumulativeBid += order.amount;
       return { time: order.price, value: cumulativeBid };
@@ -80,7 +217,10 @@ const buildDepthData = (orderbook: { buy: Order[]; sell: Order[] }) => {
       return { time: order.price, value: cumulativeAsk };
     });
 
-  return { bids, asks };
+  return {
+    bids: bids.sort((a, b) => a.time - b.time),
+    asks: asks.sort((a, b) => a.time - b.time),
+  };
 };
 
 const createFallbackCandles = (count = 80, startPrice = 30000): Candle[] => {
@@ -96,18 +236,74 @@ const createFallbackCandles = (count = 80, startPrice = 30000): Candle[] => {
     const high = Math.max(open, close) + Math.random() * 50;
     const low = Math.min(open, close) - Math.random() * 50;
 
-    fallbackCandles.push({
-      time: now - i * 60,
-      open: Number(open.toFixed(2)),
-      high: Number(high.toFixed(2)),
-      low: Number(low.toFixed(2)),
-      close: Number(close.toFixed(2)),
-      volume: Number((Math.random() * 10 + 1).toFixed(2)),
-    });
+    const interval = 60;
+
+fallbackCandles.push({
+  time: Math.floor((now - i * interval) / interval) * interval,
+  open: Number(open.toFixed(2)),
+  high: Number(high.toFixed(2)),
+  low: Number(low.toFixed(2)),
+  close: Number(close.toFixed(2)),
+  volume: Number((Math.random() * 10 + 1).toFixed(2)),
+});
   }
 
   return fallbackCandles;
 };
+
+const createFallbackAccountSummary = (): AccountSummary => ({
+  available: 12450.25,
+  locked: 520.6,
+  holdings: [
+    { asset: "BTC", amount: 0.62, value: 23800 },
+    { asset: "ETH", amount: 4.1, value: 8800 },
+    { asset: "USDT", amount: 5200, value: 5200 },
+  ],
+});
+
+const createFallbackUserOrders = (): UserOrder[] => [
+  {
+    id: "o-1",
+    pair: "BTC/USDT",
+    type: "limit",
+    side: "buy",
+    price: 29750,
+    amount: 0.12,
+    status: "open",
+    createdAt: Math.floor(Date.now() / 1000) - 4300,
+  },
+  {
+    id: "o-2",
+    pair: "BTC/USDT",
+    type: "stop-loss",
+    side: "sell",
+    price: 31200,
+    amount: 0.05,
+    stopLoss: 30000,
+    takeProfit: 32400,
+    status: "open",
+    createdAt: Math.floor(Date.now() / 1000) - 7800,
+  },
+];
+
+const createFallbackTradeHistory = (): TradeHistoryItem[] => [
+  {
+    time: Math.floor(Date.now() / 1000) - 480,
+    price: 30080,
+    quantity: 0.09,
+    side: "buy",
+    pair: "BTC/USDT",
+    type: "market",
+  },
+  {
+    time: Math.floor(Date.now() / 1000) - 1280,
+    price: 30145,
+    quantity: 0.03,
+    side: "sell",
+    pair: "BTC/USDT",
+    type: "limit",
+  },
+];
 
 export default function Trading() {
   const [symbols, setSymbols] = useState<string[]>([]);
@@ -125,6 +321,21 @@ export default function Trading() {
   const [change24h, setChange24h] = useState<number>(0);
   const [showSMA, setShowSMA] = useState(true);
   const [showEMA, setShowEMA] = useState(true);
+  const [showRSI, setShowRSI] = useState(false);
+  const [showBollinger, setShowBollinger] = useState(false);
+  const [showMACD, setShowMACD] = useState(false);
+  const [showTradingView, setShowTradingView] = useState(false);
+  const [orderType, setOrderType] = useState<UserOrder["type"]>("market");
+  const [orderSide, setOrderSide] = useState<"buy" | "sell">("buy");
+  const [stopLoss, setStopLoss] = useState<string>("");
+  const [takeProfit, setTakeProfit] = useState<string>("");
+  const [sortBy, setSortBy] = useState<"name" | "change" | "volume">("name");
+  const [depthLimit, setDepthLimit] = useState<number>(15);
+  const [pricePrecision, setPricePrecision] = useState<number>(2);
+  const [accountSummary, setAccountSummary] = useState<AccountSummary>(createFallbackAccountSummary());
+  const [userOrders, setUserOrders] = useState<UserOrder[]>(createFallbackUserOrders());
+  const [tradeHistory, setTradeHistory] = useState<TradeHistoryItem[]>(createFallbackTradeHistory());
+  const [macdSummary, setMacdSummary] = useState({ macd: 0, signal: 0, histogram: 0 });
 
   const chartContainerRef = useRef<HTMLDivElement | null>(null);
   const depthContainerRef = useRef<HTMLDivElement | null>(null);
@@ -132,286 +343,367 @@ export default function Trading() {
   const candleSeriesRef = useRef<any>(null);
   const smaSeriesRef = useRef<any>(null);
   const emaSeriesRef = useRef<any>(null);
+  const bbUpperSeriesRef = useRef<any>(null);
+  const bbMiddleSeriesRef = useRef<any>(null);
+  const bbLowerSeriesRef = useRef<any>(null);
   const depthChartRef = useRef<any>(null);
   const bidsSeriesRef = useRef<any>(null);
   const asksSeriesRef = useRef<any>(null);
   const lastCandleRef = useRef<Candle | null>(null);
 
   const updateIndicatorLines = (data: Candle[]) => {
-    if (!smaSeriesRef.current || !emaSeriesRef.current) return;
+    if (!candleSeriesRef.current) return;
+
     const sma = calculateSMA(data, 20);
-    const ema = calculateEMA(data, 50);
-    smaSeriesRef.current.setData(showSMA ? sma : []);
-    emaSeriesRef.current.setData(showEMA ? ema : []);
+    const ema = calculateEMA(data, 50, (item) => item.close);
+    const bollinger = calculateBollingerBands(data, 20, 2);
+    const rsi = calculateRSI(data, 14);
+    const macd = calculateMACD(data, 12, 26, 9);
+
+    smaSeriesRef.current?.setData(showSMA ? sma : []);
+    emaSeriesRef.current?.setData(showEMA ? ema : []);
+
+    if (showBollinger) {
+      bbUpperSeriesRef.current?.setData(bollinger.upper);
+      bbMiddleSeriesRef.current?.setData(bollinger.middle);
+      bbLowerSeriesRef.current?.setData(bollinger.lower);
+    } else {
+      bbUpperSeriesRef.current?.setData([]);
+      bbMiddleSeriesRef.current?.setData([]);
+      bbLowerSeriesRef.current?.setData([]);
+    }
+
+    if (showMACD) {
+      setMacdSummary({
+        macd: macd.macd.length ? macd.macd[macd.macd.length - 1].value : 0,
+        signal: macd.signalLine.length ? macd.signalLine[macd.signalLine.length - 1].value : 0,
+        histogram: macd.latest.value,
+      });
+    }
   };
 
   const createChartInstances = () => {
     if (!chartContainerRef.current || chartRef.current) return;
 
-    const chart: any = createChart(chartContainerRef.current, {
-      width: chartContainerRef.current.clientWidth,
-      height: 420,
-      layout: {
-        background: { color: "#07101f" },
-        textColor: "#cbd5e1",
-      },
-      grid: {
-        vertLines: { color: "#1b2738" },
-        horzLines: { color: "#1b2738" },
-      },
-      rightPriceScale: { borderColor: "#1f2a3d" },
-      timeScale: {
-        borderColor: "#1f2a3d",
-        timeVisible: true,
-      },
-      crosshair: { mode: 1 },
-    });
+    try {
+      const containerWidth = chartContainerRef.current.clientWidth;
+      const containerHeight = chartContainerRef.current.clientHeight || 420;
 
-    candleSeriesRef.current = chart.addCandlestickSeries({
-      upColor: "#10b981",
-      downColor: "#ef4444",
-      wickVisible: true,
-      borderVisible: false,
-    });
+      const chart: any = createChart(chartContainerRef.current, {
+        width: containerWidth,
+        height: Math.max(containerHeight, 380),
+        layout: {
+          background: { color: "#07101f" },
+          textColor: "#cbd5e1",
+        },
+        grid: {
+          vertLines: { color: "#1b2738" },
+          horzLines: { color: "#1b2738" },
+        },
+        rightPriceScale: { borderColor: "#1f2a3d" },
+        timeScale: {
+          borderColor: "#1f2a3d",
+          timeVisible: true,
+        },
+        crosshair: { mode: 1 },
+      });
 
-    smaSeriesRef.current = chart.addLineSeries({
-      color: "#f8e71c",
-      lineWidth: 2,
-    });
+      candleSeriesRef.current = chart.addCandlestickSeries({
+        upColor: "#10b981",
+        downColor: "#ef4444",
+        wickVisible: true,
+        borderVisible: false,
+      });
 
-    emaSeriesRef.current = chart.addLineSeries({
-      color: "#22c55e",
-      lineWidth: 2,
-    });
+      smaSeriesRef.current = chart.addLineSeries({ color: "#f8e71c", lineWidth: 2 });
+      emaSeriesRef.current = chart.addLineSeries({ color: "#22c55e", lineWidth: 2 });
+      bbUpperSeriesRef.current = chart.addLineSeries({ color: "#60a5fa", lineWidth: 1, lineStyle: 2 });
+      bbMiddleSeriesRef.current = chart.addLineSeries({ color: "#c084fc", lineWidth: 1, lineStyle: 2 });
+      bbLowerSeriesRef.current = chart.addLineSeries({ color: "#60a5fa", lineWidth: 1, lineStyle: 2 });
 
-    chartRef.current = chart;
+      chartRef.current = chart;
+    } catch (error) {
+      console.error("Failed to create chart:", error);
+    }
   };
 
   const createDepthChart = () => {
     if (!depthContainerRef.current || depthChartRef.current) return;
 
-    const chart: any = createChart(depthContainerRef.current, {
-      width: depthContainerRef.current ? depthContainerRef.current.clientWidth || 600 : 600,
-      height: 240,
-      layout: {
-        background: { color: "#07101f" },
-        textColor: "#cbd5e1",
-      },
-      grid: {
-        vertLines: { visible: false },
-        horzLines: { visible: false },
-      },
-      rightPriceScale: { visible: false },
-      timeScale: { visible: false },
-    });
+    try {
+      const containerWidth = depthContainerRef.current.clientWidth || 300;
+      const containerHeight = depthContainerRef.current.clientHeight || 300;
 
-    bidsSeriesRef.current = chart.addAreaSeries({
-      topColor: "rgba(16,185,129,0.3)",
-      bottomColor: "rgba(16,185,129,0.05)",
-      lineColor: "#10b981",
-    });
+      const chart: any = createChart(depthContainerRef.current, {
+        width: containerWidth,
+        height: Math.max(containerHeight, 280),
+        layout: {
+          background: { color: "#07101f" },
+          textColor: "#cbd5e1",
+        },
+        grid: {
+          vertLines: { visible: false },
+          horzLines: { visible: false },
+        },
+        rightPriceScale: { visible: false },
+        timeScale: { visible: false },
+      });
 
-    asksSeriesRef.current = chart.addAreaSeries({
-      topColor: "rgba(239,68,68,0.3)",
-      bottomColor: "rgba(239,68,68,0.05)",
-      lineColor: "#ef4444",
-    });
+      bidsSeriesRef.current = chart.addAreaSeries({
+        topColor: "rgba(16,185,129,0.4)",
+        bottomColor: "rgba(16,185,129,0.08)",
+        lineColor: "#10b981",
+      });
 
-    depthChartRef.current = chart;
+      asksSeriesRef.current = chart.addAreaSeries({
+        topColor: "rgba(239,68,68,0.4)",
+        bottomColor: "rgba(239,68,68,0.08)",
+        lineColor: "#ef4444",
+      });
+
+      depthChartRef.current = chart;
+    } catch (error) {
+      console.error("Failed to create depth chart:", error);
+    }
   };
 
-  
-
   const resizeCharts = () => {
-    const chartWidth = chartContainerRef.current?.clientWidth ?? 0;
-    if (chartRef.current && chartWidth) chartRef.current.applyOptions({ width: chartWidth });
+    try {
+      const chartWidth = chartContainerRef.current?.clientWidth ?? 0;
+      const chartHeight = chartContainerRef.current?.clientHeight ?? 420;
+      if (chartRef.current && chartWidth) {
+        chartRef.current.applyOptions({ 
+          width: chartWidth,
+          height: Math.max(chartHeight, 380)
+        });
+      }
 
-    const depthWidth = depthContainerRef.current?.clientWidth ?? 0;
-    if (depthChartRef.current && depthWidth) depthChartRef.current.applyOptions({ width: depthWidth });
+      const depthWidth = depthContainerRef.current?.clientWidth ?? 0;
+      const depthHeight = depthContainerRef.current?.clientHeight ?? 300;
+      if (depthChartRef.current && depthWidth) {
+        depthChartRef.current.applyOptions({ 
+          width: depthWidth,
+          height: Math.max(depthHeight, 280)
+        });
+      }
+    } catch (error) {
+      console.error("Failed to resize charts:", error);
+    }
   };
 
   const fetchSymbols = async () => {
     try {
       const api = await getAxios();
       const res = await api.get("/api/market/symbols");
-      const available = res.data.symbols || ["BTC/USDT"];
+      const available = generateSyntheticPairs(res.data.symbols || ["BTC/USDT"]);
       setSymbols(available);
       setFilteredSymbols(available);
       setMarketMovers(
         available.map((pair: string) => ({
           pair,
-          change: Number(((Math.random() - 0.5) * 10).toFixed(2)),
-          volume: Number((Math.random() * 120 + 20).toFixed(2)),
+          change: Number(((Math.random() - 0.5) * 12).toFixed(2)),
+          volume: Number((Math.random() * 150 + 10).toFixed(2)),
         }))
       );
       setSymbol((prev) => (available.includes(prev) ? prev : available[0]));
     } catch (error) {
       console.error("Unable to load symbols:", error);
-      setSymbols(["BTC/USDT"]);
-      setFilteredSymbols(["BTC/USDT"]);
-      setMarketMovers([{ pair: "BTC/USDT", change: 0.12, volume: 76.5 }]);
+      const available = generateSyntheticPairs(["BTC/USDT"]);
+      setSymbols(available);
+      setFilteredSymbols(available);
+      setMarketMovers(
+        available.slice(0, 20).map((pair) => ({
+          pair,
+          change: Number(((Math.random() - 0.5) * 12).toFixed(2)),
+          volume: Number((Math.random() * 150 + 10).toFixed(2)),
+        }))
+      );
+    }
+  };
+
+  const fetchOrderBook = async (selectedSymbol: string) => {
+    try {
+      const api = await getAxios();
+      const bookRes = await api.get(`/api/market/orderbook/${encodeURIComponent(selectedSymbol)}`);
+      const book: { buy: Order[]; sell: Order[] } = bookRes.data;
+      let sellTotal = 0;
+      const sell = book.sell.map((o: Order) => {
+        sellTotal += o.amount;
+        return { ...o, total: sellTotal };
+      });
+      let buyTotal = 0;
+      const buy = book.buy.map((o: Order) => {
+        buyTotal += o.amount;
+        return { ...o, total: buyTotal };
+      });
+      setOrderbook({ buy, sell });
+      const { bids, asks } = buildDepthData({ buy, sell });
+      try {
+        bidsSeriesRef.current?.setData(bids);
+        asksSeriesRef.current?.setData(asks);
+        depthChartRef.current?.timeScale().fitContent();
+      } catch (err) {
+        console.error("Error updating depth chart:", err);
+      }
+    } catch (error) {
+      console.error("Order book fetch failed:", error);
+      setOrderbook({ buy: [], sell: [] });
     }
   };
 
   const fetchMarketData = async (selectedSymbol: string, selectedTimeframe: string) => {
     try {
       const api = await getAxios();
-const [bookRes, candlesRes] = await Promise.all([
-  api.get(`/api/market/orderbook/${encodeURIComponent(selectedSymbol)}`),
-  api.get(`/api/market/candles/${encodeURIComponent(selectedSymbol)}?timeframe=${selectedTimeframe}`)
-]);
+      const [candlesRes, tradesRes] = await Promise.all([
+        api.get(`/api/market/candles/${encodeURIComponent(selectedSymbol)}?timeframe=${selectedTimeframe}`),
+        api.get(`/api/market/trades/${encodeURIComponent(selectedSymbol)}`),
+      ]);
 
-       const book: { buy: Order[]; sell: Order[] } = bookRes.data;
-
-      
-  let sellTotal = 0;
-book.sell = book.sell.map((o: Order) => {
-  sellTotal += o.amount;
-  return { ...o, total: sellTotal };
-});
-
-
-let buyTotal = 0;
-book.buy = book.buy.map((o: Order) => {
-  buyTotal += o.amount;
-  return { ...o, total: buyTotal };
-});
-  
-      
       const candleData: Candle[] = candlesRes.data;
+      const liveTradeData: Trade[] = tradesRes.data || [];
 
-      if (!candleData || candleData.length === 0) {
-        const fallbackCandles = createFallbackCandles();
-        setCandles(fallbackCandles);
-        setOrderbook({ buy: [], sell: [] });
-        setTrades([]);
-        setLastPrice(fallbackCandles[fallbackCandles.length - 1]?.close || 30000);
-        setPriceInput("30000.00");
-        setChange24h(0);
-        lastCandleRef.current = fallbackCandles[fallbackCandles.length - 1];
+      const cleanCandles = candleData
+        .map((c) => ({ ...c, time: Math.floor(Number(c.time)) }))
+        .sort((a, b) => a.time - b.time);
 
-        if (!candleSeriesRef.current) return;
+      const fallbackCandles = cleanCandles.length ? cleanCandles : createFallbackCandles();
+      setCandles(fallbackCandles);
+      setTrades(liveTradeData.slice().sort((a, b) => b.time - a.time).slice(0, 40));
+      setTradeHistory(
+        liveTradeData
+          .slice()
+          .sort((a, b) => b.time - a.time)
+          .slice(0, 40)
+          .map((trade) => ({
+            time: trade.time,
+            price: trade.price,
+            quantity: trade.amount,
+            side: trade.side,
+            pair: selectedSymbol,
+            type: "market",
+          }))
+      );
 
-      const sortedFallback = fallbackCandles
-  .slice()
-  .sort((a, b) => a.time - b.time);
+      if (!candleSeriesRef.current) return;
 
-candleSeriesRef.current?.setData(
-  sortedFallback.map((candle) => ({
-    time: candle.time,
-    open: candle.open,
-    high: candle.high,
-    low: candle.low,
-    close: candle.close,
+     const cleaned = fallbackCandles
+  .map(c => ({
+    time: Math.floor(Number(c.time)), // force integer timestamps
+    open: Number(c.open),
+    high: Number(c.high),
+    low: Number(c.low),
+    close: Number(c.close),
   }))
-);
+  .filter(c => !isNaN(c.time))
+  .sort((a, b) => a.time - b.time)
+  .reduce((acc: any[], curr) => {
+    if (!acc.length) {
+      acc.push(curr);
+    } else {
+      const prev = acc[acc.length - 1];
 
-updateIndicatorLines(sortedFallback);
-chartRef.current?.timeScale().fitContent();
-depthChartRef.current?.timeScale().fitContent();
-return;
+      // skip duplicates
+      if (curr.time === prev.time) return acc;
+
+      // fix backward time (force forward)
+      if (curr.time < prev.time) {
+        curr.time = prev.time + 1;
       }
 
-      setOrderbook(book);
-setCandles(candleData);
+      acc.push(curr);
+    }
+    return acc;
+  }, [])
+  .sort((a, b) => a.time - b.time); // ensure ascending order
 
-const clean = candleData
-  .map(c => ({
-    ...c,
-    time: Math.floor(Number(c.time)),
-  }))
-  .sort((a, b) => a.time - b.time);
+try {
+  candleSeriesRef.current.setData(
+    cleaned.map((candle) => ({
+      time: candle.time,
+      open: candle.open,
+      high: candle.high,
+      low: candle.low,
+      close: candle.close,
+    }))
+  );
 
-if (!candleSeriesRef.current) return;
-
-candleSeriesRef.current.setData(
-  clean.map((c) => ({
-    time: c.time,
-    open: c.open,
-    high: c.high,
-    low: c.low,
-    close: c.close,
-  }))
-);
-
-updateIndicatorLines(clean);
-chartRef.current?.timeScale().fitContent();
-
-    const lastCandle = clean[clean.length - 1];
-if (lastCandle) {
-  setLastPrice(lastCandle.close);
-  setPriceInput(lastCandle.close.toFixed(2));
-  setChange24h(lastCandle.close - clean[0].open);
-  lastCandleRef.current = lastCandle;
+  updateIndicatorLines(cleaned);
+  chartRef.current?.timeScale().fitContent();
+} catch (err) {
+  console.error("Error setting chart data:", err);
 }
 
-const { bids, asks } = buildDepthData(book);
-bidsSeriesRef.current?.setData(bids);
-asksSeriesRef.current?.setData(asks);
+     
 
-depthChartRef.current?.timeScale().fitContent();
+      const lastCandle = fallbackCandles[fallbackCandles.length - 1];
+      if (lastCandle) {
+        setLastPrice(lastCandle.close);
+        setPriceInput(lastCandle.close.toFixed(2));
+        setChange24h(Number((lastCandle.close - fallbackCandles[0].open).toFixed(2)));
+        lastCandleRef.current = lastCandle;
+      }
     } catch (error) {
       console.error("Market data load failed:", error);
-      // Fallback data for demo
-      const fallbackCandles: Candle[] = [];
-      const now = Math.floor(Date.now() / 1000);
-      let price = 30000;
-      for (let i = 79; i >= 0; i--) {
-        const change = (Math.random() - 0.5) * 200;
-        price += change;
-        const open = price;
-        const close = price + (Math.random() - 0.5) * 100;
-        const high = Math.max(open, close) + Math.random() * 50;
-        const low = Math.min(open, close) - Math.random() * 50;
-        fallbackCandles.push({
-          time: now - i * 60,
-          open: Number(open.toFixed(2)),
-          high: Number(high.toFixed(2)),
-          low: Number(low.toFixed(2)),
-          close: Number(close.toFixed(2)),
-          volume: Number((Math.random() * 10 + 1).toFixed(2)),
-        });
-      }
+      const fallbackCandles = createFallbackCandles();
       setCandles(fallbackCandles);
-      setOrderbook({ buy: [], sell: [] });
       setTrades([]);
+      setTradeHistory(createFallbackTradeHistory());
       setLastPrice(fallbackCandles[fallbackCandles.length - 1]?.close || 30000);
       setPriceInput("30000.00");
       setChange24h(0);
+      lastCandleRef.current = fallbackCandles[fallbackCandles.length - 1];
+
       if (!candleSeriesRef.current) return;
 
-const sorted = [...fallbackCandles].sort((a, b) => a.time - b.time);
-
-candleSeriesRef.current?.setData(
-  sorted.map((candle) => ({
-    time: candle.time,
-    open: candle.open,
-    high: candle.high,
-    low: candle.low,
-    close: candle.close,
-  }))
-);
-      updateIndicatorLines(fallbackCandles);
-      chartRef.current?.timeScale().fitContent();
+      const sorted = [...fallbackCandles].sort((a, b) => a.time - b.time);
+      try {
+        candleSeriesRef.current?.setData(
+          sorted.map((candle) => ({
+            time: candle.time,
+            open: candle.open,
+            high: candle.high,
+            low: candle.low,
+            close: candle.close,
+          }))
+        );
+        updateIndicatorLines(sorted);
+        chartRef.current?.timeScale().fitContent();
+      } catch (err) {
+        console.error("Error setting fallback chart data:", err);
+      }
     }
   };
 
   useEffect(() => {
-  setTimeout(() => {
-    createChartInstances();
-    createDepthChart();
-    resizeCharts();
-  }, 100);
+    // Create charts with a slight delay to ensure DOM is ready
+    const initTimer = setTimeout(() => {
+      try {
+        createChartInstances();
+        createDepthChart();
+        resizeCharts();
+      } catch (error) {
+        console.error("Chart initialization failed:", error);
+      }
+    }, 150);
 
-  fetchSymbols();
-  window.addEventListener("resize", resizeCharts);
+    fetchSymbols();
+    
+    const resizeHandler = () => {
+      resizeCharts();
+    };
+    window.addEventListener("resize", resizeHandler);
 
-  return () => {
-    window.removeEventListener("resize", resizeCharts);
-    chartRef.current?.remove();
-    depthChartRef.current?.remove();
-  };
-}, []);
+    return () => {
+      clearTimeout(initTimer);
+      window.removeEventListener("resize", resizeHandler);
+      try {
+        chartRef.current?.remove();
+        depthChartRef.current?.remove();
+      } catch (e) {
+        console.error("Error cleaning up charts:", e);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!symbol) return;
@@ -419,216 +711,353 @@ candleSeriesRef.current?.setData(
   }, [symbol, timeframe]);
 
   useEffect(() => {
+    if (!symbol) return;
+    fetchOrderBook(symbol);
+    const interval = setInterval(() => {
+      fetchOrderBook(symbol);
+    }, 500); // poll every 500ms for millisecond-like updates
+    return () => clearInterval(interval);
+  }, [symbol]);
+
+  useEffect(() => {
     setFilteredSymbols(
-      symbols.filter((s) => s.toLowerCase().includes(searchQuery.toLowerCase()))
+      symbols
+        .filter((s) => s.toLowerCase().includes(searchQuery.toLowerCase()))
+        .sort((a, b) => {
+          if (sortBy === "change") {
+            const aMover = marketMovers.find((m) => m.pair === a)?.change || 0;
+            const bMover = marketMovers.find((m) => m.pair === b)?.change || 0;
+            return Math.abs(bMover) - Math.abs(aMover);
+          }
+          if (sortBy === "volume") {
+            const aMover = marketMovers.find((m) => m.pair === a)?.volume || 0;
+            const bMover = marketMovers.find((m) => m.pair === b)?.volume || 0;
+            return bMover - aMover;
+          }
+          return a.localeCompare(b);
+        })
     );
-  }, [searchQuery, symbols]);
+  }, [searchQuery, symbols, sortBy, marketMovers]);
 
   useEffect(() => {
     updateIndicatorLines(candles);
-  }, [showSMA, showEMA]);
+  }, [showSMA, showEMA, showBollinger, showMACD, showRSI]);
 
   useEffect(() => {
-  let socket: any;
+    let socket: any;
 
-  const initSocket = async () => {
-    socket = await getSocket();
+    const initSocket = async () => {
+      socket = await getSocket();
 
-    socket.on("trade", (trade: any) => {
-      if (trade.pair !== symbol) return;
+      socket.on("trade", (trade: any) => {
+        if (trade.pair !== symbol) return;
 
-      const tradePrice = Number(trade.price);
-
-      const tfMap: any = {
-        "1m": 60,
-        "5m": 300,
-        "15m": 900,
-        "1h": 3600,
-        "4h": 14400,
-        "1d": 86400,
-      };
-      const formatOrderbook = (data: any) => {
-  let sellTotal = 0;
-  const sell = data.sell.map((o: any) => {
-    sellTotal += o.amount;
-    return { ...o, total: sellTotal };
-  });
-
-  let buyTotal = 0;
-  const buy = data.buy.map((o: any) => {
-    buyTotal += o.amount;
-    return { ...o, total: buyTotal };
-  });
-
-  return { buy, sell };
-};
-      const interval = tfMap[timeframe] || 60;
-      const tradeTime = Math.floor(Date.now() / 1000 / interval) * interval;
-
-      const tradeVolume = Number(trade.amount);
-      const side = trade.side === "sell" ? "sell" : "buy";
-
-      setTrades((prev) => [
-        { time: tradeTime, price: tradePrice, amount: tradeVolume, side },
-        ...prev.slice(0, 29),
-      ]);
-
-      const existing = lastCandleRef.current;
-
-      if (!existing || existing.time !== tradeTime) {
-        const nextCandle = {
-          time: tradeTime,
-          open: tradePrice,
-          high: tradePrice,
-          low: tradePrice,
-          close: tradePrice,
-          volume: tradeVolume,
+        const tradePrice = Number(trade.price);
+        const tfMap: any = {
+          "1m": 60,
+          "5m": 300,
+          "15m": 900,
+          "1h": 3600,
+          "4h": 14400,
+          "1d": 86400,
         };
+        const interval = tfMap[timeframe] || 60;
+        const tradeTime = Math.floor(Date.now() / 1000 / interval) * interval;
+        const tradeVolume = Number(trade.amount);
+        const side = trade.side === "sell" ? "sell" : "buy";
 
-        lastCandleRef.current = nextCandle;
-        candleSeriesRef.current?.update(nextCandle);
-      } else {
-        existing.high = Math.max(existing.high, tradePrice);
-        existing.low = Math.min(existing.low, tradePrice);
-        existing.close = tradePrice;
-        existing.volume += tradeVolume;
-        candleSeriesRef.current?.update(existing);
-      }
+        setTrades((prev) => [
+          { time: trade.time || tradeTime, price: tradePrice, amount: tradeVolume, side },
+          ...prev.slice(0, 39),
+        ]);
 
-      setLastPrice(tradePrice);
-    });
+        setTradeHistory((prev) => [
+          {
+            time: trade.time || tradeTime,
+            price: tradePrice,
+            quantity: tradeVolume,
+            side,
+            pair: symbol,
+            type: "market",
+          },
+          ...prev.slice(0, 39),
+        ]);
 
-    socket.on("orderbook", (data: any) => {
-      if (data.pair !== symbol) return;
+        const existing = lastCandleRef.current;
+        if (!existing || existing.time !== tradeTime) {
+          const nextCandle = {
+            time: tradeTime,
+            open: tradePrice,
+            high: tradePrice,
+            low: tradePrice,
+            close: tradePrice,
+            volume: tradeVolume,
+          };
+          lastCandleRef.current = nextCandle;
+          try {
+            candleSeriesRef.current?.update(nextCandle);
+          } catch (err) {
+            console.error("Error updating candle:", err);
+          }
+        } else {
+          existing.high = Math.max(existing.high, tradePrice);
+          existing.low = Math.min(existing.low, tradePrice);
+          existing.close = tradePrice;
+          existing.volume += tradeVolume;
+          try {
+            candleSeriesRef.current?.update(existing);
+          } catch (err) {
+            console.error("Error updating existing candle:", err);
+          }
+        }
 
-      // ✅ THIS is the logic you removed → must stay here
-      let sellTotal = 0;
-      const sell = data.sell.map((o: any) => {
-        sellTotal += o.amount;
-        return { ...o, total: sellTotal };
+        setLastPrice(tradePrice);
       });
 
-      let buyTotal = 0;
-      const buy = data.buy.map((o: any) => {
-        buyTotal += o.amount;
-        return { ...o, total: buyTotal };
+      socket.on("priceUpdate", (update: any) => {
+        if (update.pair !== symbol) return;
+        const price = Number(update.price);
+        if (Number.isNaN(price)) return;
+        setLastPrice(price);
+        setChange24h(Number((price - (candles[0]?.open || price)).toFixed(2)));
       });
 
-      setOrderbook({ buy, sell });
+      socket.on("orderbook", (data: any) => {
+        if (data.pair !== symbol) return;
 
-      const { bids, asks } = buildDepthData({ buy, sell });
-      bidsSeriesRef.current?.setData(bids);
-      asksSeriesRef.current?.setData(asks);
-    });
-  };
+        let sellTotal = 0;
+        const sell = data.sell.map((o: any) => {
+          sellTotal += o.amount;
+          return { ...o, total: sellTotal };
+        });
 
-  initSocket();
+        let buyTotal = 0;
+        const buy = data.buy.map((o: any) => {
+          buyTotal += o.amount;
+          return { ...o, total: buyTotal };
+        });
 
-  return () => {
-    socket?.off("trade");
-    socket?.off("orderbook");
-    socket?.disconnect();
-  };
-}, [symbol, timeframe]);
+        setOrderbook({ buy, sell });
+        const { bids, asks } = buildDepthData({ buy, sell });
+        try {
+          bidsSeriesRef.current?.setData(bids);
+          asksSeriesRef.current?.setData(asks);
+        } catch (err) {
+          console.error("Error updating orderbook in socket:", err);
+        }
+      });
+    };
+
+    initSocket();
+
+    return () => {
+      socket?.off("trade");
+      socket?.off("orderbook");
+      socket?.off("priceUpdate");
+      socket?.disconnect();
+    };
+  }, [symbol, timeframe]);
 
   const placeOrder = async (side: "buy" | "sell") => {
+    if (!priceInput || !amountInput) return;
+    const price = Number(priceInput);
+    const amount = Number(amountInput);
+    if (Number.isNaN(price) || Number.isNaN(amount) || amount <= 0) return;
+
+    const newOrder: UserOrder = {
+      id: `u-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      pair: symbol,
+      type: orderType,
+      side,
+      price,
+      amount,
+      status: orderType === "market" ? "filled" : "open",
+      stopLoss: stopLoss ? Number(stopLoss) : undefined,
+      takeProfit: takeProfit ? Number(takeProfit) : undefined,
+      createdAt: Math.floor(Date.now() / 1000),
+    };
+
+    setUserOrders((prev) => [newOrder, ...prev.slice(0, 29)]);
+    setTradeHistory((prev) => [
+      {
+        time: Math.floor(Date.now() / 1000),
+        price,
+        quantity: amount,
+        side,
+        pair: symbol,
+        type: orderType === "market" ? "market" : "limit",
+      },
+      ...prev.slice(0, 39),
+    ]);
+
+    if (orderType === "market") {
+      setLastPrice(price);
+      setChange24h(Number((price - (candles[0]?.open || price)).toFixed(2)));
+    }
+
     try {
       const api = await getAxios();
       await api.post("/api/trade/place", {
         pair: symbol,
-        amount: Number(amountInput),
+        amount,
         side,
+        price,
+        type: orderType,
+        stopLoss: stopLoss ? Number(stopLoss) : undefined,
+        takeProfit: takeProfit ? Number(takeProfit) : undefined,
       });
-      setAmountInput("");
     } catch (error) {
       console.error("Order failed:", error);
     }
+
+    setAmountInput("");
   };
 
-  
-  
+  const cancelOrder = (orderId: string) => {
+    setUserOrders((prev) =>
+      prev.map((order) =>
+        order.id === orderId ? { ...order, status: "cancelled" } : order
+      )
+    );
+  };
+
+  const activeOrders = userOrders.filter((order) => order.status === "open");
+  const recentHistory = tradeHistory.slice(0, 8);
+  const sortedPairs = filteredSymbols.slice(0, 30);
+
+  const buyOrders = orderbook.buy
+    .slice()
+    .sort((a, b) => b.price - a.price)
+    .slice(0, depthLimit)
+    .map((order) => ({ ...order, total: Number((order.price * order.amount).toFixed(2)) }));
+
+  const sellOrders = orderbook.sell
+    .slice()
+    .sort((a, b) => a.price - b.price)
+    .slice(0, depthLimit)
+    .map((order) => ({ ...order, total: Number((order.price * order.amount).toFixed(2)) }));
+
+  let buyCumulative = 0;
+  const buyDisplay = buyOrders.map((order) => {
+    buyCumulative += order.total || 0;
+    return { ...order, cumulative: buyCumulative };
+  });
+
+  let sellCumulative = 0;
+  const sellDisplay = sellOrders.map((order) => {
+    sellCumulative += order.total || 0;
+    return { ...order, cumulative: sellCumulative };
+  });
+
+  const renderPriceBlock = () => {
+    const totalBuy = orderbook.buy.reduce((sum, item) => sum + item.amount, 0);
+    const totalSell = orderbook.sell.reduce((sum, item) => sum + item.amount, 0);
+    const pressure = totalBuy + totalSell ? ((totalBuy - totalSell) / (totalBuy + totalSell)) * 100 : 0;
+    const pressureText = pressure >= 0 ? `Buy pressure +${pressure.toFixed(1)}%` : `Sell pressure ${pressure.toFixed(1)}%`;
+
+    return (
+      <div className="liquidity-summary">
+        <span>{pressureText}</span>
+        <strong>{totalBuy.toFixed(2)} / {totalSell.toFixed(2)}</strong>
+      </div>
+    );
+  };
+
   return (
     <div className="trading-page">
-     <div className="trading-sidebar trading-panel">
-  <div className="section-title">
-    <span>Market</span>
-    <strong>Professional</strong>
-  </div>
-
-  <div className="market-select-row">
-    <label htmlFor="symbol-select">Symbol</label>
-    <select
-      id="symbol-select"
-      value={symbol}
-      onChange={(e) => setSymbol(e.target.value)}
-    >
-      {symbols.map((symbolOption) => (
-        <option key={symbolOption} value={symbolOption}>
-          {symbolOption}
-        </option>
-      ))}
-    </select>
-  </div>
-
-  <div className="orderbook-panel">
-    <div className="section-title">
-      <span>Order Book</span>
-      <strong>{symbol}</strong>
-    </div>
-
-    <div className="orderbook-table">
-      <div className="orderbook-row orderbook-header">
-        <span>Price</span>
-        <span>Amount</span>
-          <span>Total</span>
-
-      </div>
-
-      {orderbook.sell.map((order, index) => (
-  <div
-    className="orderbook-row sell"
-    key={`sell-${index}`}
-    onClick={() => setPriceInput(order.price.toFixed(2))}
-    style={{
-      background: `linear-gradient(to left, rgba(239,68,68,0.2) ${Math.min(
-        (order.total! / (orderbook.sell[orderbook.sell.length - 1]?.total || 1)) * 100,
-        100
-      )}%, transparent 0%)`
-    }}
-  >
-    <span>{order.price.toFixed(2)}</span>
-    <span>{order.amount.toFixed(3)}</span>
-    <span>{order.total?.toFixed(3)}</span>
+      <div className="trading-sidebar trading-panel">
+        <div className="section-title">
+          <span>Account</span>
+          <strong>Portfolio</strong>
         </div>
-      ))}
 
-      <div className="orderbook-middle">
-        <strong className={change24h >= 0 ? "price-up" : "price-down"}>
-          {lastPrice.toFixed(2)}
-        </strong>
-        <span>${lastPrice.toFixed(2)}</span>
-      </div>
-
-      {orderbook.buy.map((order, index) => (
-  <div
-    className="orderbook-row buy"
-    key={`buy-${index}`}
-    onClick={() => setPriceInput(order.price.toFixed(2))}
-    style={{
-      background: `linear-gradient(to right, rgba(16,185,129,0.2) ${Math.min(
-        (order.total! / (orderbook.buy[orderbook.buy.length - 1]?.total || 1)) * 100,
-        100
-      )}%, transparent 0%)`
-    }}
-  >
-    <span>{order.price.toFixed(2)}</span>
-    <span>{order.amount.toFixed(3)}</span>
-    <span>{order.total?.toFixed(3)}</span>
+        <div className="account-summary card-panel">
+          <div className="balance-row">
+            <div>
+              <span>Available</span>
+              <strong>${accountSummary.available.toLocaleString()}</strong>
+            </div>
+            <div>
+              <span>Locked</span>
+              <strong>${accountSummary.locked.toLocaleString()}</strong>
+            </div>
+          </div>
+          <div className="holdings-list">
+            {accountSummary.holdings.map((holding) => (
+              <div key={holding.asset} className="holding-row">
+                <span>{holding.asset}</span>
+                <strong>{holding.amount.toFixed(4)}</strong>
+                <span>${holding.value.toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
         </div>
-      ))}
-    </div>
-  </div>
-</div>
+
+        <div className="section-title">
+          <span>Open Orders</span>
+          <strong>Live Ticket</strong>
+        </div>
+        <div className="orders-summary card-panel">
+          {activeOrders.length ? (
+            activeOrders.map((order) => (
+              <div key={order.id} className={`order-card ${order.side}`}>
+                <div>
+                  <strong>{order.pair}</strong>
+                  <span>{order.type} • {order.side.toUpperCase()}</span>
+                </div>
+                <div>
+                  <span>{order.amount} @ {order.price.toFixed(2)}</span>
+                  <button onClick={() => cancelOrder(order.id)}>Cancel</button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="empty-state">No active orders. Place market, limit, stop, take-profit or OCO orders below.</div>
+          )}
+        </div>
+
+        <div className="section-title">
+          <span>Order Book</span>
+          <strong>Market Depth</strong>
+        </div>
+        <div className="sidebar-orderbook card-panel">
+          <div className="sidebar-orderbook-header">
+            <span>Ask / Bid</span>
+            <span>Levels 17 / 17</span>
+          </div>
+          <div className="sidebar-orderbook-list">
+            {[...Array(17).keys()].map((index) => {
+              const ask = orderbook.sell.slice().sort((a, b) => b.price - a.price)[index];
+              return (
+                <div
+                  key={`sidebar-ask-${index}`}
+                  className={`sidebar-orderbook-row sell ${ask ? "has-order" : "empty"}`}
+                  onClick={() => ask && setPriceInput(ask.price.toFixed(2))}
+                >
+                  <span>{ask ? ask.price.toFixed(2) : "-"}</span>
+                  <span>{ask ? ask.amount.toFixed(3) : "-"}</span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="sidebar-orderbook-divider" />
+          <div className="sidebar-orderbook-list">
+            {[...Array(17).keys()].map((index) => {
+              const bid = orderbook.buy.slice().sort((a, b) => b.price - a.price)[index];
+              return (
+                <div
+                  key={`sidebar-bid-${index}`}
+                  className={`sidebar-orderbook-row buy ${bid ? "has-order" : "empty"}`}
+                  onClick={() => bid && setPriceInput(bid.price.toFixed(2))}
+                >
+                  <span>{bid ? bid.price.toFixed(2) : "-"}</span>
+                  <span>{bid ? bid.amount.toFixed(3) : "-"}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
 
       <div className="chart-panel trading-panel">
         <div className="chart-toolbar">
@@ -638,6 +1067,7 @@ candleSeriesRef.current?.setData(
               ${lastPrice.toFixed(2)} • 24h {change24h >= 0 ? "+" : ""}{change24h.toFixed(2)}
             </div>
           </div>
+
           <div className="chart-actions">
             <div className="timeframe-tabs">
               {timeframeOptions.map((frame) => (
@@ -652,55 +1082,175 @@ candleSeriesRef.current?.setData(
             </div>
             <div className="indicator-controls">
               <label>
-                <input
-                  type="checkbox"
-                  checked={showSMA}
-                  onChange={() => setShowSMA((prev) => !prev)}
-                />
+                <input type="checkbox" checked={showSMA} onChange={() => setShowSMA((prev) => !prev)} />
                 SMA 20
               </label>
               <label>
-                <input
-                  type="checkbox"
-                  checked={showEMA}
-                  onChange={() => setShowEMA((prev) => !prev)}
-                />
+                <input type="checkbox" checked={showEMA} onChange={() => setShowEMA((prev) => !prev)} />
                 EMA 50
               </label>
+              <label>
+                <input type="checkbox" checked={showBollinger} onChange={() => setShowBollinger((prev) => !prev)} />
+                Bollinger
+              </label>
+            </div>
+            <div className="indicator-controls">
+              <button className={`timeframe-btn ${showTradingView ? "active" : ""}`} onClick={() => setShowTradingView((prev) => !prev)}>
+                {showTradingView ? "Chart" : "TradingView"}
+              </button>
             </div>
           </div>
         </div>
 
-        <div className="chart-wrapper" ref={chartContainerRef} />
-        <div className="depth-panel">
-          <div className="section-title">
-            <span>Depth Chart</span>
-            <strong>Bid / Ask Liquidity</strong>
+        <div className="chart-and-depth-container">
+          {showTradingView ? (
+            <div className="tradingview-wrapper">
+              <iframe
+                title="TradingView"
+                src={`https://s.tradingview.com/widgetembed/?symbol=${formatTradingViewSymbol(symbol)}&theme=dark&interval=${timeframe}&hidetoptoolbar=1&timezone=Etc/UTC`}
+                frameBorder="0"
+                className="tradingview-iframe"
+              />
+            </div>
+          ) : (
+            <div className="chart-wrapper" ref={chartContainerRef} />
+          )}
+          
+          <div className="depth-panel integrated-depth">
+            <div className="section-title compact">
+              <span>Depth</span>
+              <strong>Chart</strong>
+            </div>
+            {renderPriceBlock()}
+            <div className="depth-chart-wrapper" ref={depthContainerRef} />
           </div>
-          <div className="depth-chart-wrapper" ref={depthContainerRef} />
+        </div>
+
+        <div className="central-orderbook card-panel">
+          <div className="central-orderbook-top">
+            <div className="central-orderbook-title">
+              <span>Order Book</span>
+              <strong>{symbol}</strong>
+            </div>
+            <div className="central-orderbook-controls">
+              <label>
+                Depth
+                <select value={depthLimit} onChange={(e) => setDepthLimit(Number(e.target.value))}>
+                  {[10, 15, 20, 25].map((value) => (
+                    <option key={value} value={value}>{value}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Group
+                <select value={pricePrecision} onChange={(e) => setPricePrecision(Number(e.target.value))}>
+                  {[1, 2, 3, 4].map((value) => (
+                    <option key={value} value={value}>{value} decimals</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div className="central-orderbook-grid">
+            <div className="orderbook-side">
+              <div className="orderbook-side-header buy">
+                <span>Buy Order</span>
+              </div>
+              <div className="orderbook-column-header">
+                <span>Price (USDT)</span>
+                <span>Amount</span>
+                <span>Total</span>
+                <span>Sum</span>
+              </div>
+              {buyDisplay.map((order, index) => (
+                <div
+                  key={`buy-${index}`}
+                  className={`orderbook-table-row buy ${order ? "has-order" : "empty"}`}
+                  onClick={() => order && setPriceInput(order.price.toFixed(pricePrecision))}
+                >
+                  <span>{order ? order.price.toFixed(pricePrecision) : "-"}</span>
+                  <span>{order ? order.amount.toFixed(4) : "-"}</span>
+                  <span>{order ? order.total.toFixed(2) : "-"}</span>
+                  <span>{order ? order.cumulative.toFixed(2) : "-"}</span>
+                </div>
+              ))}
+            </div>
+            <div className="orderbook-side">
+              <div className="orderbook-side-header sell">
+                <span>Sell Order</span>
+              </div>
+              <div className="orderbook-column-header">
+                <span>Price (USDT)</span>
+                <span>Amount</span>
+                <span>Total</span>
+                <span>Sum</span>
+              </div>
+              {sellDisplay.map((order, index) => (
+                <div
+                  key={`sell-${index}`}
+                  className={`orderbook-table-row sell ${order ? "has-order" : "empty"}`}
+                  onClick={() => order && setPriceInput(order.price.toFixed(pricePrecision))}
+                >
+                  <span>{order ? order.price.toFixed(pricePrecision) : "-"}</span>
+                  <span>{order ? order.amount.toFixed(4) : "-"}</span>
+                  <span>{order ? order.total.toFixed(2) : "-"}</span>
+                  <span>{order ? order.cumulative.toFixed(2) : "-"}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className="section-title order-form-title">
-          <span>Place Order</span>
-          <strong>Quick Entry</strong>
+          <span>Order Ticket</span>
+          <strong>Market + Advanced</strong>
         </div>
         <div className="order-form">
-          <div className="input-row">
-            <label>Price</label>
-            <input
-              placeholder="Price"
-              value={priceInput}
-              onChange={(e) => setPriceInput(e.target.value)}
-            />
+          <div className="input-row split">
+            <div className="order-field">
+              <label>Side</label>
+              <select value={orderSide} onChange={(e) => setOrderSide(e.target.value as "buy" | "sell")}> 
+                <option value="buy">Buy</option>
+                <option value="sell">Sell</option>
+              </select>
+            </div>
+            <div className="order-field">
+              <label>Type</label>
+              <select value={orderType} onChange={(e) => setOrderType(e.target.value as UserOrder["type"])}>
+                <option value="market">Market</option>
+                <option value="limit">Limit</option>
+                <option value="stop-loss">Stop-Loss</option>
+                <option value="take-profit">Take-Profit</option>
+                <option value="oco">OCO</option>
+              </select>
+            </div>
           </div>
-          <div className="input-row">
-            <label>Amount</label>
-            <input
-              placeholder="Amount"
-              value={amountInput}
-              onChange={(e) => setAmountInput(e.target.value)}
-            />
+
+          <div className="input-row split">
+            <div className="order-field">
+              <label>Price</label>
+              <input placeholder="Price" value={priceInput} onChange={(e) => setPriceInput(e.target.value)} />
+            </div>
+            <div className="order-field">
+              <label>Amount</label>
+              <input placeholder="Amount" value={amountInput} onChange={(e) => setAmountInput(e.target.value)} />
+            </div>
           </div>
+
+          {(orderType === "stop-loss" || orderType === "oco") && (
+            <div className="input-row split">
+              <div className="order-field">
+                <label>Stop Loss</label>
+                <input placeholder="Stop Loss" value={stopLoss} onChange={(e) => setStopLoss(e.target.value)} />
+              </div>
+              <div className="order-field">
+                <label>Take Profit</label>
+                <input placeholder="Take Profit" value={takeProfit} onChange={(e) => setTakeProfit(e.target.value)} />
+              </div>
+            </div>
+          )}
+
           <div className="trade-actions">
             <button className="action-btn buy" onClick={() => placeOrder("buy")}>Buy</button>
             <button className="action-btn sell" onClick={() => placeOrder("sell")}>Sell</button>
@@ -708,27 +1258,45 @@ candleSeriesRef.current?.setData(
           <button className="secondary-btn" onClick={() => {
             setPriceInput("");
             setAmountInput("");
+            setStopLoss("");
+            setTakeProfit("");
           }}>
             Clear
           </button>
+        </div>
+
+        <div className="indicator-summary-grid">
+          <div className="indicator-summary-card">
+            <span>RSI 14</span>
+            <strong>{showRSI ? `${calculateRSI(candles, 14).slice(-1)[0]?.value ?? 0}` : "—"}</strong>
+          </div>
+          <div className="indicator-summary-card">
+            <span>MACD</span>
+            <strong>{showMACD ? `${macdSummary.macd.toFixed(2)} / ${macdSummary.signal.toFixed(2)}` : "—"}</strong>
+          </div>
+          <div className="indicator-summary-card">
+            <span>Bollinger Band</span>
+            <strong>{showBollinger ? `${calculateBollingerBands(candles, 20, 2).upper.slice(-1)[0]?.value ?? 0}` : "—"}</strong>
+          </div>
         </div>
       </div>
 
       <div className="market-sidebar trading-panel">
         <div className="section-title">
           <span>Market Pairs</span>
-          <strong>Spot Watchlist</strong>
+          <strong>Search & Sort</strong>
         </div>
         <div className="market-search-row">
-          <input
-            type="text"
-            placeholder="Search pair"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+          <input type="text" placeholder="Search pair" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
         </div>
+        <div className="sort-buttons">
+          <button className={sortBy === "name" ? "sort-active" : ""} onClick={() => setSortBy("name")}>Name</button>
+          <button className={sortBy === "change" ? "sort-active" : ""} onClick={() => setSortBy("change")}>Move</button>
+          <button className={sortBy === "volume" ? "sort-active" : ""} onClick={() => setSortBy("volume")}>Volume</button>
+        </div>
+
         <div className="pair-list">
-          {filteredSymbols.map((pair) => (
+          {sortedPairs.map((pair) => (
             <button
               key={pair}
               className={`pair-list-item ${pair === symbol ? "active" : ""}`}
@@ -745,26 +1313,43 @@ candleSeriesRef.current?.setData(
           <strong>Live Feed</strong>
         </div>
         <div className="trades-list market-trades">
-          {trades.map((trade, index) => (
-            <div
-              className={`trade-row ${trade.side === "sell" ? "price-down" : "price-up"}`}
-              key={`trade-${index}`}
-            >
+          {trades.slice(0, 20).map((trade, index) => (
+            <div className={`trade-row ${trade.side === "sell" ? "price-down" : "price-up"}`} key={`trade-${index}`}>
               <strong>${trade.price.toFixed(2)}</strong>
               <span>{trade.amount.toFixed(4)}</span>
+              <span>{formatTime(trade.time)}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="section-title">
+          <span>Recent History</span>
+          <strong>My Trades</strong>
+        </div>
+        <div className="trade-history-list scrollable">
+          {tradeHistory.slice(0, 7).map((item) => (
+            <div key={`${item.pair}-${item.time}`} className="history-row">
+              <div>
+                <strong>{item.pair}</strong>
+                <span>{item.type}</span>
+              </div>
+              <div>
+                <span>{item.quantity.toFixed(4)}</span>
+                <strong className={item.side === "sell" ? "price-down" : "price-up"}>${item.price.toFixed(2)}</strong>
+              </div>
             </div>
           ))}
         </div>
 
         <div className="section-title">
           <span>Top Movers</span>
-          <strong>24h Change</strong>
+          <strong>24h</strong>
         </div>
         <div className="top-movers">
           {marketMovers
             .slice()
             .sort((a, b) => Math.abs(b.change) - Math.abs(a.change))
-            .slice(0, 4)
+            .slice(0, 5)
             .map((mover) => (
               <div className="mover-row" key={mover.pair}>
                 <span>{mover.pair}</span>

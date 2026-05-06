@@ -17,9 +17,26 @@ function setSavedAPI(url) {
 
 export { setSavedAPI };
 
+export function resetAPI() {
+  localStorage.removeItem(CACHE_KEY);
+  API = LOCAL_URL;
+  socket = null;
+  socketBaseURL = null;
+  apiInstance = null;
+}
+
 /* ================= API RESOLUTION ================= */
 let API = LOCAL_URL;
 const API_PROBE_TIMEOUT = 2500;
+
+const normalizeUrl = (url) => url?.replace(/\/+$/, "");
+
+const inferBrowserUrls = () => {
+  if (typeof window === "undefined") return [];
+  const origin = normalizeUrl(window.location.origin);
+  const sameHostPort5000 = `${window.location.protocol}//${window.location.hostname}:5000`;
+  return [origin, sameHostPort5000].filter(url => !url.includes(':3000')).filter(Boolean);
+};
 
 async function fetchWithTimeout(url) {
   const controller = new AbortController();
@@ -33,20 +50,36 @@ async function fetchWithTimeout(url) {
 }
 
 export async function getAPI() {
+  const explicitAPI = process.env.REACT_APP_API_URL
+    ? normalizeUrl(process.env.REACT_APP_API_URL)
+    : null;
   const cached = getSavedAPI();
-  const urls = cached ? [cached, LOCAL_URL, CLOUD_URL] : [LOCAL_URL, CLOUD_URL];
+  const browserUrls = inferBrowserUrls();
+  const origin = browserUrls[0] || null;
+  const sameHostPort5000 = browserUrls[1] || null;
+
+  // Reset cache if it points to frontend port
+  if (cached && cached.includes(':3000')) {
+    localStorage.removeItem(CACHE_KEY);
+  }
+
+  const urls = [explicitAPI, LOCAL_URL, sameHostPort5000, origin, cached, CLOUD_URL]
+    .filter(Boolean)
+    .reduce((acc, url) => {
+      const normalized = normalizeUrl(url);
+      return acc.includes(normalized) ? acc : [...acc, normalized];
+    }, []);
 
   for (const url of urls) {
     try {
       const res = await fetchWithTimeout(`${url}/api/ping`);
-
       if (res.ok) {
         API = url;
         setSavedAPI(url);
         return url;
       }
     } catch {
-      // ignore and try next
+      // continue to next URL
     }
   }
 
@@ -79,12 +112,27 @@ export async function getAxios() {
 
 /* ================= SOCKET ================= */
 let socket = null;
+let socketBaseURL = null;
 
-export function getSocket() {
+export async function getSocket() {
   if (!socket) {
-    socket = io(API, {
+    socketBaseURL = await getAPI();
+    socket = io(socketBaseURL, {
       transports: ["websocket", "polling"],
       withCredentials: true,
+    });
+
+    socket.on("connect_error", async (err) => {
+      console.warn("Socket connect error:", err);
+      if (socketBaseURL !== LOCAL_URL) {
+        console.warn("Falling back to local API socket at", LOCAL_URL);
+        socket.disconnect();
+        socketBaseURL = LOCAL_URL;
+        socket = io(LOCAL_URL, {
+          transports: ["websocket", "polling"],
+          withCredentials: true,
+        });
+      }
     });
   }
   return socket;

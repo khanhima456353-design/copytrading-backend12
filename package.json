@@ -7,6 +7,7 @@
     "start": "node server.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.94.0",
     "apple-signin-auth": "^2.0.0",
     "axios": "^1.15.0",
     "bcrypt": "^6.0.0",
@@ -22,6 +23,7 @@
     "mongoose": "^9.4.1",
     "nodemailer": "^8.0.5",
     "open-graph-scraper": "^6.11.0",
+    "openai": "^6.36.0",
     "redis": "^5.12.1",
     "rss-parser": "^3.13.0",
     "socket.io": "^4.8.3",

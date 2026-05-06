@@ -11,20 +11,24 @@ async function comparePassword(password, hash) {
   return await bcrypt.compare(password, hash);
 }
 
+const JWT_SECRET = process.env.JWT_SECRET || "default-secret-change-this";
+
 // 🔐 Access Token (short life)
 function generateAccessToken(user) {
   return jwt.sign(
     { id: user._id, email: user.email },
-    process.env.JWT_SECRET,
+    JWT_SECRET,
     { expiresIn: "15m" }
   );
 }
+
+const REFRESH_SECRET = process.env.REFRESH_SECRET || "default-refresh-secret-change-this";
 
 // 🔄 Refresh Token (long life)
 function generateRefreshToken(user) {
   return jwt.sign(
     { id: user._id },
-    process.env.REFRESH_SECRET,
+    REFRESH_SECRET,
     { expiresIn: "7d" }
   );
 }

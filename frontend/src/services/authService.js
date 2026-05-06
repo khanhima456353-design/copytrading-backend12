@@ -1,16 +1,22 @@
 import axios from "axios";
+import { getAPI } from "../api";
 
-const baseURL = "http://localhost:5000";
+const apiClient = axios.create();
 
 export const sendOtp = async ({ email, captchaToken }) => {
-  return axios.post("http://localhost:5000/api/auth/send-otp", {
+  const baseURL = await getAPI();
+  return apiClient.post(`${baseURL}/api/auth/send-otp`, {
     email,
-    captchaToken, // MUST match backend name exactly
+    captchaToken,
   });
 };
 
-export const verifyOtp = (email, otp) =>
-  axios.post(`${baseURL}/api/auth/verify-otp`, { email, otp });
+export const verifyOtp = async (email, otp) => {
+  const baseURL = await getAPI();
+  return apiClient.post(`${baseURL}/api/auth/verify-otp`, { email, otp });
+};
 
-export const setPassword = (email, password) =>
-  axios.post(`${baseURL}/api/auth/set-password`, { email, password });
+export const setPassword = async (email, password) => {
+  const baseURL = await getAPI();
+  return apiClient.post(`${baseURL}/api/auth/set-password`, { email, password });
+};

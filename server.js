@@ -76,12 +76,109 @@ const EventEmitter = require("events");
 const emitter = new EventEmitter();
 
 const markets = {};
+const BINANCE_API_BASE = "https://api.binance.com";
+const BINANCE_QUOTE_ASSETS = ["USDT", "USD", "BTC", "ETH", "BNB"];
 
 function getMarket(pair) {
   if (!markets[pair]) {
     markets[pair] = { buy: [], sell: [], trades: [] };
   }
   return markets[pair];
+}
+
+function binanceSymbolForPair(pair) {
+  return pair.replace("/", "");
+}
+
+function pairFromBinanceSymbol(symbol) {
+  for (const quote of BINANCE_QUOTE_ASSETS) {
+    if (symbol.endsWith(quote)) {
+      return `${symbol.slice(0, -quote.length)}/${quote}`;
+    }
+  }
+  return symbol;
+}
+
+async function fetchBinanceSymbols() {
+  try {
+    const { data } = await axios.get(`${BINANCE_API_BASE}/api/v3/exchangeInfo`, {
+      timeout: 8000,
+    });
+
+    if (!data || !Array.isArray(data.symbols)) {
+      throw new Error("Invalid Binance exchangeInfo response");
+    }
+
+    const symbols = data.symbols
+      .filter((item) => item.status === "TRADING" && item.quoteAsset === "USDT")
+      .map((item) => `${item.baseAsset}/${item.quoteAsset}`)
+      .slice(0, 120);
+
+    return symbols.length ? symbols : ["BTC/USDT"];
+  } catch (err) {
+    console.error("Binance symbols fetch failed:", err.message || err);
+    return ["BTC/USDT"];
+  }
+}
+
+async function fetchBinanceOrderBook(pair) {
+  try {
+    const symbol = binanceSymbolForPair(pair);
+    const { data } = await axios.get(`${BINANCE_API_BASE}/api/v3/depth`, {
+      params: { symbol, limit: 50 },
+      timeout: 8000,
+    });
+
+    return {
+      buy: data.bids.map(([price, amount]) => ({ price: Number(price), amount: Number(amount) })),
+      sell: data.asks.map(([price, amount]) => ({ price: Number(price), amount: Number(amount) })),
+    };
+  } catch (err) {
+    console.error("Binance orderbook fetch failed for", pair, err.message || err);
+    return null;
+  }
+}
+
+async function fetchBinanceTrades(pair) {
+  try {
+    const symbol = binanceSymbolForPair(pair);
+    const { data } = await axios.get(`${BINANCE_API_BASE}/api/v3/trades`, {
+      params: { symbol, limit: 40 },
+      timeout: 8000,
+    });
+
+    return data.map((trade) => ({
+      time: Math.floor(trade.time / 1000),
+      price: Number(trade.price),
+      amount: Number(trade.qty),
+      side: trade.isBuyerMaker ? "sell" : "buy",
+    }));
+  } catch (err) {
+    console.error("Binance trades fetch failed for", pair, err.message || err);
+    return null;
+  }
+}
+
+async function fetchBinanceCandles(pair, timeframe = "1m", limit = 80) {
+  try {
+    const symbol = binanceSymbolForPair(pair);
+    const { data } = await axios.get(`${BINANCE_API_BASE}/api/v3/klines`, {
+      params: { symbol, interval: timeframe, limit },
+      timeout: 8000,
+    });
+
+    return data.map((k) => ({
+      time: Math.floor(k[0] / 1000),
+      open: Number(k[1]),
+      high: Number(k[2]),
+      low: Number(k[3]),
+      close: Number(k[4]),
+      volume: Number(k[5]),
+    }));
+  } catch (err) {
+    console.error("Binance candles fetch failed for", pair, err.message || err);
+    return null;
+  }
 }
 
 function sortBook(book) {
@@ -174,26 +271,39 @@ app.get("/api/ping", (req, res) => {
 });
 
 // symbols
-app.get("/api/market/symbols", (req, res) => {
-  res.json({ symbols: ["BTC/USDT"] });
+app.get("/api/market/symbols", async (req, res) => {
+  const symbols = await fetchBinanceSymbols();
+  res.json({ symbols });
 });
 
 // orderbook
-app.get("/api/market/orderbook/:pair", (req, res) => {
+app.get("/api/market/orderbook/:pair", async (req, res) => {
   const pair = cleanPair(req.params.pair);
+  const book = await fetchBinanceOrderBook(pair);
+  if (book) {
+    return res.json(book);
+  }
   res.json(getOrderBook(pair));
 });
 
 // trades
-app.get("/api/market/trades/:pair", (req, res) => {
+app.get("/api/market/trades/:pair", async (req, res) => {
   const pair = cleanPair(req.params.pair);
+  const trades = await fetchBinanceTrades(pair);
+  if (trades) {
+    return res.json(trades);
+  }
   res.json(getTrades(pair));
 });
 
 // candles
-app.get("/api/market/candles/:pair", (req, res) => {
+app.get("/api/market/candles/:pair", async (req, res) => {
   const pair = cleanPair(req.params.pair);
-  const timeframe = req.query.timeframe || "1m";
+  const timeframe = String(req.query.timeframe || "1m");
+  const candles = await fetchBinanceCandles(pair, timeframe, 80);
+  if (candles) {
+    return res.json(candles);
+  }
 
   const trades = getTrades(pair);
   const intervalMap = {
@@ -234,8 +344,7 @@ app.get("/api/market/candles/:pair", (req, res) => {
   const candlesMap = {};
 
   trades.forEach((trade) => {
-    const time = trade.time; // FIXED
-
+    const time = trade.time;
     const bucket = Math.floor(time / interval) * interval;
 
     if (!candlesMap[bucket]) {
@@ -282,6 +391,32 @@ emitter.on("trade", (trade) => {
 emitter.on("orderbook", (data) => {
   io.emit("orderbook", data);
 });
+
+const trackedPairs = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "LTC/USDT", "ADA/USDT"];
+
+async function emitPriceUpdates() {
+  try {
+    const symbols = trackedPairs.map(binanceSymbolForPair);
+    const { data } = await axios.get(`${BINANCE_API_BASE}/api/v3/ticker/price`, {
+      params: symbols.length === 1 ? { symbol: symbols[0] } : { symbols: JSON.stringify(symbols) },
+      timeout: 8000,
+    });
+
+    const payloads = Array.isArray(data) ? data : [data];
+    payloads.forEach((item) => {
+      const pair = pairFromBinanceSymbol(item.symbol);
+      io.emit("priceUpdate", {
+        pair,
+        price: Number(item.price),
+        time: Date.now(),
+      });
+    });
+  } catch (err) {
+    console.error("Price update poll failed:", err.message || err);
+  }
+}
+
+setInterval(emitPriceUpdates, 250);
 
 // ================= REDIS =================
 const redisClient = redis.createClient({
