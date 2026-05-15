@@ -10,6 +10,7 @@ import followRoutes from "./routes/followRoutes";
 import marketRoutes from "./routes/marketRoutes";
 import { authMiddleware } from "./middleware/authMiddleware";
 import { setCurrentPrice } from "./services/marketData";
+import User from "../models/User";
 
 const app = express();
 const server = http.createServer(app);
@@ -45,10 +46,27 @@ app.get("/", (req: any, res: any) => {
   res.send("Copy Trading Backend Running");
 });
 
-app.get("/api/profile", authMiddleware, (req: any, res: any) => {
-  res.json({
-    message: "Protected route accessed successfully"
-  });
+app.get("/api/profile", authMiddleware, async (req: any, res: any) => {
+  try {
+    const user = await User.findById(req.userId).select("name email balance kycVerified kycStatus");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.json({
+      success: true,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        balance: user.balance || 0,
+        kycVerified: user.kycVerified || false,
+        kycStatus: user.kycStatus || "pending"
+      }
+    });
+  } catch (error) {
+    console.error("Profile fetch error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 });
 
 // 🔥 Fake BTC price generator + DEBUG LOG

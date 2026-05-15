@@ -4,6 +4,7 @@ import ScrollToTop from "./ScrollToTop";
 
 // Pages
 import Login from "./pages/Login";
+import Registration from "./pages/Registration";
 import Markets from "./Markets";
 import Discover from "./Discover";
 import Privacy from "./Privacy";
@@ -17,8 +18,17 @@ import Careers from "./pages/Careers";
 import Imformation from "./Imformation";
 import BuildingTrust from "./pages/BuildingTrust";
 import Trading from './pages/Trading.tsx';
-
-
+import Verification from './pages/Verification';
+import ResponsiveHomepage from './pages/ResponsiveHomepage';
+import AdminLogin from "./pages/AdminLogin";
+import AdminDashboard from "./pages/AdminDashboard";
+import AdminUsers from "./pages/AdminUsers";
+import AdminUserDetails from "./pages/AdminUserDetails";
+import AdminDeposits from "./pages/AdminDeposits";
+import AdminWithdrawals from "./pages/AdminWithdrawals";
+import AdminBalances from "./pages/AdminBalances";
+import AuthWrapper from "./AuthWrapper";
+import ProtectedRoute from "./ProtectedRoute";
 
 export default function App() {
   return (
@@ -26,8 +36,9 @@ export default function App() {
       <ScrollToTop />
 
       <Routes>
-        <Route path="/" element={<Landing />} />
+        <Route path="/" element={<AuthWrapper />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Registration />} />
         <Route path="/markets" element={<Markets />} />
         <Route path="/discover" element={<Discover />} />
         <Route path="/news" element={<News />} />
@@ -40,7 +51,20 @@ export default function App() {
         <Route path="/imformation" element={<Imformation />} />
         <Route path="/legal/privacy" element={<Privacy />} />
         <Route path="/trade" element={<Trading />} />
+        <Route path="/verification" element={<Verification />} />
+        <Route path="/home" element={
+          <ProtectedRoute>
+            <ResponsiveHomepage />
+          </ProtectedRoute>
+        } />
         <Route path="/building-trust" element={<BuildingTrust />} />
+        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/admin/users" element={<AdminUsers />} />
+        <Route path="/admin/user/:id" element={<AdminUserDetails />} />
+        <Route path="/admin/deposits" element={<AdminDeposits />} />
+        <Route path="/admin/withdrawals" element={<AdminWithdrawals />} />
+        <Route path="/admin/balances" element={<AdminBalances />} />
       </Routes>
     </>
   );

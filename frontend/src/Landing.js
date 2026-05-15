@@ -38,6 +38,8 @@ export default function Landing() {
   const [news, setNews] = useState([]);
 
   const [users, setUsers] = useState(315735436);
+  const qrTargetUrl = process.env.REACT_APP_QR_CODE_URL || window.location.origin;
+  const qrImageSrc = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=10&data=${encodeURIComponent(qrTargetUrl)}`;
   const [displayUsers, setDisplayUsers] = useState(315735436);
 /* FAQ STATE */
   const [activeFAQ, setActiveFAQ] = useState(null);
@@ -212,48 +214,67 @@ Beyond trading, Swancore offers early participation in promising projects throug
         </div>
 
         <div className="hero-right">
-          <div className="card slide-right right-top">
-            <div className="card-header">
-              <span>Popular</span>
-              <span className="link">View More</span>
-            </div>
 
-            {coins.map((c) => (
-              <div className="coin" key={c.id}>
-                <div className="coin-name">
-                  <img src={c.image} alt="" />
-                  {c.symbol.toUpperCase()}
-                </div>
-                <div>${c.current_price}</div>
-                <div className={c.price_change_percentage_24h > 0 ? "green" : "red"}>
-                  {c.price_change_percentage_24h?.toFixed(2)}%
-                </div>
-              </div>
-            ))}
+  {/* Popular Markets */}
+  <div className="card slide-right right-top">
+    <div className="card-header">
+      <span>Popular</span>
+      <span className="link">View More</span>
+    </div>
+
+    <div className="market-list">
+      {coins.map((c) => (
+        <div className="coin" key={c.id}>
+          <div className="coin-name">
+            <img src={c.image} alt="" />
+            {c.symbol.toUpperCase()}
           </div>
 
-          <div className="card slide-right right-bottom">
-            <div className="card-header">
-              <span>News</span>
-              <span className="link" onClick={() => navigate("/news")}>
-                View All
-              </span>
-            </div>
+          <div>${c.current_price}</div>
 
-            {news.length === 0 ? (
-              <div style={{ opacity: 0.6 }}>Loading news...</div>
-            ) : (
-              news.map((n, i) => (
-                <div key={i} className="news-item">
-                  {n.title}
-                </div>
-              ))
-            )}
+          <div
+            className={
+              c.price_change_percentage_24h > 0
+                ? "green"
+                : "red"
+            }
+          >
+            {c.price_change_percentage_24h?.toFixed(2)}%
           </div>
-
         </div>
-      </div>
+      ))}
+    </div>
+  </div>
 
+  {/* News */}
+  <div className="card slide-right right-bottom">
+    <div className="card-header">
+      <span>News</span>
+
+      <span
+        className="link"
+        onClick={() => navigate("/news")}
+      >
+        View All
+      </span>
+    </div>
+
+    <div className="news-list">
+      {news.length === 0 ? (
+        <div style={{ opacity: 0.6 }}>
+          Loading news...
+        </div>
+      ) : (
+        news.map((n, i) => (
+          <div key={i} className="news-item">
+            {n.title}
+          </div>
+        ))
+      )}
+    </div>
+  </div>
+</div>
+</div>
       {/* TICKER */}
       <div className="ticker">
         <div className="ticker-track">
@@ -316,8 +337,8 @@ Beyond trading, Swancore offers early participation in promising projects throug
             <div className="qr-row">
               <div className="qr-box">
                 <img
-                  src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https://yourapp.com"
-                  alt="qr"
+                  src={qrImageSrc}
+                  alt="Download app QR code"
                 />
               </div>
 
@@ -402,26 +423,35 @@ Beyond trading, Swancore offers early participation in promising projects throug
 }}>
   About
 </span>
-      <Link to="/careers" className="footer-link">
+<span
+  className="footer-link"
+  onClick={() => navigate("/careers")}
+>
   Careers
-</Link>
-      <span>News</span>
-      <Link to="/imformation" className="imformation-link">
+</span>
+<span
+  className="footer-link"
+  onClick={() => navigate("/imformation")}
+>
   Imformation
-</Link>
-      <Link to="/building-trust" className="footer-link">
+</span>
+      <span
+  className="footer-link"
+  onClick={() => navigate("/building-trust")}
+>
   Building Trust
-</Link>
-<Link to="/legal/privacy">Privacy Notice</Link>
+</span>
 
-      <span>Privacy</span>
-      <span>Building Trust</span>
-      <span>Blog</span>
+<span
+  className="footer-link"
+  onClick={() => navigate("/legal/privacy")}
+>
+  Privacy Notice
+</span>
+      
       <span>Community</span>
       <span>Risk Warning</span>
       <span>Notices</span>
-      <span>Downloads</span>
-      <span>Desktop Application</span>
       <span>Secure Internal Communication Channel</span>
     </div>
 
@@ -432,52 +462,30 @@ Beyond trading, Swancore offers early participation in promising projects throug
       <span>Buy Crypto</span>
       <span>Pay</span>
       <span>Crypto Payments</span>
-      <span>Binance Junior</span>
-      <span>Academy</span>
       <span>Gift Card</span>
-      <span>Launchpool</span>
       <span>Auto-Invest</span>
       <span>ETH Staking</span>
-      <span>NFT</span>
-      <span>BABT</span>
-      <span>Research</span>
       <span>Charity</span>
     </div>
 
     {/* COLUMN 3 */}
     <div className="footer-col">
       <h4>Business</h4>
-      <span>P2P Merchant Application</span>
-      <span>P2Pro Merchant Application</span>
-      <span>Listing Application</span>
+    
       <span>Institutional & VIP Services</span>
-      <span>Labs</span>
-      <span>Binance Connect</span>
+    
 
       <h4 className="footer-sub">Learn</h4>
       <span>Learn & Earn</span>
       <span>Browse Crypto Prices</span>
       <span>Bitcoin Price</span>
       <span>Ethereum Price</span>
-      <span>Browse Crypto Price Predictions</span>
-      <span>Bitcoin Price Prediction</span>
-      <span>Ethereum Price Prediction</span>
       <span>Ethereum Upgrade (Pectra)</span>
-      <span>Buy Bitcoin</span>
-      <span>Buy BNB</span>
-      <span>Buy XRP</span>
-      <span>Buy Dogecoin</span>
-      <span>Buy Ethereum</span>
-      <span>Buy Tradable Altcoins</span>
     </div>
 
     {/* COLUMN 4 */}
     <div className="footer-col">
       <h4>Service</h4>
-      <span>Affiliate</span>
-      <span>Referral</span>
-      <span>BNB</span>
-      <span>OTC & Execution Services</span>
       <span>Historical Market Data</span>
       <span>Trading Insight</span>
       <span>Proof of Reserves</span>
@@ -485,12 +493,8 @@ Beyond trading, Swancore offers early participation in promising projects throug
       <h4 className="footer-sub">Support</h4>
       <span>24/7 Chat Support</span>
       <span>Support Center</span>
-      <span>Product Feedback & Suggestions</span>
       <span>Fees</span>
-      <span>APIs</span>
-      <span>Binance Verify</span>
       <span>Trading Parameters</span>
-      <span>Binance Airdrop Portal</span>
       <span>Law Enforcement Requests</span>
       <span>How to Raise a Complaint</span>
     </div>

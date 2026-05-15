@@ -14,9 +14,15 @@ export default function Imformation() {
       <div className="imformation-grid">
 
         <div className="imformation-item">
-          <span>Licenses, Registrations and Other Legal Matters</span>
-          <a href="/legal/licenses">Here</a>
-        </div>
+  <span>Licenses, Registrations and Other Legal Matters</span>
+
+  <button
+    className="link-btn"
+    onClick={() => setActivePdf("licenses")}
+  >
+    Here
+  </button>
+</div>
 
         <div className="imformation-item">
   <span>SwanCore Terms of Use</span>
@@ -161,6 +167,13 @@ export default function Imformation() {
     src="/prohibited_use_policy_swancore.pdf"
     className="pdf-frame"
     title="Prohibited Use Policy"
+  />
+)}
+{activePdf === "licenses" && (
+  <iframe
+    src="/licenses_registrations.pdf"
+    className="pdf-frame"
+    title="Licenses and Registrations"
   />
 )}
 

@@ -1,5 +1,11 @@
 .imformation-page {
-  background: #0b0e11;
+  background:
+    radial-gradient(circle at top, rgba(120, 200, 255, 0.25), transparent 45%),
+    radial-gradient(circle at top right, rgba(0, 180, 255, 0.18), transparent 55%),
+    radial-gradient(circle at bottom left, rgba(0, 120, 200, 0.20), transparent 60%),
+    linear-gradient(180deg, #0a1a2a 0%, #06121f 60%, #040b14 100%);
+  background-repeat: no-repeat;
+  background-size: cover;
   color: #eaecef;
   min-height: 100vh;
   padding: 40px 60px;
