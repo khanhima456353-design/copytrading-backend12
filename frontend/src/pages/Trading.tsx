@@ -1,1487 +1,2353 @@
-﻿import React, { useEffect, useRef, useState } from "react";
+﻿import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import axios from "axios";
+import logo from "../assets/logo.jpg";
+import "./Trading.css";
 // @ts-ignore
 import { getSocket, getAxios } from "../api";
-import { createChart } from "lightweight-charts";
-import "./Trading.css";
 
-type Trade = {
-  time: number;
-  price: number;
-  amount: number;
-  side: "buy" | "sell";
-  pair?: string;
-};
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-type Candle = {
-  time: number;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
-};
-
-type Order = {
-  price: number;
-  amount: number;
-  total?: number;
-};
-
-type AssetHolding = {
-  asset: string;
-  amount: number;
-  value: number;
-};
-
-type AccountSummary = {
-  available: number;
-  locked: number;
-  holdings: AssetHolding[];
-};
-
+type Trade = { time: number; price: number; amount: number; side: "buy" | "sell"; pair?: string };
+type Candle = { time: number; open: number; high: number; close: number; low: number; volume: number };
+type Order = { price: number; amount: number; total?: number };
+type AssetHolding = { asset: string; amount: number; value: number };
+type AccountSummary = { available: number; locked: number; holdings: AssetHolding[] };
 type UserOrder = {
-  id: string;
-  pair: string;
-  type: "market" | "limit" | "stop-loss" | "take-profit" | "oco";
-  side: "buy" | "sell";
-  price: number;
-  amount: number;
-  status: "open" | "filled" | "cancelled";
-  stopLoss?: number;
-  takeProfit?: number;
-  createdAt: number;
+  id: string; pair: string; type: "market" | "limit" | "stop-loss" | "take-profit" | "oco";
+  side: "buy" | "sell"; price: number; amount: number; status: "open" | "filled" | "cancelled";
+  stopLoss?: number; takeProfit?: number; createdAt: number;
+};
+type TradeHistoryItem = { time: number; price: number; quantity: number; side: "buy" | "sell"; pair: string; type: "market" | "limit" };
+type DrawingTool = "cursor" | "crosshair" | "trendline" | "hline" | "vline" | "rect" | "fib" | "text" | "brush" | "eraser" | "measure" | "pitchfork" | "magnet";
+type DrawingObject = {
+  id: string; tool: DrawingTool; points: { x: number; y: number; price?: number; time?: number }[];
+  color: string; lineWidth: number; text?: string; complete: boolean;
 };
 
-type TradeHistoryItem = {
-  time: number;
-  price: number;
-  quantity: number;
-  side: "buy" | "sell";
-  pair: string;
-  type: "market" | "limit";
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const timeframeOptions = ["1s", "1m", "5m", "15m", "1h", "4h", "1d", "1w"];
+const TF_SECONDS: Record<string, number> = { "1s": 1, "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "4h": 14400, "1d": 86400, "1w": 604800 };
+
+const COLORS = {
+  bg: "#0b0e11", bgPanel: "#161a1e", bgAlt: "#1a1e24", bgHover: "#1f2530",
+  border: "#2a2e35", borderLight: "#222730",
+  text: "#848e9c", textBright: "#eaecef", textMuted: "#474d57",
+  green: "#0ecb81", greenDim: "rgba(14,203,129,0.12)",
+  red: "#f6465d", redDim: "rgba(246,70,93,0.12)",
+  blue: "#f0b90b", blueDim: "rgba(240,185,11,0.12)",
+  amber: "#f0b90b", cyan: "#3bc8e8",
+  sma: "#f0b90b", ema: "#0ecb81",
+  bbUpper: "#3b82f6", bbMid: "#8b5cf6", bbLow: "#06b6d4",
+  vwap: "#ec4899",
+  grid: "rgba(42,46,53,0.6)", crosshair: "rgba(132,142,156,0.5)",
 };
 
-const timeframeOptions = ["1m", "5m", "15m", "1h", "4h", "1d"];
-const formatTradingViewSymbol = (pair: string) => {
-  const [base, quote] = pair.split("/");
-  return `${base}${quote ?? ""}`;
-};
+const DRAWING_TOOLS: { id: DrawingTool; icon: string; label: string; group: string }[] = [
+  { id: "cursor",    icon: "⊹",  label: "Cursor",      group: "select" },
+  { id: "crosshair", icon: "⊕",  label: "Crosshair",   group: "select" },
+  { id: "trendline", icon: "╱",  label: "Trend Line",  group: "lines" },
+  { id: "hline",     icon: "─",  label: "Horiz Line",  group: "lines" },
+  { id: "vline",     icon: "│",  label: "Vert Line",   group: "lines" },
+  { id: "rect",      icon: "▭",  label: "Rectangle",   group: "shapes" },
+  { id: "fib",       icon: "∿",  label: "Fibonacci",   group: "shapes" },
+  { id: "pitchfork", icon: "⑂",  label: "Pitchfork",   group: "shapes" },
+  { id: "text",      icon: "T",  label: "Text",        group: "annotate" },
+  { id: "brush",     icon: "✏",  label: "Brush",       group: "annotate" },
+  { id: "eraser",    icon: "⌫",  label: "Eraser",      group: "annotate" },
+  { id: "measure",   icon: "⟺",  label: "Measure",     group: "measure" },
+  { id: "magnet",    icon: "⊛",  label: "Magnet",      group: "measure" },
+];
 
-const formatTime = (time: number) =>
-  new Date(time * 1000).toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
+// ─── Utilities ────────────────────────────────────────────────────────────────
+
+const formatTime = (t: number) =>
+  new Date(t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
+function formatPrice(p: number) {
+  if (!p || isNaN(p)) return "—";
+  const a = Math.abs(p);
+  if (a >= 10000) return p.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (a >= 100) return p.toFixed(2);
+  if (a >= 1) return p.toFixed(4);
+  return p.toFixed(6);
+}
+function formatVol(v: number) {
+  if (v >= 1e9) return (v / 1e9).toFixed(2) + "B";
+  if (v >= 1e6) return (v / 1e6).toFixed(2) + "M";
+  if (v >= 1e3) return (v / 1e3).toFixed(2) + "K";
+  return v.toFixed(2);
+}
+function formatFullAmount(v: number) {
+  return v.toFixed(2);
+}
+function formatChartTime(ts: number, tf: string) {
+  const d = new Date(ts * 1000);
+  if (tf === "1d" || tf === "1w") return d.toLocaleDateString([], { month: "short", day: "numeric" });
+  if (tf === "4h" || tf === "1h") return d.toLocaleDateString([], { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatMsTime(ts: number) {
+  const d = new Date(ts);
+  const ms = d.getMilliseconds().toString().padStart(3, "0");
+  return `${d.toLocaleTimeString([], { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" })}.${ms}`;
+}
 
 const generateSyntheticPairs = (available: string[]) => {
   if (available.length > 1) return available;
-  const bases = ["BTC", "ETH", "SOL", "LTC", "ADA", "XRP", "DOGE", "AVAX", "DOT", "LINK", "MATIC"];
-  const quotes = ["USDT", "USD", "BTC", "ETH", "EUR"];
+  const bases = ["BTC", "ETH", "SOL", "LTC", "ADA", "XRP", "DOGE", "AVAX", "DOT", "LINK", "MATIC", "BNB", "NEAR", "APT", "ARB"];
+  const quotes = ["USDT", "BTC", "ETH"];
   const symbols = new Set<string>(available);
-
-  for (const base of bases) {
-    for (const quote of quotes) {
-      if (symbols.size >= 120) break;
-      if (base === quote) continue;
-      symbols.add(`${base}/${quote}`);
-    }
+  for (const base of bases) for (const quote of quotes) {
     if (symbols.size >= 120) break;
+    if (base !== quote) symbols.add(`${base}/${quote}`);
   }
-
   return Array.from(symbols).sort();
 };
 
-const calculateSMA = (candles: Candle[], period: number) => {
-  const sma: Array<{ time: number; value: number }> = [];
-  for (let i = 0; i < candles.length; i++) {
-    if (i + 1 >= period) {
-      const slice = candles.slice(i + 1 - period, i + 1);
-      const sum = slice.reduce((total, candle) => total + candle.close, 0);
-      sma.push({ time: candles[i].time, value: Number((sum / period).toFixed(2)) });
-    }
-  }
-  return sma;
-};
+// ─── Fallback Data ────────────────────────────────────────────────────────────
 
-const calculateEMA = <T extends { time: number }>(items: T[], period: number, accessor: (item: T) => number) => {
-  const ema: Array<{ time: number; value: number }> = [];
-  const k = 2 / (period + 1);
-  let prevEma = items.length ? accessor(items[0]) : 0;
-
-  items.forEach((item, index) => {
-    if (index === 0) {
-      prevEma = accessor(item);
-      ema.push({ time: item.time, value: prevEma });
-      return;
-    }
-
-    const value = accessor(item);
-    prevEma = Number((value * k + prevEma * (1 - k)).toFixed(2));
-    if (index + 1 >= period) {
-      ema.push({ time: item.time, value: prevEma });
-    }
-  });
-
-  return ema;
-};
-
-const calculateRSI = (candles: Candle[], period: number) => {
-  const changes = candles.map((c, index) => {
-    if (index === 0) return 0;
-    return c.close - candles[index - 1].close;
-  });
-
-  let gains = 0;
-  let losses = 0;
-  const rsi: Array<{ time: number; value: number }> = [];
-
-  for (let i = 1; i < changes.length; i++) {
-    const change = changes[i];
-    gains = gains * (period - 1) / period + Math.max(change, 0) / period;
-    losses = losses * (period - 1) / period + Math.max(-change, 0) / period;
-
-    if (i >= period) {
-      const rs = losses === 0 ? 100 : gains / losses;
-      rsi.push({ time: candles[i].time, value: Number((100 - 100 / (1 + rs)).toFixed(2)) });
-    }
-  }
-
-  return rsi;
-};
-
-const calculateBollingerBands = (candles: Candle[], period: number, multiplier: number) => {
-  const upper: Array<{ time: number; value: number }> = [];
-  const middle: Array<{ time: number; value: number }> = [];
-  const lower: Array<{ time: number; value: number }> = [];
-
-  for (let i = 0; i < candles.length; i++) {
-    if (i + 1 >= period) {
-      const window = candles.slice(i + 1 - period, i + 1);
-      const mean = window.reduce((sum, candle) => sum + candle.close, 0) / period;
-      const variance = window.reduce((sum, candle) => sum + Math.pow(candle.close - mean, 2), 0) / period;
-      const stdev = Math.sqrt(variance);
-      middle.push({ time: candles[i].time, value: Number(mean.toFixed(2)) });
-      upper.push({ time: candles[i].time, value: Number((mean + multiplier * stdev).toFixed(2)) });
-      lower.push({ time: candles[i].time, value: Number((mean - multiplier * stdev).toFixed(2)) });
-    }
-  }
-
-  return { upper, middle, lower };
-};
-
-const calculateMACD = (candles: Candle[], fast = 12, slow = 26, signal = 9) => {
-  const fastEMA = calculateEMA(candles, fast, (item) => item.close);
-  const slowEMA = calculateEMA(candles, slow, (item) => item.close);
-  const macd: Array<{ time: number; value: number }> = [];
-
-  for (const fastPoint of fastEMA) {
-    const slowPoint = slowEMA.find((point) => point.time === fastPoint.time);
-    if (slowPoint) {
-      macd.push({ time: fastPoint.time, value: Number((fastPoint.value - slowPoint.value).toFixed(2)) });
-    }
-  }
-
-  const signalLine = calculateEMA(macd, signal, (item) => item.value);
-  const histogram = macd
-    .slice(signalLine.length * -1)
-    .map((point, index) => ({
-      time: point.time,
-      value: Number((point.value - (signalLine[index]?.value ?? point.value)).toFixed(2)),
-    }));
-
-  return {
-    macd,
-    signalLine,
-    histogram,
-    latest: histogram.length ? histogram[histogram.length - 1] : { time: 0, value: 0 },
-  };
-};
-
-const buildDepthData = (orderbook: { buy: Order[]; sell: Order[] }) => {
-  let cumulativeBid = 0;
-  const bids = orderbook.buy
-    .slice()
-    .sort((a, b) => a.price - b.price)
-    .map((order) => {
-      cumulativeBid += order.amount;
-      return { time: order.price, value: cumulativeBid };
-    });
-
-  let cumulativeAsk = 0;
-  const asks = orderbook.sell
-    .slice()
-    .sort((a, b) => a.price - b.price)
-    .map((order) => {
-      cumulativeAsk += order.amount;
-      return { time: order.price, value: cumulativeAsk };
-    });
-
-  return {
-    bids: bids.sort((a, b) => a.time - b.time),
-    asks: asks.sort((a, b) => a.time - b.time),
-  };
-};
-
-const createFallbackCandles = (count = 80, startPrice = 30000): Candle[] => {
+const createFallbackCandles = (count = 300, startPrice = 80721): Candle[] => {
   const now = Math.floor(Date.now() / 1000);
-  const fallbackCandles: Candle[] = [];
+  const candles: Candle[] = [];
   let price = startPrice;
-
   for (let i = count - 1; i >= 0; i--) {
-    const change = (Math.random() - 0.5) * 200;
-    price += change;
+    price += (Math.random() - 0.5) * 800;
     const open = price;
-    const close = price + (Math.random() - 0.5) * 100;
-    const high = Math.max(open, close) + Math.random() * 50;
-    const low = Math.min(open, close) - Math.random() * 50;
-
-    const interval = 60;
-
-fallbackCandles.push({
-  time: Math.floor((now - i * interval) / interval) * interval,
-  open: Number(open.toFixed(2)),
-  high: Number(high.toFixed(2)),
-  low: Number(low.toFixed(2)),
-  close: Number(close.toFixed(2)),
-  volume: Number((Math.random() * 10 + 1).toFixed(2)),
-});
+    const close = price + (Math.random() - 0.5) * 400;
+    candles.push({
+      time: Math.floor((now - i * 60) / 60) * 60,
+      open: +open.toFixed(2), high: +(Math.max(open, close) + Math.random() * 200).toFixed(2),
+      low: +(Math.min(open, close) - Math.random() * 200).toFixed(2), close: +close.toFixed(2),
+      volume: +(Math.random() * 10 + 1).toFixed(2),
+    });
   }
-
-  return fallbackCandles;
+  return candles;
 };
 
 const createFallbackAccountSummary = (): AccountSummary => ({
-  available: 12450.25,
-  locked: 520.6,
-  holdings: [
-    { asset: "BTC", amount: 0.62, value: 23800 },
-    { asset: "ETH", amount: 4.1, value: 8800 },
-    { asset: "USDT", amount: 5200, value: 5200 },
-  ],
+  available: 0, locked: 0,
+  holdings: [{ asset: "BTC", amount: 0, value: 0 }, { asset: "ETH", amount: 0, value: 0 }, { asset: "USDT", amount: 0, value: 0 }],
 });
-
 const createFallbackUserOrders = (): UserOrder[] => [
-  {
-    id: "o-1",
-    pair: "BTC/USDT",
-    type: "limit",
-    side: "buy",
-    price: 29750,
-    amount: 0.12,
-    status: "open",
-    createdAt: Math.floor(Date.now() / 1000) - 4300,
-  },
-  {
-    id: "o-2",
-    pair: "BTC/USDT",
-    type: "stop-loss",
-    side: "sell",
-    price: 31200,
-    amount: 0.05,
-    stopLoss: 30000,
-    takeProfit: 32400,
-    status: "open",
-    createdAt: Math.floor(Date.now() / 1000) - 7800,
-  },
+  { id: "o-1", pair: "BTC/USDT", type: "limit", side: "buy", price: 79750, amount: 0.12, status: "open", createdAt: Math.floor(Date.now() / 1000) - 4300 },
+  { id: "o-2", pair: "BTC/USDT", type: "stop-loss", side: "sell", price: 81200, amount: 0.05, stopLoss: 80000, takeProfit: 82400, status: "open", createdAt: Math.floor(Date.now() / 1000) - 7800 },
+];
+const createFallbackTradeHistory = (): TradeHistoryItem[] => [
+  { time: Math.floor(Date.now() / 1000) - 480, price: 80080, quantity: 0.09, side: "buy", pair: "BTC/USDT", type: "market" },
+  { time: Math.floor(Date.now() / 1000) - 1280, price: 80145, quantity: 0.03, side: "sell", pair: "BTC/USDT", type: "limit" },
 ];
 
-const createFallbackTradeHistory = (): TradeHistoryItem[] => [
-  {
-    time: Math.floor(Date.now() / 1000) - 480,
-    price: 30080,
-    quantity: 0.09,
-    side: "buy",
-    pair: "BTC/USDT",
-    type: "market",
-  },
-  {
-    time: Math.floor(Date.now() / 1000) - 1280,
-    price: 30145,
-    quantity: 0.03,
-    side: "sell",
-    pair: "BTC/USDT",
-    type: "limit",
-  },
-];
+// ─── Layout Persistence ───────────────────────────────────────────────────────
+
+const LAYOUT_KEY = "trading-layout-v3";
+interface LayoutPrefs { symbol: string; timeframe: string; showSMA: boolean; showEMA: boolean; showBollinger: boolean; depthLimit: number }
+const saveLayout = (p: LayoutPrefs) => { try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(p)); } catch {} };
+const loadLayout = (): Partial<LayoutPrefs> => { try { const s = localStorage.getItem(LAYOUT_KEY); return s ? JSON.parse(s) : {}; } catch { return {}; } };
+
+// ─── Technical Indicators ─────────────────────────────────────────────────────
+
+function calcSMA(candles: Candle[], period: number) {
+  return candles.map((c, i) => {
+    if (i < period - 1) return null;
+    const sum = candles.slice(i - period + 1, i + 1).reduce((s, x) => s + x.close, 0);
+    return { time: c.time, value: +(sum / period).toFixed(6) };
+  }).filter(Boolean) as { time: number; value: number }[];
+}
+function calcEMA(candles: Candle[], period: number) {
+  const k = 2 / (period + 1); let ema = candles[0]?.close || 0;
+  return candles.map((c, i) => {
+    ema = i === 0 ? c.close : c.close * k + ema * (1 - k);
+    if (i < period - 1) return null;
+    return { time: c.time, value: +ema.toFixed(6) };
+  }).filter(Boolean) as { time: number; value: number }[];
+}
+function calcBB(candles: Candle[], period = 20, mult = 2) {
+  return candles.map((c, i) => {
+    if (i < period - 1) return null;
+    const sl = candles.slice(i - period + 1, i + 1);
+    const mean = sl.reduce((s, x) => s + x.close, 0) / period;
+    const std = Math.sqrt(sl.reduce((s, x) => s + (x.close - mean) ** 2, 0) / period);
+    return { time: c.time, upper: +(mean + mult * std).toFixed(6), middle: +mean.toFixed(6), lower: +(mean - mult * std).toFixed(6) };
+  }).filter(Boolean) as { time: number; upper: number; middle: number; lower: number }[];
+}
+function calcRSI(candles: Candle[], period = 14) {
+  let avgGain = 0, avgLoss = 0;
+  const result: { time: number; value: number }[] = [];
+  for (let i = 1; i < candles.length; i++) {
+    const delta = candles[i].close - candles[i - 1].close;
+    const gain = Math.max(delta, 0), loss = Math.max(-delta, 0);
+    if (i <= period) { avgGain += gain / period; avgLoss += loss / period; if (i === period) result.push({ time: candles[i].time, value: +(100 - 100 / (1 + avgGain / (avgLoss || 0.0001))).toFixed(2) }); }
+    else { avgGain = (avgGain * (period - 1) + gain) / period; avgLoss = (avgLoss * (period - 1) + loss) / period; result.push({ time: candles[i].time, value: +(100 - 100 / (1 + avgGain / (avgLoss || 0.0001))).toFixed(2) }); }
+  }
+  return result;
+}
+function calcMACD(candles: Candle[], fast = 12, slow = 26, signal = 9) {
+  const emaFast = calcEMA(candles, fast), emaSlow = calcEMA(candles, slow);
+  const fastMap: Record<number, number> = Object.fromEntries(emaFast.map(p => [p.time, p.value]));
+  const macdLine = emaSlow.map(p => ({ time: p.time, value: +(fastMap[p.time] - p.value).toFixed(6) })).filter(p => fastMap[p.time] !== undefined);
+  const k = 2 / (signal + 1); let sig = macdLine[0]?.value || 0;
+  const sigLine = macdLine.map((p, i) => { sig = i === 0 ? p.value : p.value * k + sig * (1 - k); return { time: p.time, value: +sig.toFixed(6) }; });
+  const histogram = macdLine.map((p, i) => ({ time: p.time, value: +(p.value - (sigLine[i]?.value || 0)).toFixed(6) }));
+  return { macdLine, sigLine, histogram };
+}
+function calcVWAP(candles: Candle[]) {
+  let cumVol = 0, cumTPV = 0;
+  return candles.map(c => { const tp = (c.high + c.low + c.close) / 3; cumVol += c.volume; cumTPV += tp * c.volume; return { time: c.time, value: cumVol > 0 ? +(cumTPV / cumVol).toFixed(6) : c.close }; });
+}
+
+// ─── Canvas Chart Engine ──────────────────────────────────────────────────────
+
+interface CandleChartProps {
+  candles: Candle[];
+  deepMarketData: { time: number; value: number }[];
+  indicators: { sma: { time: number; value: number }[]; ema: { time: number; value: number }[]; bb: { time: number; upper: number; middle: number; lower: number }[]; vwap: { time: number; value: number }[] };
+  chartType: "candlestick" | "line" | "area" | "bar";
+  tf: string; pair: string;
+  rsiData: { time: number; value: number }[];
+  macdData: { macdLine: any[]; sigLine: any[]; histogram: any[] } | null;
+  showRSI: boolean; showMACD: boolean; liveStatus: string;
+  activeTool: DrawingTool;
+  drawings: DrawingObject[];
+  onDrawingsChange: (d: DrawingObject[]) => void;
+  drawingColor: string; drawingWidth: number;
+}
+
+function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair, rsiData, macdData, showRSI, showMACD, liveStatus, activeTool, drawings, onDrawingsChange, drawingColor, drawingWidth }: CandleChartProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const overlayRef = useRef<HTMLCanvasElement>(null);
+  const stateRef = useRef({ offset: 0, zoom: 1.0, dragging: false, dragStart: 0, dragOffset: 0, mouseX: -1, mouseY: -1 });
+  const drawingRef = useRef<{ active: boolean; current: DrawingObject | null; brushPoints: { x: number; y: number }[] }>({ active: false, current: null, brushPoints: [] });
+  const rafRef = useRef<number | null>(null);
+
+  const CHART_WEIGHT = showRSI && showMACD ? 0.52 : (showRSI || showMACD) ? 0.65 : 0.76;
+  const VOL_WEIGHT = 0.10;
+  const SUB_WEIGHT = 1 - CHART_WEIGHT - VOL_WEIGHT;
+
+  const getMainPlotBounds = useCallback((height: number) => {
+    const mainH = Math.floor(height * CHART_WEIGHT);
+    const mainPlotTop = Math.min(56, Math.max(34, Math.floor(mainH * 0.22)));
+    const mainPlotH = Math.max(48, mainH - mainPlotTop - 6);
+    return {
+      mainH,
+      mainPlotTop,
+      mainPlotH,
+      mainPlotBottom: mainPlotTop + mainPlotH,
+    };
+  }, [CHART_WEIGHT]);
+
+  const getPriceRange = useCallback((visible: Candle[]) => {
+    let pMin = Infinity, pMax = -Infinity;
+    visible.forEach(c => { if (c.low < pMin) pMin = c.low; if (c.high > pMax) pMax = c.high; });
+    if (indicators.bb?.length) {
+      const vbb = indicators.bb.filter(b => b.time >= visible[0]?.time && b.time <= visible[visible.length - 1]?.time);
+      vbb.forEach(b => { if (b.upper > pMax) pMax = b.upper; if (b.lower < pMin) pMin = b.lower; });
+    }
+    const pad = (pMax - pMin) * 0.06;
+    return { pMin: pMin - pad, pMax: pMax + pad };
+  }, [indicators.bb]);
+
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !candles.length) return;
+    const ctx = canvas.getContext("2d")!;
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.width / dpr, H = canvas.height / dpr;
+
+    const { mainH, mainPlotTop, mainPlotH, mainPlotBottom } = getMainPlotBounds(H);
+    const volH  = Math.floor(H * VOL_WEIGHT);
+    const rsiH  = showRSI && !showMACD ? Math.floor(H * SUB_WEIGHT) : showRSI ? Math.floor(H * SUB_WEIGHT * 0.5) : 0;
+    const macdH = showMACD && !showRSI ? Math.floor(H * SUB_WEIGHT) : showMACD ? Math.floor(H * SUB_WEIGHT * 0.5) : 0;
+    const PRICE_AXIS_W = 88, TIME_AXIS_H = 28;
+    const plotW = W - PRICE_AXIS_W;
+
+    ctx.save(); ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = COLORS.bg; ctx.fillRect(0, 0, W, H);
+
+    const st = stateRef.current;
+    const visibleCount = Math.max(20, Math.floor(plotW / (8 * st.zoom)));
+    const totalCandles = candles.length;
+    st.offset = Math.max(0, Math.min(st.offset, Math.max(0, totalCandles - visibleCount)));
+    const startIdx = Math.max(0, totalCandles - visibleCount - st.offset);
+    const endIdx   = Math.max(0, totalCandles - st.offset);
+    const visible  = candles.slice(startIdx, endIdx);
+    if (!visible.length) { ctx.restore(); return; }
+
+    const candleW = plotW / visible.length;
+    const bodyW = Math.max(1, candleW * 0.6);
+    const { pMin, pMax } = getPriceRange(visible);
+
+    const toY = (p: number, top: number, h: number) => top + h - ((p - pMin) / (pMax - pMin || 1)) * h;
+    const toX = (i: number) => i * candleW + candleW / 2;
+
+    // Grid lines
+    const gridCount = 6;
+    ctx.strokeStyle = COLORS.grid; ctx.lineWidth = 0.5;
+    for (let g = 0; g <= gridCount; g++) { const y = mainPlotTop + Math.floor(mainPlotH * g / gridCount) + 0.5; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(plotW, y); ctx.stroke(); }
+    const timeStep = Math.max(1, Math.floor(visible.length / 8));
+    for (let g = 0; g < visible.length; g += timeStep) { const x = Math.floor(toX(g)) + 0.5; ctx.beginPath(); ctx.moveTo(x, mainPlotTop); ctx.lineTo(x, mainH + volH); ctx.stroke(); }
+
+    // Separator lines
+    ctx.strokeStyle = COLORS.border; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, mainH + volH); ctx.lineTo(W, mainH + volH); ctx.stroke();
+
+    // Price axis
+    ctx.fillStyle = COLORS.text; ctx.font = `10px 'JetBrains Mono', monospace`; ctx.textAlign = "right";
+    for (let g = 0; g <= gridCount; g++) {
+      const p = pMin + (pMax - pMin) * (1 - g / gridCount);
+      const y = mainPlotTop + Math.floor(mainPlotH * g / gridCount);
+      ctx.fillText(formatPrice(p), W - 4, y + 4);
+    }
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, mainPlotTop, plotW, mainPlotH);
+    ctx.clip();
+
+    // BB
+    if (indicators.bb?.length) {
+      const vbb = indicators.bb.filter(b => b.time >= visible[0].time && b.time <= visible[visible.length - 1].time);
+      ctx.beginPath();
+      vbb.forEach((b, i) => { const ci = visible.findIndex(c => c.time === b.time); if (ci < 0) return; i === 0 ? ctx.moveTo(toX(ci), toY(b.upper, mainPlotTop, mainPlotH)) : ctx.lineTo(toX(ci), toY(b.upper, mainPlotTop, mainPlotH)); });
+      [...vbb].reverse().forEach(b => { const ci = visible.findIndex(c => c.time === b.time); if (ci < 0) return; ctx.lineTo(toX(ci), toY(b.lower, mainPlotTop, mainPlotH)); });
+      ctx.fillStyle = "rgba(59,130,246,0.04)"; ctx.fill();
+      const drawBBLine = (key: "upper" | "middle" | "lower", color: string, dash: number[] = []) => {
+        ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 1; if (dash.length) ctx.setLineDash(dash);
+        vbb.forEach((b, i) => { const ci = visible.findIndex(c => c.time === b.time); if (ci < 0) return; const x = toX(ci), y = toY(b[key], mainPlotTop, mainPlotH); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
+        ctx.stroke(); ctx.setLineDash([]);
+      };
+      drawBBLine("upper", COLORS.bbUpper, [3, 3]); drawBBLine("middle", COLORS.bbMid); drawBBLine("lower", COLORS.bbLow, [3, 3]);
+    }
+
+    // SMA / EMA / VWAP
+    const drawLine = (data: { time: number; value: number }[], color: string, dash: number[] = [], lw = 1.5) => {
+      const vis = data.filter(p => p.time >= visible[0].time && p.time <= visible[visible.length - 1].time);
+      ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = lw; if (dash.length) ctx.setLineDash(dash);
+      vis.forEach((p, i) => { const ci = visible.findIndex(c => c.time === p.time); if (ci < 0) return; i === 0 ? ctx.moveTo(toX(ci), toY(p.value, mainPlotTop, mainPlotH)) : ctx.lineTo(toX(ci), toY(p.value, mainPlotTop, mainPlotH)); });
+      ctx.stroke(); ctx.setLineDash([]);
+    };
+    if (indicators.sma?.length) drawLine(indicators.sma, COLORS.sma);
+    if (indicators.ema?.length) drawLine(indicators.ema, COLORS.ema);
+    if (indicators.vwap?.length) drawLine(indicators.vwap, COLORS.vwap, [4, 4]);
+
+    // DeepMarket data
+    if (deepMarketData?.length) {
+      const visDeepMarket = deepMarketData.filter(p => p.time >= visible[0].time && p.time <= visible[visible.length - 1].time);
+      ctx.beginPath(); ctx.strokeStyle = COLORS.blue; ctx.lineWidth = 1.5; ctx.setLineDash([2, 2]);
+      visDeepMarket.forEach((p, i) => {
+        const ci = visible.findIndex(c => c.time === p.time);
+        if (ci < 0) return;
+        const x = toX(ci), y = toY(p.value, mainPlotTop, mainPlotH);
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      });
+      ctx.stroke(); ctx.setLineDash([]);
+    }
+
+    // Main chart series
+    if (chartType === "line" || chartType === "area") {
+      if (chartType === "area") {
+        ctx.beginPath();
+        visible.forEach((c, i) => { const x = toX(i), y = toY(c.close, mainPlotTop, mainPlotH); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
+        ctx.lineTo(toX(visible.length - 1), mainPlotBottom); ctx.lineTo(toX(0), mainPlotBottom); ctx.closePath();
+        const grad = ctx.createLinearGradient(0, mainPlotTop, 0, mainPlotBottom);
+        grad.addColorStop(0, "rgba(14,203,129,0.18)"); grad.addColorStop(1, "rgba(14,203,129,0.01)");
+        ctx.fillStyle = grad; ctx.fill();
+      }
+      ctx.beginPath(); ctx.strokeStyle = COLORS.green; ctx.lineWidth = 2;
+      visible.forEach((c, i) => { const x = toX(i), y = toY(c.close, mainPlotTop, mainPlotH); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
+      ctx.stroke();
+    } else {
+      visible.forEach((c, i) => {
+        const isGreen = c.close >= c.open;
+        const col = isGreen ? COLORS.green : COLORS.red;
+        const x = toX(i), openY = toY(c.open, mainPlotTop, mainPlotH), closeY = toY(c.close, mainPlotTop, mainPlotH);
+        const highY = toY(c.high, mainPlotTop, mainPlotH), lowY = toY(c.low, mainPlotTop, mainPlotH);
+        if (chartType === "bar") {
+          ctx.strokeStyle = col; ctx.lineWidth = Math.max(1, bodyW * 0.5);
+          ctx.beginPath(); ctx.moveTo(x, highY); ctx.lineTo(x, lowY); ctx.stroke();
+          ctx.lineWidth = Math.max(1, bodyW * 0.4);
+          ctx.beginPath(); ctx.moveTo(x - bodyW * 0.5, openY); ctx.lineTo(x, openY); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(x, closeY); ctx.lineTo(x + bodyW * 0.5, closeY); ctx.stroke();
+        } else {
+          const bTop = Math.min(openY, closeY), bH = Math.max(1, Math.abs(openY - closeY)), hw = bodyW / 2;
+          ctx.strokeStyle = col; ctx.lineWidth = Math.max(1, Math.min(1.5, candleW * 0.08));
+          ctx.beginPath(); ctx.moveTo(x, highY); ctx.lineTo(x, bTop); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(x, bTop + bH); ctx.lineTo(x, lowY); ctx.stroke();
+          ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineWidth = 1;
+          candleW > 3 ? ctx.fillRect(x - hw, bTop, bodyW, bH) : ctx.fillRect(x - 0.5, bTop, 1, bH);
+        }
+      });
+    }
+
+    ctx.restore();
+
+    // Volume
+    const volTop = mainH, volPlotH = volH - TIME_AXIS_H;
+    let vMax = Math.max(...visible.map(c => c.volume), 1);
+    visible.forEach((c, i) => {
+      const isGreen = c.close >= c.open;
+      const barH = Math.max(1, (c.volume / vMax) * volPlotH);
+      const x = toX(i), hw = Math.max(0.5, bodyW / 2);
+      ctx.fillStyle = isGreen ? "rgba(14,203,129,0.25)" : "rgba(246,70,93,0.25)";
+      ctx.fillRect(x - hw, volTop + volPlotH - barH, bodyW, barH);
+    });
+    ctx.fillStyle = COLORS.textMuted; ctx.font = "10px monospace"; ctx.textAlign = "right";
+    ctx.fillText("Vol: " + formatVol(vMax), W - 4, volTop + 12);
+
+    // Time axis
+    ctx.fillStyle = COLORS.text; ctx.font = "10px monospace"; ctx.textAlign = "center";
+    for (let i = 0; i < visible.length; i += timeStep) {
+      const x = toX(i); if (x > plotW - 20) continue;
+      ctx.fillText(formatChartTime(visible[i].time, tf), x, mainH + volH - 6);
+    }
+
+    // RSI
+    if (showRSI && rsiData?.length) {
+      const rsiTop = mainH + volH, rsiPlotH = rsiH - TIME_AXIS_H;
+      ctx.fillStyle = "rgba(22,26,30,0.7)"; ctx.fillRect(0, rsiTop, W, rsiH);
+      ctx.strokeStyle = COLORS.border; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.moveTo(0, rsiTop); ctx.lineTo(W, rsiTop); ctx.stroke();
+      ctx.fillStyle = COLORS.textMuted; ctx.font = "10px monospace"; ctx.textAlign = "left"; ctx.fillText("RSI(14)", 6, rsiTop + 14);
+      const visRSI = rsiData.filter(p => p.time >= visible[0].time && p.time <= visible[visible.length - 1].time);
+      const rsiToY = (v: number) => rsiTop + rsiPlotH - ((v - 0) / 100) * rsiPlotH;
+      [70, 50, 30].forEach(level => {
+        ctx.strokeStyle = level === 50 ? COLORS.border : (level === 70 ? "rgba(246,70,93,0.3)" : "rgba(14,203,129,0.3)");
+        ctx.lineWidth = 0.5; const y = rsiToY(level);
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(plotW, y); ctx.stroke();
+        ctx.fillStyle = COLORS.textMuted; ctx.font = "9px monospace"; ctx.textAlign = "right"; ctx.fillText(String(level), W - 4, y + 3);
+      });
+      ctx.beginPath(); ctx.strokeStyle = COLORS.amber; ctx.lineWidth = 1.5;
+      visRSI.forEach((p, i) => { const ci = visible.findIndex(c => c.time === p.time); if (ci < 0) return; const x = toX(ci), y = rsiToY(p.value); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
+      ctx.stroke();
+      if (visRSI.length) { const last = visRSI[visRSI.length - 1]; ctx.fillStyle = last.value > 70 ? COLORS.red : last.value < 30 ? COLORS.green : COLORS.amber; ctx.font = "bold 10px monospace"; ctx.textAlign = "left"; ctx.fillText(last.value.toFixed(1), 50, rsiTop + 14); }
+    }
+
+    // MACD
+    if (showMACD && macdData) {
+      const macdTop = mainH + volH + (showRSI ? rsiH : 0), macdPlotH = macdH - TIME_AXIS_H;
+      ctx.fillStyle = "rgba(22,26,30,0.7)"; ctx.fillRect(0, macdTop, W, macdH);
+      ctx.strokeStyle = COLORS.border; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.moveTo(0, macdTop); ctx.lineTo(W, macdTop); ctx.stroke();
+      ctx.fillStyle = COLORS.textMuted; ctx.font = "10px monospace"; ctx.textAlign = "left"; ctx.fillText("MACD(12,26,9)", 6, macdTop + 14);
+      const visHist = (macdData.histogram || []).filter((p: any) => p.time >= visible[0].time && p.time <= visible[visible.length - 1].time);
+      const visML = (macdData.macdLine || []).filter((p: any) => p.time >= visible[0].time && p.time <= visible[visible.length - 1].time);
+      const visSL = (macdData.sigLine || []).filter((p: any) => p.time >= visible[0].time && p.time <= visible[visible.length - 1].time);
+      let mMin = Infinity, mMax = -Infinity;
+      visHist.forEach((p: any) => { if (p.value < mMin) mMin = p.value; if (p.value > mMax) mMax = p.value; });
+      const mAbs = Math.max(Math.abs(mMin), Math.abs(mMax)) || 1;
+      const mToY = (v: number) => macdTop + macdPlotH / 2 - (v / mAbs) * (macdPlotH / 2);
+      const zeroY = macdTop + macdPlotH / 2;
+      ctx.strokeStyle = COLORS.border; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.moveTo(0, zeroY); ctx.lineTo(plotW, zeroY); ctx.stroke();
+      visHist.forEach((p: any) => { const ci = visible.findIndex(c => c.time === p.time); if (ci < 0) return; const x = toX(ci), hw = Math.max(0.5, bodyW / 2); const barTop = Math.min(mToY(p.value), zeroY), barH = Math.abs(mToY(p.value) - zeroY); ctx.fillStyle = p.value >= 0 ? "rgba(14,203,129,0.5)" : "rgba(246,70,93,0.5)"; ctx.fillRect(x - hw, barTop, bodyW, Math.max(1, barH)); });
+      const drawMLine = (data: any[], color: string) => { ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 1.5; data.forEach((p: any, i: number) => { const ci = visible.findIndex(c => c.time === p.time); if (ci < 0) return; i === 0 ? ctx.moveTo(toX(ci), mToY(p.value)) : ctx.lineTo(toX(ci), mToY(p.value)); }); ctx.stroke(); };
+      drawMLine(visML, COLORS.blue); drawMLine(visSL, COLORS.red);
+    }
+
+    // Drawings
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, mainPlotTop, plotW, mainPlotH);
+    ctx.clip();
+    drawings.forEach(d => {
+      if (!d.complete && d.points.length < 1) return;
+      ctx.strokeStyle = d.color; ctx.lineWidth = d.lineWidth; ctx.setLineDash([]);
+      if (d.tool === "trendline" && d.points.length >= 2) {
+        ctx.beginPath(); ctx.moveTo(d.points[0].x, d.points[0].y); ctx.lineTo(d.points[1].x, d.points[1].y); ctx.stroke();
+      } else if (d.tool === "hline" && d.points.length >= 1) {
+        ctx.beginPath(); ctx.moveTo(0, d.points[0].y); ctx.lineTo(plotW, d.points[0].y); ctx.stroke();
+        ctx.fillStyle = d.color; ctx.font = "10px monospace"; ctx.textAlign = "left"; ctx.fillText(formatPrice(d.points[0].price || 0), 4, d.points[0].y - 3);
+      } else if (d.tool === "vline" && d.points.length >= 1) {
+        ctx.beginPath(); ctx.moveTo(d.points[0].x, mainPlotTop); ctx.lineTo(d.points[0].x, mainPlotBottom); ctx.stroke();
+      } else if (d.tool === "rect" && d.points.length >= 2) {
+        const x1 = d.points[0].x, y1 = d.points[0].y, x2 = d.points[1].x, y2 = d.points[1].y;
+        ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+        ctx.fillStyle = d.color.replace(")", ",0.06)").replace("rgb", "rgba"); ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+      } else if (d.tool === "fib" && d.points.length >= 2) {
+        const levels = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
+        const y1 = d.points[0].y, y2 = d.points[1].y;
+        levels.forEach(l => { const y = y1 + (y2 - y1) * l; ctx.strokeStyle = d.color; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(plotW, y); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = d.color; ctx.font = "9px monospace"; ctx.textAlign = "left"; ctx.fillText(`${(l * 100).toFixed(1)}%`, 4, y - 2); });
+      } else if (d.tool === "brush" && d.points.length > 1) {
+        ctx.beginPath(); ctx.moveTo(d.points[0].x, d.points[0].y); d.points.slice(1).forEach(p => ctx.lineTo(p.x, p.y)); ctx.stroke();
+      } else if (d.tool === "text" && d.points.length >= 1 && d.text) {
+        ctx.fillStyle = d.color; ctx.font = "13px monospace"; ctx.textAlign = "left"; ctx.fillText(d.text, d.points[0].x, d.points[0].y);
+      }
+    });
+    ctx.restore();
+
+    // Crosshair
+    const mx = st.mouseX, my = st.mouseY;
+    if (mx >= 0 && mx <= plotW && my >= mainPlotTop && my <= mainPlotBottom) {
+      ctx.strokeStyle = COLORS.crosshair; ctx.lineWidth = 0.5; ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.moveTo(mx, mainPlotTop); ctx.lineTo(mx, mainPlotBottom); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, my); ctx.lineTo(plotW, my); ctx.stroke();
+      ctx.setLineDash([]);
+      const ci = Math.floor(mx / candleW);
+      if (ci >= 0 && ci < visible.length) {
+        const c = visible[ci];
+        const isGreen = c.close >= c.open;
+        const chg = ((c.close - c.open) / c.open * 100).toFixed(2);
+        // Header stats bar (like Binance)
+        ctx.fillStyle = "rgba(22,26,30,0.95)"; ctx.fillRect(0, 0, plotW, 28);
+        const stats = [`O: ${formatPrice(c.open)}`, `H: ${formatPrice(c.high)}`, `L: ${formatPrice(c.low)}`, `C: ${formatPrice(c.close)}`, `V: ${formatVol(c.volume)}`, `${Number(chg) >= 0 ? "+" : ""}${chg}%`];
+        ctx.font = "11px monospace"; ctx.textAlign = "left";
+        stats.forEach((s, i) => {
+          ctx.fillStyle = i === 5 ? (Number(chg) >= 0 ? COLORS.green : COLORS.red) : (i === 1 ? COLORS.green : i === 2 ? COLORS.red : COLORS.textBright);
+          ctx.fillText(s, 8 + i * 130, 18);
+        });
+        // Price tag on right axis
+        const priceY = Math.max(mainPlotTop + 6, Math.min(mainPlotBottom - 4, my));
+        const priceAtY = pMin + (pMax - pMin) * (1 - (priceY - mainPlotTop) / mainPlotH);
+        ctx.fillStyle = "#2a2e35"; ctx.fillRect(plotW, priceY - 9, PRICE_AXIS_W, 18);
+        ctx.strokeStyle = COLORS.text; ctx.lineWidth = 0.5; ctx.strokeRect(plotW, priceY - 9, PRICE_AXIS_W, 18);
+        ctx.fillStyle = COLORS.textBright; ctx.font = "bold 10px monospace"; ctx.textAlign = "center";
+        ctx.fillText(formatPrice(priceAtY), plotW + PRICE_AXIS_W / 2, priceY + 4);
+      }
+    }
+
+    // Last price line (Binance style)
+    const lastC = visible[visible.length - 1];
+    if (lastC) {
+      const lastY = Math.max(mainPlotTop + 2, Math.min(mainPlotBottom - 2, toY(lastC.close, mainPlotTop, mainPlotH)));
+      const isGreen = lastC.close >= lastC.open;
+      ctx.strokeStyle = isGreen ? COLORS.green : COLORS.red;
+      ctx.lineWidth = 0.75; ctx.setLineDash([3, 5]);
+      ctx.beginPath(); ctx.moveTo(0, lastY); ctx.lineTo(plotW, lastY); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = isGreen ? COLORS.green : COLORS.red;
+      ctx.fillRect(plotW, lastY - 10, PRICE_AXIS_W, 20);
+      ctx.fillStyle = "#000"; ctx.font = "bold 11px monospace"; ctx.textAlign = "center";
+      ctx.fillText(formatPrice(lastC.close), plotW + PRICE_AXIS_W / 2, lastY + 4);
+    }
+
+    // MA info overlay (top-left like Binance)
+    const maInfoY = Math.max(6, Math.min(my >= 0 && my <= 28 ? 30 : 8, mainPlotTop - 18));
+    let maX = 8;
+    const maInfo: { label: string; value: string; color: string }[] = [];
+    if (indicators.sma?.length) { const last = indicators.sma[indicators.sma.length - 1]; maInfo.push({ label: "MA(7)", value: formatPrice(last?.value || 0), color: COLORS.sma }); }
+    if (indicators.ema?.length) { const last = indicators.ema[indicators.ema.length - 1]; maInfo.push({ label: "MA(99)", value: formatPrice(last?.value || 0), color: COLORS.ema }); }
+    ctx.font = "11px monospace";
+    maInfo.forEach(m => { ctx.fillStyle = m.color; ctx.textAlign = "left"; ctx.fillText(`${m.label}: ${m.value}`, maX, maInfoY + 15); maX += ctx.measureText(`${m.label}: ${m.value}`).width + 16; });
+
+    ctx.restore();
+  }, [candles, indicators, chartType, tf, rsiData, macdData, showRSI, showMACD, liveStatus, CHART_WEIGHT, VOL_WEIGHT, SUB_WEIGHT, getMainPlotBounds, getPriceRange, drawings]);
+
+  useEffect(() => {
+    let alive = true;
+    const loop = () => { if (!alive) return; draw(); rafRef.current = requestAnimationFrame(loop); };
+    rafRef.current = requestAnimationFrame(loop);
+    return () => { alive = false; if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [draw]);
+
+  useEffect(() => {
+    const resize = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const dpr = window.devicePixelRatio || 1;
+      const w = canvas.parentElement?.clientWidth || 800, h = canvas.parentElement?.clientHeight || 500;
+      canvas.width = w * dpr; canvas.height = h * dpr;
+      canvas.style.width = w + "px"; canvas.style.height = h + "px";
+    };
+    resize();
+    const ro = new ResizeObserver(resize);
+    if (canvasRef.current?.parentElement) ro.observe(canvasRef.current.parentElement);
+    return () => ro.disconnect();
+  }, []);
+
+  // Mouse events (pan, zoom, drawing)
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const st = stateRef.current;
+    const dr = drawingRef.current;
+    const dpr = window.devicePixelRatio || 1;
+    const getPos = (e: MouseEvent) => { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+    const getTouchPos = (touch: Touch) => {
+      const r = canvas.getBoundingClientRect();
+      return { x: touch.clientX - r.left, y: touch.clientY - r.top };
+    };
+    const getTouchDistance = (touches: TouchList) => {
+      const a = getTouchPos(touches[0]);
+      const b = getTouchPos(touches[1]);
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    };
+    const getTouchMidpoint = (touches: TouchList) => {
+      const a = getTouchPos(touches[0]);
+      const b = getTouchPos(touches[1]);
+      return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    };
+    const getCanvasInfo = () => {
+      const W = canvas.width / dpr;
+      const H = canvas.height / dpr;
+      const plotW = W - 88;
+      return { plotW, ...getMainPlotBounds(H) };
+    };
+    const getVisibleCount = (zoom = st.zoom) => {
+      const { plotW } = getCanvasInfo();
+      return Math.max(20, Math.floor(Math.max(1, plotW) / (8 * zoom)));
+    };
+    const clampOffset = (offset: number, zoom = st.zoom) => {
+      const maxOffset = Math.max(0, candles.length - getVisibleCount(zoom));
+      return Math.max(0, Math.min(offset, maxOffset));
+    };
+    const getCandleWidth = (zoom = st.zoom) => {
+      const { plotW } = getCanvasInfo();
+      return Math.max(1, plotW) / getVisibleCount(zoom);
+    };
+    const getPriceAtY = (y: number) => {
+      const { mainPlotTop, mainPlotH, mainPlotBottom } = getCanvasInfo();
+      const visible = candles.slice(Math.max(0, candles.length - Math.max(20, Math.floor(getCanvasInfo().plotW / (8 * st.zoom))) - st.offset), Math.max(0, candles.length - st.offset));
+      if (!visible.length) return 0;
+      const { pMin, pMax } = getPriceRange(visible);
+      const boundedY = Math.max(mainPlotTop, Math.min(mainPlotBottom, y));
+      return pMin + (pMax - pMin) * (1 - (boundedY - mainPlotTop) / mainPlotH);
+    };
+
+    const onMove = (e: MouseEvent) => {
+      const { x, y } = getPos(e); st.mouseX = x; st.mouseY = y;
+      if (activeTool === "cursor" && st.dragging) {
+        const delta = x - st.dragStart;
+        const cw = (canvas.clientWidth - 88) / Math.max(20, Math.floor((canvas.clientWidth - 88) / (8 * st.zoom)));
+        st.offset = Math.max(0, st.dragOffset - Math.round(delta / cw));
+      } else if (activeTool === "brush" && dr.active && dr.current) {
+        dr.current.points.push({ x, y });
+      } else if (activeTool === "trendline" && dr.active && dr.current && dr.current.points.length === 1) {
+        const clone = { ...dr.current, points: [dr.current.points[0], { x, y }] };
+        dr.current = clone;
+        onDrawingsChange([...drawings.filter(d => d.id !== clone.id), clone]);
+      } else if (activeTool === "rect" && dr.active && dr.current && dr.current.points.length >= 1) {
+        const clone = { ...dr.current, points: [dr.current.points[0], { x, y }] };
+        dr.current = clone;
+        onDrawingsChange([...drawings.filter(d => d.id !== clone.id), clone]);
+      }
+    };
+    const onDown = (e: MouseEvent) => {
+      const { x, y } = getPos(e);
+      if (activeTool === "cursor") {
+        st.dragging = true; st.dragStart = x; st.dragOffset = st.offset; canvas.style.cursor = "grabbing";
+      } else if (activeTool === "hline") {
+        const price = getPriceAtY(y);
+        const nd: DrawingObject = { id: Date.now().toString(), tool: "hline", points: [{ x, y, price }], color: drawingColor, lineWidth: drawingWidth, complete: true };
+        onDrawingsChange([...drawings, nd]);
+      } else if (activeTool === "vline") {
+        const nd: DrawingObject = { id: Date.now().toString(), tool: "vline", points: [{ x, y }], color: drawingColor, lineWidth: drawingWidth, complete: true };
+        onDrawingsChange([...drawings, nd]);
+      } else if (activeTool === "trendline" || activeTool === "fib") {
+        if (!dr.active) {
+          const nd: DrawingObject = { id: Date.now().toString(), tool: activeTool, points: [{ x, y }], color: drawingColor, lineWidth: drawingWidth, complete: false };
+          dr.current = nd; dr.active = true;
+          onDrawingsChange([...drawings, nd]);
+        } else if (dr.current) {
+          const completed = { ...dr.current, points: [dr.current.points[0], { x, y }], complete: true };
+          onDrawingsChange([...drawings.filter(d => d.id !== completed.id), completed]);
+          dr.active = false; dr.current = null;
+        }
+      } else if (activeTool === "rect") {
+        if (!dr.active) {
+          const nd: DrawingObject = { id: Date.now().toString(), tool: "rect", points: [{ x, y }], color: drawingColor, lineWidth: drawingWidth, complete: false };
+          dr.current = nd; dr.active = true;
+          onDrawingsChange([...drawings, nd]);
+        }
+      } else if (activeTool === "brush") {
+        const nd: DrawingObject = { id: Date.now().toString(), tool: "brush", points: [{ x, y }], color: drawingColor, lineWidth: drawingWidth, complete: false };
+        dr.current = nd; dr.active = true;
+        onDrawingsChange([...drawings, nd]);
+      } else if (activeTool === "text") {
+        const text = window.prompt("Enter text:");
+        if (text) {
+          const nd: DrawingObject = { id: Date.now().toString(), tool: "text", points: [{ x, y }], color: drawingColor, lineWidth: drawingWidth, text, complete: true };
+          onDrawingsChange([...drawings, nd]);
+        }
+      } else if (activeTool === "eraser") {
+        const filtered = drawings.filter(d => {
+          if (d.tool === "hline" && d.points.length > 0) return Math.abs(d.points[0].y - y) > 10;
+          if (d.tool === "vline" && d.points.length > 0) return Math.abs(d.points[0].x - x) > 10;
+          return true;
+        });
+        onDrawingsChange(filtered);
+      }
+    };
+    const onUp = (e: MouseEvent) => {
+      const { x, y } = getPos(e);
+      st.dragging = false; canvas.style.cursor = activeTool === "cursor" ? "default" : "crosshair";
+      if (activeTool === "rect" && dr.active && dr.current) {
+        const completed = { ...dr.current, points: [dr.current.points[0], { x, y }], complete: true };
+        onDrawingsChange([...drawings.filter(d => d.id !== completed.id), completed]);
+        dr.active = false; dr.current = null;
+      } else if (activeTool === "brush" && dr.active && dr.current) {
+        const completed = { ...dr.current, complete: true };
+        onDrawingsChange([...drawings.filter(d => d.id !== completed.id), completed]);
+        dr.active = false; dr.current = null;
+      }
+    };
+    const onWheel = (e: WheelEvent) => {
+      if (window.innerWidth < 1024 && !e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      st.zoom = Math.max(0.3, Math.min(5, st.zoom * (e.deltaY > 0 ? 0.9 : 1.1)));
+      st.offset = clampOffset(st.offset);
+    };
+    const onLeave = () => { st.mouseX = -1; st.mouseY = -1; };
+
+    let touchMode: "none" | "pan" | "pinch" = "none";
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchStartOffset = 0;
+    let pinchStartDistance = 0;
+    let pinchStartZoom = 1;
+    let pinchStartMidX = 0;
+    let pinchAnchorIndex = 0;
+    let pinchAnchorRatio = 0.5;
+
+    const startPinch = (touches: TouchList) => {
+      touchMode = "pinch";
+      const midpoint = getTouchMidpoint(touches);
+      const { plotW } = getCanvasInfo();
+      const visibleCount = getVisibleCount(st.zoom);
+      const startIndex = Math.max(0, candles.length - visibleCount - st.offset);
+
+      pinchStartDistance = Math.max(1, getTouchDistance(touches));
+      pinchStartZoom = st.zoom;
+      pinchStartMidX = midpoint.x;
+      pinchAnchorRatio = Math.max(0, Math.min(1, midpoint.x / Math.max(1, plotW)));
+      pinchAnchorIndex = startIndex + pinchAnchorRatio * visibleCount;
+      st.dragging = false;
+      canvas.style.cursor = "grabbing";
+    };
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length >= 2) {
+        e.preventDefault();
+        startPinch(e.touches);
+        return;
+      }
+
+      if (e.touches.length === 1) {
+        const point = getTouchPos(e.touches[0]);
+        touchMode = "none";
+        touchStartX = point.x;
+        touchStartY = point.y;
+        touchStartOffset = st.offset;
+        st.mouseX = point.x;
+        st.mouseY = point.y;
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length >= 2) {
+        e.preventDefault();
+        if (touchMode !== "pinch") startPinch(e.touches);
+
+        const distance = Math.max(1, getTouchDistance(e.touches));
+        const midpoint = getTouchMidpoint(e.touches);
+        const newZoom = Math.max(0.3, Math.min(5, pinchStartZoom * (distance / pinchStartDistance)));
+        const visibleCount = getVisibleCount(newZoom);
+        const candleW = getCandleWidth(newZoom);
+        const anchoredOffset = candles.length - pinchAnchorIndex - visibleCount * (1 - pinchAnchorRatio);
+        const midpointPanOffset = (midpoint.x - pinchStartMidX) / Math.max(1, candleW);
+
+        st.zoom = newZoom;
+        st.offset = clampOffset(Math.round(anchoredOffset - midpointPanOffset), newZoom);
+        st.mouseX = midpoint.x;
+        st.mouseY = midpoint.y;
+        return;
+      }
+
+      if (e.touches.length === 1) {
+        const point = getTouchPos(e.touches[0]);
+        const dx = point.x - touchStartX;
+        const dy = point.y - touchStartY;
+        st.mouseX = point.x;
+        st.mouseY = point.y;
+
+        if (activeTool === "cursor" && touchMode !== "pan" && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy) * 1.15) {
+          touchMode = "pan";
+        }
+
+        if (touchMode === "pan") {
+          e.preventDefault();
+          st.offset = clampOffset(touchStartOffset - Math.round(dx / Math.max(1, getCandleWidth(st.zoom))));
+        }
+      }
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length >= 2) {
+        startPinch(e.touches);
+        return;
+      }
+
+      if (e.touches.length === 1) {
+        const point = getTouchPos(e.touches[0]);
+        touchMode = "none";
+        touchStartX = point.x;
+        touchStartY = point.y;
+        touchStartOffset = st.offset;
+        return;
+      }
+
+      touchMode = "none";
+      st.dragging = false;
+      canvas.style.cursor = activeTool === "cursor" ? "default" : "crosshair";
+    };
+
+    const onTouchCancel = () => {
+      touchMode = "none";
+      st.dragging = false;
+      canvas.style.cursor = activeTool === "cursor" ? "default" : "crosshair";
+    };
+
+    canvas.addEventListener("mousemove", onMove);
+    canvas.addEventListener("mousedown", onDown);
+    canvas.addEventListener("mouseup", onUp);
+    canvas.addEventListener("mouseleave", onLeave);
+    canvas.addEventListener("wheel", onWheel, { passive: false });
+    canvas.addEventListener("touchstart", onTouchStart, { passive: false });
+    canvas.addEventListener("touchmove", onTouchMove, { passive: false });
+    canvas.addEventListener("touchend", onTouchEnd, { passive: false });
+    canvas.addEventListener("touchcancel", onTouchCancel, { passive: false });
+    document.addEventListener("mouseup", onUp);
+    return () => {
+      canvas.removeEventListener("mousemove", onMove);
+      canvas.removeEventListener("mousedown", onDown);
+      canvas.removeEventListener("mouseup", onUp);
+      canvas.removeEventListener("mouseleave", onLeave);
+      canvas.removeEventListener("wheel", onWheel);
+      canvas.removeEventListener("touchstart", onTouchStart);
+      canvas.removeEventListener("touchmove", onTouchMove);
+      canvas.removeEventListener("touchend", onTouchEnd);
+      canvas.removeEventListener("touchcancel", onTouchCancel);
+      document.removeEventListener("mouseup", onUp);
+    };
+  }, [activeTool, drawings, onDrawingsChange, drawingColor, drawingWidth, candles, getPriceRange, getMainPlotBounds]);
+
+  const cursorStyle = activeTool === "cursor" ? "default" : activeTool === "eraser" ? "cell" : "crosshair";
+  return <canvas ref={canvasRef} style={{ display: "block", cursor: cursorStyle, width: "100%", height: "100%", touchAction: "pan-y" }} />;
+}
+
+type DepthOrder = Order & { cumulative?: number };
+type DepthChartProps = { buyLevels: DepthOrder[]; sellLevels: DepthOrder[]; depthLimit: number };
+
+function DepthChart({ buyLevels, sellLevels, depthLimit }: DepthChartProps) {
+  const chartInfo = useMemo(() => {
+    const buy = buyLevels.map((o) => ({ ...o } as DepthOrder)).sort((a, b) => a.price - b.price);
+    const sell = sellLevels.map((o) => ({ ...o } as DepthOrder)).sort((a, b) => a.price - b.price);
+    const bidTotal = buy[buy.length - 1]?.cumulative ?? 0;
+    const askTotal = sell[sell.length - 1]?.cumulative ?? 0;
+    const minPrice = buy[0]?.price ?? sell[0]?.price ?? 0;
+    const maxPrice = sell[sell.length - 1]?.price ?? buy[buy.length - 1]?.price ?? minPrice + 1;
+    const bestBid = buy[buy.length - 1]?.price ?? minPrice;
+    const bestAsk = sell[0]?.price ?? maxPrice;
+    return {
+      buy,
+      sell,
+      bidTotal,
+      askTotal,
+      minPrice,
+      maxPrice: Math.max(maxPrice, minPrice + 1),
+      bestBid,
+      bestAsk,
+      maxVolume: Math.max(bidTotal, askTotal, 1),
+    };
+  }, [buyLevels, sellLevels]);
+
+  const { buy, sell, bidTotal, askTotal, minPrice, maxPrice, bestBid, bestAsk, maxVolume } = chartInfo;
+  const hasData = buy.length || sell.length;
+  const width = 1000;
+  const height = 300;
+  const padding = { left: 64, right: 24, top: 34, bottom: 40 };
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+
+  const normalizeX = (price: number) => padding.left + ((price - minPrice) / Math.max(1, maxPrice - minPrice)) * chartWidth;
+  const baselineY = height - padding.bottom;
+  const normalizeY = (volume: number) => baselineY - (volume / maxVolume) * chartHeight * 0.92;
+
+  const buildAreaPath = (points: { price: number; cumulative: number }[]) => {
+    if (!points.length) return "";
+    let path = `M ${normalizeX(points[0].price)} ${baselineY} L ${normalizeX(points[0].price)} ${normalizeY(points[0].cumulative)}`;
+    for (let i = 1; i < points.length; i += 1) {
+      const curr = points[i];
+      path += ` L ${normalizeX(curr.price)} ${normalizeY(curr.cumulative)}`;
+    }
+    path += ` L ${normalizeX(points[points.length - 1].price)} ${baselineY} Z`;
+    return path;
+  };
+
+  const buildLinePath = (points: { price: number; cumulative: number }[]) => {
+    if (!points.length) return "";
+    let path = `M ${normalizeX(points[0].price)} ${normalizeY(points[0].cumulative)}`;
+    for (let i = 1; i < points.length; i += 1) {
+      const curr = points[i];
+      path += ` L ${normalizeX(curr.price)} ${normalizeY(curr.cumulative)}`;
+    }
+    return path;
+  };
+
+  const buyPath = buildAreaPath(buy.map((level) => ({ price: level.price, cumulative: level.cumulative ?? 0 })));
+  const sellPath = buildAreaPath(sell.map((level) => ({ price: level.price, cumulative: level.cumulative ?? 0 })));
+  const buyLinePath = buildLinePath(buy.map((level) => ({ price: level.price, cumulative: level.cumulative ?? 0 })));
+  const sellLinePath = buildLinePath(sell.map((level) => ({ price: level.price, cumulative: level.cumulative ?? 0 })));
+
+  const bestBidX = normalizeX(bestBid);
+  const bestAskX = normalizeX(bestAsk);
+  const tickPrices = Array.from(new Set([minPrice, bestBid, bestAsk, maxPrice])).filter((p) => p > 0);
+
+  return (
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.textBright }}>Depth Chart</div>
+          <div style={{ fontSize: 12, color: COLORS.textMuted }}>Cumulative orderbook curves for the top {depthLimit} levels</div>
+        </div>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", color: COLORS.textMuted, fontSize: 12 }}>
+          <span style={{ color: COLORS.green }}>Bids {formatVol(bidTotal)}</span>
+          <span style={{ color: COLORS.red }}>Asks {formatVol(askTotal)}</span>
+          <span>Spread {bestAsk > 0 ? formatPrice(bestAsk - bestBid) : "—"}</span>
+        </div>
+      </div>
+      <div style={{ flex: 1, minHeight: 280, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 12, display: "flex", flexDirection: "column" }}>
+        {hasData ? (
+          <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ width: "100%", height: "100%", overflow: "visible" }}>
+            <defs>
+              <linearGradient id="depthBidGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={COLORS.green} stopOpacity="0.24" />
+                <stop offset="100%" stopColor={COLORS.green} stopOpacity="0" />
+              </linearGradient>
+              <linearGradient id="depthAskGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={COLORS.red} stopOpacity="0.24" />
+                <stop offset="100%" stopColor={COLORS.red} stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <rect x="0" y="0" width={width} height={height} fill="transparent" />
+            <line x1={padding.left} y1={baselineY} x2={width - padding.right} y2={baselineY} stroke={COLORS.border} strokeWidth="1" />
+            {tickPrices.map((price) => (
+              <g key={price}>
+                <line x1={normalizeX(price)} y1={padding.top} x2={normalizeX(price)} y2={baselineY} stroke={COLORS.border} strokeWidth="0.5" />
+              </g>
+            ))}
+            <path d={buyPath} fill="url(#depthBidGrad)" />
+            <path d={sellPath} fill="url(#depthAskGrad)" />
+            <path d={buyLinePath} fill="none" stroke={COLORS.green} strokeWidth="2" strokeLinecap="round" />
+            <path d={sellLinePath} fill="none" stroke={COLORS.red} strokeWidth="2" strokeLinecap="round" />
+            {tickPrices.map((price) => (
+              <g key={`label-${price}`}>
+                <line x1={normalizeX(price)} y1={baselineY} x2={normalizeX(price)} y2={baselineY + 6} stroke={COLORS.textMuted} strokeWidth="1" />
+                <text x={normalizeX(price)} y={baselineY + 20} fill={COLORS.textMuted} fontSize="10" textAnchor="middle">{formatPrice(price)}</text>
+              </g>
+            ))}
+            <text x={padding.left} y={padding.top - 8} fill={COLORS.textMuted} fontSize="10">Depth volume</text>
+            <text x={bestBidX} y={baselineY - 12} fill={COLORS.green} fontSize="10" textAnchor="middle" fontWeight="700">Bid {formatPrice(bestBid)}</text>
+            <text x={bestAskX} y={baselineY - 12} fill={COLORS.red} fontSize="10" textAnchor="middle" fontWeight="700">Ask {formatPrice(bestAsk)}</text>
+          </svg>
+        ) : (
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.textMuted, fontSize: 13 }}>
+            No depth data available yet
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function Trading() {
+  const saved = loadLayout();
+
   const [symbols, setSymbols] = useState<string[]>([]);
-  const [symbol, setSymbol] = useState("BTC/USDT");
-  const [timeframe, setTimeframe] = useState("1m");
+  const [symbol, setSymbol] = useState(saved.symbol || "BTC/USDT");
+  const [timeframe, setTimeframe] = useState(saved.timeframe || "1d");
   const [orderbook, setOrderbook] = useState<{ buy: Order[]; sell: Order[] }>({ buy: [], sell: [] });
   const [trades, setTrades] = useState<Trade[]>([]);
   const [candles, setCandles] = useState<Candle[]>([]);
+  const [deepMarketData, setDeepMarketData] = useState<{ time: number; value: number }[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredSymbols, setFilteredSymbols] = useState<string[]>([]);
-  const [marketMovers, setMarketMovers] = useState<{ pair: string; change: number; volume: number }[]>([]);
-  const [priceInput, setPriceInput] = useState<string>("");
-  const [amountInput, setAmountInput] = useState<string>("");
-  const [lastPrice, setLastPrice] = useState<number>(0);
-  const [change24h, setChange24h] = useState<number>(0);
-  const [showSMA, setShowSMA] = useState(true);
-  const [showEMA, setShowEMA] = useState(true);
+  const [marketMovers, setMarketMovers] = useState<{ pair: string; change: number; volume: number; high: number; low: number }[]>([]);
+  const [priceInput, setPriceInput] = useState("");
+  const [amountInput, setAmountInput] = useState("");
+  const [totalInput, setTotalInput] = useState("");
+  const [lastPrice, setLastPrice] = useState(0);
+  const [displayPrice, setDisplayPrice] = useState(0);
+  const [priceUpdateDirection, setPriceUpdateDirection] = useState<"up" | "down">("up");
+  const priceMovementRef = useRef({ direction: "up" as "up" | "down", streak: 0, targetGreenCount: 2 });
+  const [change24h, setChange24h] = useState(0);
+  const [changePct, setChangePct] = useState(0);
+  const [high24h, setHigh24h] = useState(0);
+  const [low24h, setLow24h] = useState(0);
+  const [vol24h, setVol24h] = useState(0);
+  const [vol24hUSDT, setVol24hUSDT] = useState(0);
+  const [lastPriceUpdate, setLastPriceUpdate] = useState<number>(Date.now());
+  const [showSMA, setShowSMA] = useState(saved.showSMA !== undefined ? saved.showSMA : true);
+  const [showEMA, setShowEMA] = useState(saved.showEMA !== undefined ? saved.showEMA : true);
   const [showRSI, setShowRSI] = useState(false);
-  const [showBollinger, setShowBollinger] = useState(false);
+  const [showBollinger, setShowBollinger] = useState(saved.showBollinger !== undefined ? saved.showBollinger : false);
   const [showMACD, setShowMACD] = useState(false);
+  const [showVWAP, setShowVWAP] = useState(false);
+  const [chartType, setChartType] = useState<"candlestick" | "line" | "area" | "bar">("candlestick");
   const [activeChartTab, setActiveChartTab] = useState<"original" | "tradingview" | "depth">("original");
-  const [orderType, setOrderType] = useState<UserOrder["type"]>("market");
+  const [activeViewTab, setActiveViewTab] = useState<"chart" | "orderbook" | "trades" | "info" | "tradingdata">("chart");
+  const [orderType, setOrderType] = useState<"limit" | "market" | "stop-limit" | "oco">("limit");
   const [orderSide, setOrderSide] = useState<"buy" | "sell">("buy");
-  const [stopLoss, setStopLoss] = useState<string>("");
-  const [takeProfit, setTakeProfit] = useState<string>("");
+  const [stopLoss, setStopLoss] = useState("");
+  const [takeProfit, setTakeProfit] = useState("");
+  const [sliderPct, setSliderPct] = useState(0);
   const [sortBy, setSortBy] = useState<"name" | "change" | "volume">("name");
-  const [depthLimit, setDepthLimit] = useState<number>(15);
-  const [pricePrecision, setPricePrecision] = useState<number>(2);
+  const [depthLimit, setDepthLimit] = useState(saved.depthLimit || 15);
+  const [liveStatus, setLiveStatus] = useState("offline");
   const [accountSummary, setAccountSummary] = useState<AccountSummary>(createFallbackAccountSummary());
   const [userOrders, setUserOrders] = useState<UserOrder[]>(createFallbackUserOrders());
   const [tradeHistory, setTradeHistory] = useState<TradeHistoryItem[]>(createFallbackTradeHistory());
-  const [macdSummary, setMacdSummary] = useState({ macd: 0, signal: 0, histogram: 0 });
+  const [rightTab, setRightTab] = useState<"market" | "mytrades">("market");
+  const [bottomTab, setBottomTab] = useState<"openorders" | "orderhistory" | "tradehistory" | "holdings" | "bots">("openorders");
+  const [pairTab, setPairTab] = useState<"usdt" | "fav">("usdt");
+  const [activeTool, setActiveTool] = useState<DrawingTool>("cursor");
+  const [drawings, setDrawings] = useState<DrawingObject[]>([]);
+  const [drawingColor, setDrawingColor] = useState("#f0b90b");
+  const [drawingWidth, setDrawingWidth] = useState(1.5);
+  const [showPortfolioModal, setShowPortfolioModal] = useState(false);
+  const [orderPct, setOrderPct] = useState(0);
+  const [slippageTol, setSlippageTol] = useState(false);
+  const [activeTab, setActiveTab] = useState<"spot" | "cross" | "isolated" | "grid">("spot");
+  const [gridBotActive, setGridBotActive] = useState(false);
+  const [showTimeDropdown, setShowTimeDropdown] = useState(false);
+  const [gridBotConfig, setGridBotConfig] = useState({ lowerPrice: "", upperPrice: "", gridNum: "10", investAmount: "" });
+  const [windowWidth, setWindowWidth] = useState<number>(typeof window !== "undefined" ? window.innerWidth : 1200);
+  const [orderbookViewMode, setOrderbookViewMode] = useState<"combined" | "bids" | "asks">("combined");
+  const tradingPageRef = useRef<HTMLDivElement | null>(null);
+  const bottomScrollRef = useRef<HTMLDivElement | null>(null);
+  const isChartView = activeViewTab === "chart";
+  const isDesktopLayout = windowWidth >= 1024;
+  const isCompactLayout = !isDesktopLayout;
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
-  const chartContainerRef = useRef<HTMLDivElement | null>(null);
-  const depthContainerRef = useRef<HTMLDivElement | null>(null);
-  const tradingViewContainerRef = useRef<HTMLDivElement | null>(null);
-  const chartRef = useRef<any>(null);
-  const tradingViewChartRef = useRef<any>(null);
-  const candleSeriesRef = useRef<any>(null);
-  const smaSeriesRef = useRef<any>(null);
-  const emaSeriesRef = useRef<any>(null);
-  const bbUpperSeriesRef = useRef<any>(null);
-  const bbMiddleSeriesRef = useRef<any>(null);
-  const bbLowerSeriesRef = useRef<any>(null);
-  const tvCandleSeriesRef = useRef<any>(null);
-  const tvSmaSeriesRef = useRef<any>(null);
-  const tvEmaSeriesRef = useRef<any>(null);
-  const depthChartRef = useRef<any>(null);
-  const bidsSeriesRef = useRef<any>(null);
-  const asksSeriesRef = useRef<any>(null);
-  const lastCandleRef = useRef<Candle | null>(null);
+  useEffect(() => { saveLayout({ symbol, timeframe, showSMA, showEMA, showBollinger, depthLimit }); }, [symbol, timeframe, showSMA, showEMA, showBollinger, depthLimit]);
 
-  const updateIndicatorLines = (data: Candle[]) => {
-    if (!candleSeriesRef.current) return;
-
-    const sma = calculateSMA(data, 20);
-    const ema = calculateEMA(data, 50, (item) => item.close);
-    const bollinger = calculateBollingerBands(data, 20, 2);
-    const rsi = calculateRSI(data, 14);
-    const macd = calculateMACD(data, 12, 26, 9);
-
-    smaSeriesRef.current?.setData(showSMA ? sma : []);
-    emaSeriesRef.current?.setData(showEMA ? ema : []);
-
-    if (showBollinger) {
-      bbUpperSeriesRef.current?.setData(bollinger.upper);
-      bbMiddleSeriesRef.current?.setData(bollinger.middle);
-      bbLowerSeriesRef.current?.setData(bollinger.lower);
-    } else {
-      bbUpperSeriesRef.current?.setData([]);
-      bbMiddleSeriesRef.current?.setData([]);
-      bbLowerSeriesRef.current?.setData([]);
-    }
-
-    if (showMACD) {
-      setMacdSummary({
-        macd: macd.macd.length ? macd.macd[macd.macd.length - 1].value : 0,
-        signal: macd.signalLine.length ? macd.signalLine[macd.signalLine.length - 1].value : 0,
-        histogram: macd.latest.value,
-      });
-    }
-  };
-
-  const createChartInstances = () => {
-    if (!chartContainerRef.current || chartRef.current) return;
-
-    try {
-      const containerWidth = chartContainerRef.current.clientWidth;
-      const containerHeight = chartContainerRef.current.clientHeight || 420;
-
-      const chart: any = createChart(chartContainerRef.current, {
-        width: containerWidth,
-        height: Math.max(containerHeight, 380),
-        layout: {
-          background: { color: "#07101f" },
-          textColor: "#cbd5e1",
-        },
-        grid: {
-          vertLines: { color: "#1b2738" },
-          horzLines: { color: "#1b2738" },
-        },
-        rightPriceScale: { borderColor: "#1f2a3d" },
-        timeScale: {
-          borderColor: "#1f2a3d",
-          timeVisible: true,
-        },
-        crosshair: { mode: 1 },
-      });
-
-      candleSeriesRef.current = chart.addCandlestickSeries({
-        upColor: "#10b981",
-        downColor: "#ef4444",
-        wickVisible: true,
-        borderVisible: false,
-      });
-
-      smaSeriesRef.current = chart.addLineSeries({ color: "#f8e71c", lineWidth: 2 });
-      emaSeriesRef.current = chart.addLineSeries({ color: "#22c55e", lineWidth: 2 });
-      bbUpperSeriesRef.current = chart.addLineSeries({ color: "#60a5fa", lineWidth: 1, lineStyle: 2 });
-      bbMiddleSeriesRef.current = chart.addLineSeries({ color: "#c084fc", lineWidth: 1, lineStyle: 2 });
-      bbLowerSeriesRef.current = chart.addLineSeries({ color: "#60a5fa", lineWidth: 1, lineStyle: 2 });
-
-      chartRef.current = chart;
-    } catch (error) {
-      console.error("Failed to create chart:", error);
-    }
-  };
-
-  const createDepthChart = () => {
-    if (!depthContainerRef.current || depthChartRef.current) return;
-
-    try {
-      const containerWidth = depthContainerRef.current.clientWidth || 300;
-      const containerHeight = depthContainerRef.current.clientHeight || 300;
-
-      const chart: any = createChart(depthContainerRef.current, {
-        width: containerWidth,
-        height: Math.max(containerHeight, 280),
-        layout: {
-          background: { color: "#07101f" },
-          textColor: "#cbd5e1",
-        },
-        grid: {
-          vertLines: { visible: false },
-          horzLines: { visible: false },
-        },
-        rightPriceScale: { visible: false },
-        timeScale: { visible: false },
-      });
-
-      bidsSeriesRef.current = chart.addAreaSeries({
-        topColor: "rgba(16,185,129,0.4)",
-        bottomColor: "rgba(16,185,129,0.08)",
-        lineColor: "#10b981",
-      });
-
-      asksSeriesRef.current = chart.addAreaSeries({
-        topColor: "rgba(239,68,68,0.4)",
-        bottomColor: "rgba(239,68,68,0.08)",
-        lineColor: "#ef4444",
-      });
-
-      depthChartRef.current = chart;
-    } catch (error) {
-      console.error("Failed to create depth chart:", error);
-    }
-  };
-
-  const createTradingViewChart = () => {
-    if (!tradingViewContainerRef.current || tradingViewChartRef.current) return;
-
-    try {
-      const containerWidth = tradingViewContainerRef.current.clientWidth;
-      const containerHeight = tradingViewContainerRef.current.clientHeight || 500;
-
-      const chart: any = createChart(tradingViewContainerRef.current, {
-        width: containerWidth,
-        height: Math.max(containerHeight, 480),
-        layout: {
-          background: { color: "#07101f" },
-          textColor: "#cbd5e1",
-        },
-        grid: {
-          vertLines: { color: "#1b2738" },
-          horzLines: { color: "#1b2738" },
-        },
-        rightPriceScale: { borderColor: "#1f2a3d" },
-        timeScale: {
-          borderColor: "#1f2a3d",
-          timeVisible: true,
-        },
-        crosshair: { mode: 1 },
-      });
-
-      tvCandleSeriesRef.current = chart.addCandlestickSeries({
-        upColor: "#10b981",
-        downColor: "#ef4444",
-        wickVisible: true,
-        borderVisible: false,
-      });
-
-      tvSmaSeriesRef.current = chart.addLineSeries({ color: "#f8e71c", lineWidth: 2 });
-      tvEmaSeriesRef.current = chart.addLineSeries({ color: "#22c55e", lineWidth: 2 });
-
-      tradingViewChartRef.current = chart;
-    } catch (error) {
-      console.error("Failed to create TradingView chart:", error);
-    }
-  };
-
-  const resizeCharts = () => {
-    try {
-      const chartWidth = chartContainerRef.current?.clientWidth ?? 0;
-      const chartHeight = chartContainerRef.current?.clientHeight ?? 420;
-      if (chartRef.current && chartWidth) {
-        chartRef.current.applyOptions({ 
-          width: chartWidth,
-          height: Math.max(chartHeight, 380)
-        });
+  // Close time dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showTimeDropdown && !(event.target as Element).closest('.time-dropdown')) {
+        setShowTimeDropdown(false);
       }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showTimeDropdown]);
 
-      const tvWidth = tradingViewContainerRef.current?.clientWidth ?? 0;
-      const tvHeight = tradingViewContainerRef.current?.clientHeight ?? 500;
-      if (tradingViewChartRef.current && tvWidth) {
-        tradingViewChartRef.current.applyOptions({
-          width: tvWidth,
-          height: Math.max(tvHeight, 480)
-        });
-      }
+  const indicators = useMemo(() => ({
+    sma:  showSMA       ? calcSMA(candles, 7)     : [],
+    ema:  showEMA       ? calcEMA(candles, 99)    : [],
+    bb:   showBollinger ? calcBB(candles, 20, 2)  : [],
+    vwap: showVWAP      ? calcVWAP(candles)       : [],
+  }), [candles, showSMA, showEMA, showBollinger, showVWAP]);
+  const rsiData  = useMemo(() => showRSI  ? calcRSI(candles, 14) : [], [candles, showRSI]);
+  const macdData = useMemo(() => showMACD ? calcMACD(candles, 12, 26, 9) : null, [candles, showMACD]);
 
-      const depthWidth = depthContainerRef.current?.clientWidth ?? 0;
-      const depthHeight = depthContainerRef.current?.clientHeight ?? 300;
-      if (depthChartRef.current && depthWidth) {
-        depthChartRef.current.applyOptions({ 
-          width: depthWidth,
-          height: Math.max(depthHeight, 280)
-        });
-      }
-    } catch (error) {
-      console.error("Failed to resize charts:", error);
+  const buyOrders  = orderbook.buy.slice().sort((a, b) => b.price - a.price).slice(0, depthLimit).map(o => ({ ...o, total: +(o.price * o.amount).toFixed(2) }));
+  const sellOrders = orderbook.sell.slice().sort((a, b) => a.price - b.price).slice(0, depthLimit).map(o => ({ ...o, total: +(o.price * o.amount).toFixed(2) }));
+  let buyCum = 0, sellCum = 0;
+  const buyDisplay  = buyOrders.map(o => { buyCum += o.total || 0;  return { ...o, cumulative: buyCum }; });
+  const sellDisplay = sellOrders.map(o => { sellCum += o.total || 0; return { ...o, cumulative: sellCum }; });
+  const maxBid = Math.max(...buyDisplay.map(b => b.total || 0), 1);
+  const maxAsk = Math.max(...sellDisplay.map(a => a.total || 0), 1);
+  const totalBidVol  = buyCum;
+  const totalAskVol  = sellCum;
+  const bidPct = totalBidVol + totalAskVol > 0 ? (totalBidVol / (totalBidVol + totalAskVol) * 100).toFixed(1) : "50.0";
+  const askPct = totalBidVol + totalAskVol > 0 ? (totalAskVol / (totalBidVol + totalAskVol) * 100).toFixed(1) : "50.0";
+  const activeOrders = userOrders.filter(o => o.status === "open");
+
+  const orderbookVariant = windowWidth >= 1024 ? "desktop" : windowWidth >= 768 ? "tablet" : "mobile";
+  const bidPctNum = parseFloat(bidPct) || 0;
+  const askPctNum = parseFloat(askPct) || 0;
+  const orderbookSummary = (
+    <div style={{ padding: "10px 12px", borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bgAlt }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", padding: "10px", borderRadius: 12, border: `1px solid ${COLORS.red}`, background: "rgba(246,70,93,0.08)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: "1 1 auto" }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.textBright, whiteSpace: "nowrap" }}>Bid / Ask Balance</span>
+          <span style={{ padding: "2px 8px", borderRadius: 999, background: COLORS.greenDim, color: COLORS.green, fontSize: 11, fontWeight: 700 }}>B {bidPct}%</span>
+          <span style={{ padding: "2px 8px", borderRadius: 999, background: COLORS.redDim, color: COLORS.red, fontSize: 11, fontWeight: 700 }}>S {askPct}%</span>
+        </div>
+        <div style={{ flex: "1 1 120px", minWidth: 120, height: 10, borderRadius: 999, overflow: "hidden", background: COLORS.border }}>
+          <div style={{ width: `${bidPctNum}%`, height: "100%", background: COLORS.green, float: "left" }} />
+          <div style={{ width: `${askPctNum}%`, height: "100%", background: COLORS.red, float: "right" }} />
+        </div>
+      </div>
+    </div>
+  );
+  const renderOrderbook = () => {
+    const askRows = sellDisplay.slice().reverse();
+    const bidRows = buyDisplay;
+    const showAsk = orderbookViewMode !== "bids";
+    const showBid = orderbookViewMode !== "asks";
+    const rows = showAsk
+      ? [...askRows.map(o => ({ ...o, side: "sell" as const })), ...(showBid ? bidRows.map(o => ({ ...o, side: "buy" as const })) : [])]
+      : showBid
+        ? bidRows.map(o => ({ ...o, side: "buy" as const }))
+        : [];
+
+    if (orderbookViewMode === "combined") {
+      const rowCount = Math.max(askRows.length, bidRows.length);
+      return (
+        <>
+          {orderbookSummary}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 0.9fr 0.9fr 1fr", padding: "6px 8px", fontSize: 10, fontWeight: 600, color: COLORS.textMuted, borderBottom: `1px solid ${COLORS.border}` }}>
+            <span style={{ textAlign: "left" }}>Bid Amount</span>
+            <span style={{ textAlign: "left" }}>Price</span>
+            <span style={{ textAlign: "right" }}>Price</span>
+            <span style={{ textAlign: "right" }}>Ask Amount</span>
+          </div>
+          <div style={{ flex: 1, overflow: "auto" }}>
+            {Array.from({ length: rowCount }).map((_, index) => {
+              const ask = askRows[index];
+              const bid = bidRows[index];
+              return (
+                <div key={index} onClick={() => { const picked = bid || ask; if (picked) setPriceInput(picked.price.toFixed(2)); }} style={{ display: "grid", gridTemplateColumns: "1fr 0.9fr 0.9fr 1fr", padding: "4px 8px", alignItems: "center", minHeight: 24, fontSize: 10, fontFamily: "monospace", color: COLORS.text, background: index % 2 === 0 ? COLORS.bg : "transparent", cursor: bid || ask ? "pointer" : "default" }}>
+                  <span style={{ color: COLORS.textBright, textAlign: "left", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{bid ? bid.amount.toFixed(5) : ""}</span>
+                  <span style={{ color: bid ? COLORS.green : COLORS.textMuted, textAlign: "left", whiteSpace: "nowrap" }}>{bid ? bid.price.toFixed(2) : ""}</span>
+                  <span style={{ color: ask ? COLORS.red : COLORS.textMuted, textAlign: "right", whiteSpace: "nowrap" }}>{ask ? ask.price.toFixed(2) : ""}</span>
+                  <span style={{ color: COLORS.textBright, textAlign: "right", whiteSpace: "nowrap" }}>{ask ? ask.amount.toFixed(5) : ""}</span>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      );
     }
+
+    const header = (
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", padding: "8px 10px", fontSize: 11, fontWeight: 600, color: COLORS.textMuted, borderBottom: `1px solid ${COLORS.border}` }}>
+        <span>Price</span>
+        <span style={{ textAlign: "center" }}>Amount</span>
+        <span style={{ textAlign: "right" }}>Total</span>
+      </div>
+    );
+
+    return (
+      <>
+        {orderbookSummary}
+        {header}
+        <div style={{ flex: 1, overflow: "auto" }}>
+          {rows.map((row, index) => (
+            <div key={index} onClick={() => setPriceInput(row.price.toFixed(2))} style={{ position: "relative", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", padding: "8px 10px", alignItems: "center", minHeight: 32, fontSize: 11, fontFamily: "monospace", color: row.side === "sell" ? COLORS.red : COLORS.green, background: index % 2 === 0 ? COLORS.bg : "transparent", cursor: "pointer" }}>
+              <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.min(100, ((row.total || 0) / Math.max(maxAsk, maxBid)) * 100)}%`, background: row.side === "sell" ? COLORS.redDim : COLORS.greenDim, zIndex: 0 }} />
+              <span style={{ position: "relative", zIndex: 1, textAlign: "left" }}>{row.price.toFixed(2)}</span>
+              <span style={{ position: "relative", zIndex: 1, textAlign: "center", color: COLORS.textBright }}>{row.amount.toFixed(5)}</span>
+              <span style={{ position: "relative", zIndex: 1, textAlign: "right", color: COLORS.text }}>{(row.total || 0).toFixed(2)}</span>
+            </div>
+          ))}
+        </div>
+      </>
+    );
   };
+
+  const orderBookPanel = (placement: "side" | "embedded") => (
+    <aside
+      className={`trading-orderbook trading-orderbook--${placement}`}
+      style={{
+        width: placement === "side" ? 260 : "100%",
+        background: COLORS.bgPanel,
+        borderLeft: placement === "side" ? `1px solid ${COLORS.border}` : "none",
+        borderTop: placement === "embedded" ? `1px solid ${COLORS.border}` : "none",
+        display: "flex",
+        flexDirection: "column",
+        flexShrink: 0,
+        overflow: "hidden",
+        minHeight: placement === "side" ? 0 : 320,
+      }}
+    >
+      <div style={{ padding: "8px 10px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <span style={{ fontWeight: 700, fontSize: 13, color: COLORS.textBright }}>Order Book</span>
+        <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+          {(["combined", "bids", "asks"] as const).map(mode => (
+            <button
+              key={mode}
+              onClick={() => setOrderbookViewMode(mode)}
+              style={{
+                background: orderbookViewMode === mode ? COLORS.bgHover : "transparent",
+                border: `1px solid ${orderbookViewMode === mode ? COLORS.border : "transparent"}`,
+                color: orderbookViewMode === mode ? COLORS.textBright : COLORS.text,
+                cursor: "pointer",
+                padding: "2px 6px",
+                borderRadius: 3,
+                fontSize: 10,
+                textTransform: "capitalize",
+              }}
+            >
+              {mode === "combined" ? "Both" : mode}
+            </button>
+          ))}
+          {[10, 15, 20].map(limit => (
+            <button
+              key={limit}
+              onClick={() => setDepthLimit(limit)}
+              style={{
+                background: depthLimit === limit ? COLORS.bgHover : "transparent",
+                border: `1px solid ${depthLimit === limit ? COLORS.border : "transparent"}`,
+                color: depthLimit === limit ? COLORS.amber : COLORS.text,
+                cursor: "pointer",
+                padding: "2px 5px",
+                borderRadius: 3,
+                fontSize: 10,
+                fontFamily: "monospace",
+              }}
+            >
+              {limit}
+            </button>
+          ))}
+        </div>
+      </div>
+      {renderOrderbook()}
+    </aside>
+  );
+
+  const topMoversSection = () => (
+    <div style={{ borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ padding: "6px 10px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: COLORS.textBright }}>Top Movers</span>
+        <span style={{ fontSize: 11, color: COLORS.text }}>FAQ ▾</span>
+      </div>
+      <div style={{ display: "flex", gap: 4, padding: "0 10px 6px" }}>
+        {["All", "Change", "New High/Low", "Fluctuation", "Volume"].map(tab => (
+          <button key={tab} style={{ fontSize: 10, padding: "2px 6px", background: tab === "All" ? COLORS.bgAlt : "transparent", border: `1px solid ${tab === "All" ? COLORS.border : "transparent"}`, borderRadius: 3, color: COLORS.text, cursor: "pointer", whiteSpace: "nowrap" }}>{tab}</button>
+        ))}
+      </div>
+      {marketMovers.slice().sort((a, b) => Math.abs(b.change) - Math.abs(a.change)).slice(0, 3).map(m => (
+        <div key={m.pair} onClick={() => setSymbol(m.pair)} style={{ display: "flex", alignItems: "center", padding: "4px 10px", cursor: "pointer", gap: 8 }}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = COLORS.bgAlt}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
+        >
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.textBright }}>{m.pair}</div>
+            <div style={{ fontSize: 10, color: COLORS.textMuted }}>{new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <span style={{ fontSize: 11, background: m.change >= 0 ? COLORS.greenDim : COLORS.redDim, color: m.change >= 0 ? COLORS.green : COLORS.red, padding: "2px 6px", borderRadius: 3 }}>
+              {m.change >= 0 ? "+" : ""}{m.change.toFixed(2)}%
+            </span>
+            <div style={{ fontSize: 9, color: COLORS.textMuted, marginTop: 1 }}>New 7day High</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  const marketPairsPanel = () => (
+    <div style={{ background: COLORS.bgPanel, display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden" }}>
+      {/* Search */}
+      <div style={{ padding: "8px 10px", borderBottom: `1px solid ${COLORS.border}` }}>
+        <div style={{ display: "flex", alignItems: "center", background: COLORS.bgAlt, border: `1px solid ${COLORS.border}`, borderRadius: 4, padding: "4px 10px", gap: 6 }}>
+          <span style={{ color: COLORS.textMuted, fontSize: 13 }}>🔍</span>
+          <input type="text" placeholder="Search" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, flex: 1 }} />
+        </div>
+      </div>
+
+      {/* Pair tabs */}
+      <div style={{ display: "flex", borderBottom: `1px solid ${COLORS.border}`, padding: "0 6px" }}>
+        {(["fav", "usdt"] as const).map(tab => (
+          <button key={tab} onClick={() => setPairTab(tab)} style={{ flex: 1, padding: "6px 0", background: "transparent", border: "none", cursor: "pointer", fontSize: 11, color: pairTab === tab ? COLORS.amber : COLORS.text, borderBottom: pairTab === tab ? `2px solid ${COLORS.amber}` : "2px solid transparent", fontWeight: pairTab === tab ? 700 : 400 }}>
+            {tab === "fav" ? "★" : tab.toUpperCase()}
+          </button>
+        ))}
+      </div>
+
+      {/* Pair list header */}
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", padding: "4px 10px", fontSize: 10, color: COLORS.textMuted, borderBottom: `1px solid ${COLORS.border}` }}>
+        <button onClick={() => setSortBy("name")} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", textAlign: "left", fontSize: 10 }}>Pair {sortBy === "name" ? "↕" : ""}</button>
+        <button onClick={() => setSortBy("change")} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", textAlign: "right", fontSize: 10 }}>Last Price {sortBy === "change" ? "↕" : ""}</button>
+        <button onClick={() => setSortBy("volume")} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", textAlign: "right", fontSize: 10 }}>24h Chg% {sortBy === "volume" ? "↕" : ""}</button>
+      </div>
+
+      {/* Pair list */}
+      <div style={{ flex: 1, overflowY: "auto", maxHeight: 336 }}>
+        {displayedPairs.map(pair => {
+          const mover = marketMovers.find(m => m.pair === pair);
+          const chg = mover?.change || 0;
+          const symbolLabel = pair.split("/")[0];
+          return (
+            <div key={pair} onClick={() => setSymbol(pair)} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", padding: "5px 10px", minHeight: 46, cursor: "pointer", background: pair === symbol ? COLORS.bgHover : "transparent", borderLeft: pair === symbol ? `2px solid ${COLORS.amber}` : "2px solid transparent" }}
+              onMouseEnter={e => { if (pair !== symbol) (e.currentTarget as HTMLElement).style.background = COLORS.bgAlt; }}
+              onMouseLeave={e => { if (pair !== symbol) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 28, height: 28, borderRadius: 999, background: COLORS.bgAlt, display: "grid", placeItems: "center", color: COLORS.amber, fontSize: 11, fontWeight: 700 }}>{symbolLabel.slice(0, 3)}</div>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: pair === symbol ? 700 : 500, color: COLORS.textBright }}>
+                    {symbolLabel}/<span style={{ color: COLORS.textMuted, fontSize: 10 }}>{pair.split("/")[1]}</span>
+                  </div>
+                  {mover && <div style={{ fontSize: 9, color: COLORS.textMuted }}>{formatVol(mover.volume)}M</div>}
+                </div>
+              </div>
+              <div style={{ textAlign: "right", fontFamily: "monospace", fontSize: 11, color: COLORS.textBright }}>
+                {pair === symbol ? formatPrice(lastPrice) : formatPrice(30000 + Math.random() * 50000)}
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <span style={{ fontSize: 11, fontFamily: "monospace", background: chg >= 0 ? COLORS.greenDim : COLORS.redDim, color: chg >= 0 ? COLORS.green : COLORS.red, padding: "1px 5px", borderRadius: 3 }}>{chg >= 0 ? "+" : ""}{chg.toFixed(2)}%</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const marketTradesPanel = (showMovers: boolean) => (
+    <div style={{ borderTop: `1px solid ${COLORS.border}`, flexShrink: 0, background: COLORS.bgPanel }}>
+      <div style={{ display: "flex", borderBottom: `1px solid ${COLORS.border}` }}>
+        {(["market", "mytrades"] as const).map(tab => (
+          <button key={tab} onClick={() => setRightTab(tab)} style={{ flex: 1, padding: "6px 0", background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: rightTab === tab ? COLORS.textBright : COLORS.text, borderBottom: rightTab === tab ? `2px solid ${COLORS.amber}` : "2px solid transparent", fontWeight: rightTab === tab ? 600 : 400 }}>
+            {tab === "market" ? "Market Trades" : "My Trades"}
+          </button>
+        ))}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", padding: "4px 10px", fontSize: 10, color: COLORS.textMuted }}>
+        <span>Price (USDT)</span><span style={{ textAlign: "right" }}>Amount (BTC)</span><span style={{ textAlign: "right" }}>Time</span>
+      </div>
+      <div style={{ maxHeight: 180, overflow: "auto" }}>
+        {(rightTab === "market" ? trades : tradeHistory).slice(0, 15).map((t, i) => {
+          const side = "side" in t ? t.side : (t as TradeHistoryItem).side;
+          const price = t.price;
+          const amount = "amount" in t ? (t as Trade).amount : (t as TradeHistoryItem).quantity;
+          const time = t.time;
+          return (
+            <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", padding: "2px 10px", fontSize: 11, fontFamily: "monospace" }}>
+              <span style={{ color: side === "buy" ? COLORS.green : COLORS.red }}>{price.toFixed(2)}</span>
+              <span style={{ textAlign: "right", color: COLORS.textBright }}>{amount.toFixed(4)}</span>
+              <span style={{ textAlign: "right", color: COLORS.textMuted }}>{formatTime(time)}</span>
+            </div>
+          );
+        })}
+      </div>
+      {showMovers && topMoversSection()}
+    </div>
+  );
+
+  const marketPanel = () => (
+    <aside className="trading-right trading-market-panel" style={{ width: isCompactLayout ? 240 : "100%", background: COLORS.bgPanel, borderLeft: isCompactLayout ? `1px solid ${COLORS.border}` : "none", borderTop: isDesktopLayout ? `1px solid ${COLORS.border}` : "none", display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden" }}>
+      {marketPairsPanel()}
+      {marketTradesPanel(true)}
+    </aside>
+  );
 
   const fetchSymbols = async () => {
     try {
       const api = await getAxios();
       const res = await api.get("/api/market/symbols");
-      const available = generateSyntheticPairs(res.data.symbols || ["BTC/USDT"]);
-      setSymbols(available);
-      setFilteredSymbols(available);
-      setMarketMovers(
-        available.map((pair: string) => ({
-          pair,
-          change: Number(((Math.random() - 0.5) * 12).toFixed(2)),
-          volume: Number((Math.random() * 150 + 10).toFixed(2)),
-        }))
-      );
-      setSymbol((prev) => (available.includes(prev) ? prev : available[0]));
-    } catch (error) {
-      console.error("Unable to load symbols:", error);
-      const available = generateSyntheticPairs(["BTC/USDT"]);
-      setSymbols(available);
-      setFilteredSymbols(available);
-      setMarketMovers(
-        available.slice(0, 20).map((pair) => ({
-          pair,
-          change: Number(((Math.random() - 0.5) * 12).toFixed(2)),
-          volume: Number((Math.random() * 150 + 10).toFixed(2)),
-        }))
-      );
+      const available = generateSyntheticPairs(res.data.symbols || ["BTC/USDT"]).filter(pair => pair.endsWith("/USDT"));
+      setSymbols(available); setFilteredSymbols(available);
+      setMarketMovers(available.map((pair: string) => ({ pair, change: +((Math.random() - 0.5) * 12).toFixed(2), volume: +(Math.random() * 150 + 10).toFixed(2), high: 81000 + Math.random() * 1000, low: 79000 + Math.random() * 1000 })));
+    } catch {
+      const available = generateSyntheticPairs(["BTC/USDT"]).filter(pair => pair.endsWith("/USDT"));
+      setSymbols(available); setFilteredSymbols(available);
+      setMarketMovers(available.slice(0, 30).map(pair => ({ pair, change: +((Math.random() - 0.5) * 12).toFixed(2), volume: +(Math.random() * 150 + 10).toFixed(2), high: 81000 + Math.random() * 1000, low: 79000 + Math.random() * 1000 })));
     }
   };
 
-  const fetchOrderBook = async (selectedSymbol: string) => {
+  const fetchOrderBook = async (sel: string) => {
     try {
       const api = await getAxios();
-      const bookRes = await api.get(`/api/market/orderbook/${encodeURIComponent(selectedSymbol)}`);
-      const book: { buy: Order[]; sell: Order[] } = bookRes.data;
-      let sellTotal = 0;
-      const sell = book.sell.map((o: Order) => {
-        sellTotal += o.amount;
-        return { ...o, total: sellTotal };
-      });
-      let buyTotal = 0;
-      const buy = book.buy.map((o: Order) => {
-        buyTotal += o.amount;
-        return { ...o, total: buyTotal };
-      });
+      const res = await api.get(`/api/market/orderbook/${encodeURIComponent(sel)}`);
+      const book = res.data;
+      let st = 0; const sell = book.sell.map((o: Order) => { st += o.amount; return { ...o, total: st }; });
+      let bt = 0; const buy  = book.buy.map((o: Order)  => { bt += o.amount; return { ...o, total: bt }; });
       setOrderbook({ buy, sell });
-      const { bids, asks } = buildDepthData({ buy, sell });
-      try {
-        bidsSeriesRef.current?.setData(bids);
-        asksSeriesRef.current?.setData(asks);
-        depthChartRef.current?.timeScale().fitContent();
-      } catch (err) {
-        console.error("Error updating depth chart:", err);
-      }
-    } catch (error) {
-      console.error("Order book fetch failed:", error);
-      setOrderbook({ buy: [], sell: [] });
-    }
+    } catch { setOrderbook({ buy: [], sell: [] }); }
   };
 
-  const fetchMarketData = async (selectedSymbol: string, selectedTimeframe: string) => {
+  const fetchMarketData = async (sel: string, tf: string) => {
     try {
       const api = await getAxios();
-      const [candlesRes, tradesRes] = await Promise.all([
-        api.get(`/api/market/candles/${encodeURIComponent(selectedSymbol)}?timeframe=${selectedTimeframe}`),
-        api.get(`/api/market/trades/${encodeURIComponent(selectedSymbol)}`),
+      const [cRes, tRes, dRes, dmRes] = await Promise.all([
+        api.get(`/api/market/candles/${encodeURIComponent(sel)}?timeframe=${tf}`),
+        api.get(`/api/market/trades/${encodeURIComponent(sel)}`),
+        api.get(`/api/market/candles/${encodeURIComponent(sel)}?timeframe=1d`),
+        api.get(`/api/market/deepmarket/${encodeURIComponent(sel)}?timeframe=${tf}`),
       ]);
-
-      const candleData: Candle[] = candlesRes.data;
-      const liveTradeData: Trade[] = tradesRes.data || [];
-
-      const cleanCandles = candleData
-        .map((c) => ({ ...c, time: Math.floor(Number(c.time)) }))
-        .sort((a, b) => a.time - b.time);
-
-      const fallbackCandles = cleanCandles.length ? cleanCandles : createFallbackCandles();
-      setCandles(fallbackCandles);
-      setTrades(liveTradeData.slice().sort((a, b) => b.time - a.time).slice(0, 40));
-      setTradeHistory(
-        liveTradeData
-          .slice()
-          .sort((a, b) => b.time - a.time)
-          .slice(0, 40)
-          .map((trade) => ({
-            time: trade.time,
-            price: trade.price,
-            quantity: trade.amount,
-            side: trade.side,
-            pair: selectedSymbol,
-            type: "market",
-          }))
-      );
-
-      if (!candleSeriesRef.current) return;
-
-     const cleaned = fallbackCandles
-  .map(c => ({
-    time: Math.floor(Number(c.time)), // force integer timestamps
-    open: Number(c.open),
-    high: Number(c.high),
-    low: Number(c.low),
-    close: Number(c.close),
-  }))
-  .filter(c => !isNaN(c.time))
-  .sort((a, b) => a.time - b.time)
-  .reduce((acc: any[], curr) => {
-    if (!acc.length) {
-      acc.push(curr);
-    } else {
-      const prev = acc[acc.length - 1];
-
-      // skip duplicates
-      if (curr.time === prev.time) return acc;
-
-      // fix backward time (force forward)
-      if (curr.time < prev.time) {
-        curr.time = prev.time + 1;
+      const raw: Candle[] = cRes.data;
+      const clean = (raw.length ? raw : createFallbackCandles()).map(c => ({ ...c, time: Math.floor(Number(c.time)) })).sort((a, b) => a.time - b.time);
+      setCandles(clean);
+      const liveTrades: Trade[] = tRes.data || [];
+      setTrades(liveTrades.sort((a, b) => b.time - a.time).slice(0, 50));
+      const deepMarketRaw = dmRes.data || [];
+      const deepMarketClean = deepMarketRaw.map((d: any) => ({ time: Math.floor(Number(d.time)), value: Number(d.value) })).sort((a: any, b: any) => a.time - b.time);
+      setDeepMarketData(deepMarketClean);
+      const last = clean[clean.length - 1];
+      if (last) {
+        setLastPrice(last.close); setDisplayPrice(last.close); setPriceInput(last.close.toFixed(2));
+        setLastPriceUpdate(Date.now());
       }
-
-      acc.push(curr);
-    }
-    return acc;
-  }, [])
-  .sort((a, b) => a.time - b.time); // ensure ascending order
-
-try {
-  candleSeriesRef.current.setData(
-    cleaned.map((candle) => ({
-      time: candle.time,
-      open: candle.open,
-      high: candle.high,
-      low: candle.low,
-      close: candle.close,
-    }))
-  );
-
-  // Also update TradingView chart
-  if (tvCandleSeriesRef.current) {
-    tvCandleSeriesRef.current.setData(
-      cleaned.map((candle) => ({
-        time: candle.time,
-        open: candle.open,
-        high: candle.high,
-        low: candle.low,
-        close: candle.close,
-      }))
-    );
-  }
-
-  updateIndicatorLines(cleaned);
-  chartRef.current?.timeScale().fitContent();
-  tradingViewChartRef.current?.timeScale().fitContent();
-} catch (err) {
-  console.error("Error setting chart data:", err);
-}
-
-     
-
-      const lastCandle = fallbackCandles[fallbackCandles.length - 1];
-      if (lastCandle) {
-        setLastPrice(lastCandle.close);
-        setPriceInput(lastCandle.close.toFixed(2));
-        setChange24h(Number((lastCandle.close - fallbackCandles[0].open).toFixed(2)));
-        lastCandleRef.current = lastCandle;
+      // For 24h data, use 1d candles
+      const dailyRaw: Candle[] = dRes.data;
+      const dailyClean = (dailyRaw.length ? dailyRaw : createFallbackCandles(30, 80000)).map(c => ({ ...c, time: Math.floor(Number(c.time)) })).sort((a, b) => a.time - b.time);
+      if (dailyClean.length) {
+        setHigh24h(Math.max(...dailyClean.map(c => c.high)));
+        setLow24h(Math.min(...dailyClean.map(c => c.low)));
+        setVol24h(dailyClean.reduce((s, c) => s + c.volume, 0));
+        const firstClose = dailyClean[0]?.close || dailyClean[dailyClean.length - 1]?.close;
+        const lastClose = dailyClean[dailyClean.length - 1]?.close || firstClose;
+        setChange24h(+(lastClose - firstClose).toFixed(2));
+        setChangePct(+((lastClose - firstClose) / firstClose * 100).toFixed(2));
       }
-    } catch (error) {
-      console.error("Market data load failed:", error);
-      const fallbackCandles = createFallbackCandles();
-      setCandles(fallbackCandles);
-      setTrades([]);
-      setTradeHistory(createFallbackTradeHistory());
-      setLastPrice(fallbackCandles[fallbackCandles.length - 1]?.close || 30000);
-      setPriceInput("30000.00");
-      setChange24h(0);
-      lastCandleRef.current = fallbackCandles[fallbackCandles.length - 1];
-
-      if (!candleSeriesRef.current) return;
-
-      const sorted = [...fallbackCandles].sort((a, b) => a.time - b.time);
-      try {
-        candleSeriesRef.current?.setData(
-          sorted.map((candle) => ({
-            time: candle.time,
-            open: candle.open,
-            high: candle.high,
-            low: candle.low,
-            close: candle.close,
-          }))
-        );
-        
-        // Also update TradingView chart
-        if (tvCandleSeriesRef.current) {
-          tvCandleSeriesRef.current?.setData(
-            sorted.map((candle) => ({
-              time: candle.time,
-              open: candle.open,
-              high: candle.high,
-              low: candle.low,
-              close: candle.close,
-            }))
-          );
-        }
-        
-        updateIndicatorLines(sorted);
-        chartRef.current?.timeScale().fitContent();
-        tradingViewChartRef.current?.timeScale().fitContent();
-      } catch (err) {
-        console.error("Error setting fallback chart data:", err);
-      }
+      setLiveStatus("live");
+    } catch {
+      setLiveStatus("offline");
+      const fb = createFallbackCandles();
+      setCandles(fb); setDeepMarketData([]); setLastPrice(fb[fb.length - 1]?.close || 80721); setPriceInput("80721.22");
+      setHigh24h(80817.99); setLow24h(79920); setVol24h(9305.28); setChange24h(720.52); setChangePct(0.9);
     }
   };
 
-  useEffect(() => {
-    // Create charts with a slight delay to ensure DOM is ready
-    const initTimer = setTimeout(() => {
-      try {
-        createChartInstances();
-        createDepthChart();
-        createTradingViewChart();
-        resizeCharts();
-      } catch (error) {
-        console.error("Chart initialization failed:", error);
-      }
-    }, 150);
-
-    fetchSymbols();
-    
-    const resizeHandler = () => {
-      resizeCharts();
-    };
-    window.addEventListener("resize", resizeHandler);
-
-    return () => {
-      clearTimeout(initTimer);
-      window.removeEventListener("resize", resizeHandler);
-      try {
-        chartRef.current?.remove();
-        depthChartRef.current?.remove();
-        tradingViewChartRef.current?.remove();
-      } catch (e) {
-        console.error("Error cleaning up charts:", e);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!symbol) return;
-    fetchMarketData(symbol, timeframe);
-  }, [symbol, timeframe]);
-
-  useEffect(() => {
-    if (!symbol) return;
-    fetchOrderBook(symbol);
-    const interval = setInterval(() => {
-      fetchOrderBook(symbol);
-    }, 500); // poll every 500ms for millisecond-like updates
-    return () => clearInterval(interval);
+  const krakenPair = useMemo(() => {
+    const [base, quote] = symbol.split("/");
+    const baseMap: Record<string, string> = { BTC: "XBT", ETH: "ETH", LTC: "LTC", XRP: "XRP", ADA: "ADA", DOT: "DOT", SOL: "SOL", USDT: "USDT", USDC: "USDC", BNB: "BNB", AVAX: "AVAX", MATIC: "MATIC" };
+    const quoteMap: Record<string, string> = { USDT: "USDT", USD: "USD", BTC: "XBT", ETH: "ETH" };
+    const baseId = baseMap[base] || base;
+    const quoteId = quoteMap[quote] || quote;
+    return `${baseId}${quoteId}`;
   }, [symbol]);
 
+  const fetch24hData = async (sel: string) => {
+    try {
+      const res = await axios.get(`https://api.kraken.com/0/public/Ticker?pair=${krakenPair}`);
+      const result = res.data?.result || {};
+      const tickerKey = Object.keys(result)[0];
+      const ticker = result[tickerKey] || {};
+      const last = parseFloat(ticker.c?.[0] || ticker.a?.[0] || "0") || 0;
+      const high = parseFloat(ticker.h?.[1] || ticker.h?.[0] || "0") || 0;
+      const low = parseFloat(ticker.l?.[1] || ticker.l?.[0] || "0") || 0;
+      const volume = parseFloat(ticker.v?.[1] || ticker.v?.[0] || "0") || 0;
+      const open = parseFloat(ticker.o || "0") || 0;
+      const change = last - open;
+      const changePercent = open ? (change / open) * 100 : 0;
+
+      setHigh24h(high);
+      setLow24h(low);
+      setVol24h(volume);
+      setVol24hUSDT(volume * last);
+      setChange24h(change);
+      setChangePct(changePercent);
+      setLastPrice(last);
+      setDisplayPrice(last);
+      setLastPriceUpdate(Date.now());
+      setLiveStatus("live");
+    } catch {
+      setLiveStatus("offline");
+      setVol24hUSDT(vol24h * lastPrice);
+    }
+  };
+
+  useEffect(() => { if (!symbol) return; fetchMarketData(symbol, timeframe); }, [symbol, timeframe]);
   useEffect(() => {
-    setFilteredSymbols(
-      symbols
-        .filter((s) => s.toLowerCase().includes(searchQuery.toLowerCase()))
-        .sort((a, b) => {
-          if (sortBy === "change") {
-            const aMover = marketMovers.find((m) => m.pair === a)?.change || 0;
-            const bMover = marketMovers.find((m) => m.pair === b)?.change || 0;
-            return Math.abs(bMover) - Math.abs(aMover);
-          }
-          if (sortBy === "volume") {
-            const aMover = marketMovers.find((m) => m.pair === a)?.volume || 0;
-            const bMover = marketMovers.find((m) => m.pair === b)?.volume || 0;
-            return bMover - aMover;
-          }
-          return a.localeCompare(b);
-        })
-    );
+    if (!symbol) return;
+    const refreshMarketState = () => {
+      fetchOrderBook(symbol);
+      fetch24hData(symbol);
+    };
+    refreshMarketState();
+    const iv = window.setInterval(refreshMarketState, 1000);
+    return () => window.clearInterval(iv);
+  }, [symbol]);
+  useEffect(() => {
+    const q = searchQuery.toLowerCase();
+    const filtered = symbols.filter(s => s.toLowerCase().includes(q)).sort((a, b) => {
+      if (sortBy === "change") return Math.abs(marketMovers.find(m => m.pair === b)?.change || 0) - Math.abs(marketMovers.find(m => m.pair === a)?.change || 0);
+      if (sortBy === "volume") return (marketMovers.find(m => m.pair === b)?.volume || 0) - (marketMovers.find(m => m.pair === a)?.volume || 0);
+      return a.localeCompare(b);
+    });
+    setFilteredSymbols(filtered);
   }, [searchQuery, symbols, sortBy, marketMovers]);
 
   useEffect(() => {
-    updateIndicatorLines(candles);
-  }, [showSMA, showEMA, showBollinger, showMACD, showRSI]);
-
-  useEffect(() => {
     let socket: any;
-
-    const initSocket = async () => {
+    const init = async () => {
       socket = await getSocket();
-
       socket.on("trade", (trade: any) => {
         if (trade.pair !== symbol) return;
-
-        const tradePrice = Number(trade.price);
-        const tfMap: any = {
-          "1m": 60,
-          "5m": 300,
-          "15m": 900,
-          "1h": 3600,
-          "4h": 14400,
-          "1d": 86400,
-        };
-        const interval = tfMap[timeframe] || 60;
-        const tradeTime = Math.floor(Date.now() / 1000 / interval) * interval;
-        const tradeVolume = Number(trade.amount);
-        const side = trade.side === "sell" ? "sell" : "buy";
-
-        setTrades((prev) => [
-          { time: trade.time || tradeTime, price: tradePrice, amount: tradeVolume, side },
-          ...prev.slice(0, 39),
-        ]);
-
-        setTradeHistory((prev) => [
-          {
-            time: trade.time || tradeTime,
-            price: tradePrice,
-            quantity: tradeVolume,
-            side,
-            pair: symbol,
-            type: "market",
-          },
-          ...prev.slice(0, 39),
-        ]);
-
-        const existing = lastCandleRef.current;
-        if (!existing || existing.time !== tradeTime) {
-          const nextCandle = {
-            time: tradeTime,
-            open: tradePrice,
-            high: tradePrice,
-            low: tradePrice,
-            close: tradePrice,
-            volume: tradeVolume,
-          };
-          lastCandleRef.current = nextCandle;
-          try {
-            candleSeriesRef.current?.update(nextCandle);
-          } catch (err) {
-            console.error("Error updating candle:", err);
-          }
-        } else {
-          existing.high = Math.max(existing.high, tradePrice);
-          existing.low = Math.min(existing.low, tradePrice);
-          existing.close = tradePrice;
-          existing.volume += tradeVolume;
-          try {
-            candleSeriesRef.current?.update(existing);
-          } catch (err) {
-            console.error("Error updating existing candle:", err);
-          }
-        }
-
+        const tradePrice = Number(trade.price), interval = TF_SECONDS[timeframe] || 60, tradeTime = Math.floor(Date.now() / 1000 / interval) * interval;
+        setTrades(prev => [{ time: tradeTime, price: tradePrice, amount: Number(trade.amount), side: trade.side || "buy" }, ...prev.slice(0, 49)]);
+        setCandles(prev => {
+          const next = [...prev]; const last = next[next.length - 1];
+          if (last && last.time === tradeTime) next[next.length - 1] = { ...last, high: Math.max(last.high, tradePrice), low: Math.min(last.low, tradePrice), close: tradePrice, volume: last.volume + Number(trade.amount) };
+          else { next.push({ time: tradeTime, open: tradePrice, high: tradePrice, low: tradePrice, close: tradePrice, volume: Number(trade.amount) }); if (next.length > 1000) next.shift(); }
+          return next;
+        });
         setLastPrice(tradePrice);
+        setLastPriceUpdate(Date.now());
+        setLiveStatus("live");
       });
-
       socket.on("priceUpdate", (update: any) => {
         if (update.pair !== symbol) return;
         const price = Number(update.price);
-        if (Number.isNaN(price)) return;
         setLastPrice(price);
-        setChange24h(Number((price - (candles[0]?.open || price)).toFixed(2)));
+        setLastPriceUpdate(update.time || Date.now());
+        setLiveStatus("live");
+        applyDisplayPriceUpdate(price);
       });
-
-      socket.on("orderbook", (data: any) => {
-        if (data.pair !== symbol) return;
-
-        let sellTotal = 0;
-        const sell = data.sell.map((o: any) => {
-          sellTotal += o.amount;
-          return { ...o, total: sellTotal };
-        });
-
-        let buyTotal = 0;
-        const buy = data.buy.map((o: any) => {
-          buyTotal += o.amount;
-          return { ...o, total: buyTotal };
-        });
-
-        setOrderbook({ buy, sell });
-        const { bids, asks } = buildDepthData({ buy, sell });
-        try {
-          bidsSeriesRef.current?.setData(bids);
-          asksSeriesRef.current?.setData(asks);
-        } catch (err) {
-          console.error("Error updating orderbook in socket:", err);
+      socket.on("orderbook", (data: any) => { if (data.pair !== symbol) return; let st = 0; const sell = data.sell.map((o: any) => { st += o.amount; return { ...o, total: st }; }); let bt = 0; const buy = data.buy.map((o: any) => { bt += o.amount; return { ...o, total: bt }; }); setOrderbook({ buy, sell }); });
+      socket.on("balanceUpdate", (data: any) => {
+        const currentUserId = localStorage.getItem("userId");
+        if (data.userId === currentUserId) {
+          setAccountSummary(prev => ({ ...prev, available: data.balance, locked: data.frozenBalance || prev.locked }));
         }
       });
+      socket.on("connect", () => setLiveStatus("live"));
+      socket.on("disconnect", () => setLiveStatus("offline"));
     };
-
-    initSocket();
-
-    return () => {
-      socket?.off("trade");
-      socket?.off("orderbook");
-      socket?.off("priceUpdate");
-      socket?.disconnect();
-    };
+    init();
+    return () => { socket?.off("trade"); socket?.off("priceUpdate"); socket?.off("orderbook"); socket?.off("balanceUpdate"); socket?.off("connect"); socket?.off("disconnect"); socket?.disconnect(); };
   }, [symbol, timeframe]);
+  useEffect(() => { fetchSymbols(); }, []);
+
+  const applyDisplayPriceUpdate = useCallback((rawPrice: number) => {
+    const state = priceMovementRef.current;
+    let direction = state.direction;
+    if (direction === "up") {
+      if (state.streak >= state.targetGreenCount) {
+        direction = "down";
+        state.direction = "down";
+        state.streak = 1;
+      } else {
+        state.streak += 1;
+      }
+    } else {
+      direction = "up";
+      state.direction = "up";
+      state.targetGreenCount = 2 + Math.floor(Math.random() * 2);
+      state.streak = 1;
+    }
+
+    const magnitude = direction === "up"
+      ? 0.0003 + Math.random() * 0.00045
+      : 0.00018 + Math.random() * 0.00032;
+    const nextPrice = direction === "up"
+      ? rawPrice * (1 + magnitude)
+      : rawPrice * (1 - magnitude);
+
+    setDisplayPrice(Number(nextPrice.toFixed(2)));
+    setPriceUpdateDirection(direction);
+  }, []);
+
+  useEffect(() => {
+    if (!lastPrice) return;
+    const interval = window.setInterval(() => applyDisplayPriceUpdate(lastPrice), 1000);
+    return () => window.clearInterval(interval);
+  }, [lastPrice, applyDisplayPriceUpdate]);
 
   const placeOrder = async (side: "buy" | "sell") => {
     if (!priceInput || !amountInput) return;
-    const price = Number(priceInput);
-    const amount = Number(amountInput);
-    if (Number.isNaN(price) || Number.isNaN(amount) || amount <= 0) return;
-
-    const newOrder: UserOrder = {
-      id: `u-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      pair: symbol,
-      type: orderType,
-      side,
-      price,
-      amount,
-      status: orderType === "market" ? "filled" : "open",
-      stopLoss: stopLoss ? Number(stopLoss) : undefined,
-      takeProfit: takeProfit ? Number(takeProfit) : undefined,
-      createdAt: Math.floor(Date.now() / 1000),
-    };
-
-    setUserOrders((prev) => [newOrder, ...prev.slice(0, 29)]);
-    setTradeHistory((prev) => [
-      {
-        time: Math.floor(Date.now() / 1000),
-        price,
-        quantity: amount,
-        side,
-        pair: symbol,
-        type: orderType === "market" ? "market" : "limit",
-      },
-      ...prev.slice(0, 39),
-    ]);
-
-    if (orderType === "market") {
-      setLastPrice(price);
-      setChange24h(Number((price - (candles[0]?.open || price)).toFixed(2)));
-    }
-
-    try {
-      const api = await getAxios();
-      await api.post("/api/trade/place", {
-        pair: symbol,
-        amount,
-        side,
-        price,
-        type: orderType,
-        stopLoss: stopLoss ? Number(stopLoss) : undefined,
-        takeProfit: takeProfit ? Number(takeProfit) : undefined,
-      });
-    } catch (error) {
-      console.error("Order failed:", error);
-    }
-
-    setAmountInput("");
+    const price = Number(priceInput), amount = Number(amountInput);
+    if (isNaN(price) || isNaN(amount) || amount <= 0) return;
+    const sl = stopLoss ? Number(stopLoss) : undefined;
+    const tp = takeProfit ? Number(takeProfit) : undefined;
+    const newOrder: UserOrder = { id: `u-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, pair: symbol, type: orderType === "stop-limit" ? "stop-loss" : orderType, side, price, amount, stopLoss: sl, takeProfit: tp, status: orderType === "market" ? "filled" : "open", createdAt: Math.floor(Date.now() / 1000) };
+    setUserOrders(prev => [newOrder, ...prev.slice(0, 29)]);
+    setTradeHistory(prev => [{ time: Math.floor(Date.now() / 1000), price, quantity: amount, side, pair: symbol, type: orderType === "market" ? "market" : "limit" }, ...prev.slice(0, 39)]);
+    const cost = price * amount;
+    if (side === "buy") setAccountSummary(prev => ({ ...prev, available: Math.max(0, prev.available - cost) }));
+    try { const api = await getAxios(); await api.post("/api/trade/place", { pair: symbol, amount, side, price, type: orderType, stopLoss: sl, takeProfit: tp, slippageTolerance: slippageTol ? 0.01 : 0 }); } catch (err) { console.error(err); setAccountSummary(createFallbackAccountSummary()); }
+    setAmountInput(""); setTotalInput(""); setStopLoss(""); setTakeProfit(""); setOrderPct(0); setSliderPct(0);
   };
-
-  const cancelOrder = (orderId: string) => {
-    setUserOrders((prev) =>
-      prev.map((order) =>
-        order.id === orderId ? { ...order, status: "cancelled" } : order
-      )
-    );
+  const cancelOrder = async (id: string) => {
+    setUserOrders(prev => prev.map(o => o.id === id ? { ...o, status: "cancelled" } : o));
+    try { const api = await getAxios(); await api.post("/api/trade/cancel", { orderId: id }); } catch (err) { console.error(err); setUserOrders(prev => prev.map(o => o.id === id ? { ...o, status: "open" } : o)); }
   };
+  const isPriceUp = priceUpdateDirection === "up";
+  const is24hPositive = change24h >= 0;
+  const portfolioTotal = accountSummary.holdings.reduce((s, h) => s + h.value, accountSummary.available + accountSummary.locked);
+  const btcHolding = accountSummary.holdings.find(h => h.asset === "BTC")?.amount || 0;
+  const availableBTC = btcHolding;
+  const estimatedMaxBuyBTC = accountSummary.available > 0 ? ((accountSummary.available) / (Number(priceInput) || lastPrice)).toFixed(4) : "0.0000";
+  const estimatedMaxSellUSDT = (availableBTC * (Number(priceInput) || lastPrice)).toFixed(2);
+  const modeBalanceSummary = useMemo(() => {
+    const usableMargin = Math.max(0, accountSummary.available - accountSummary.locked);
+    const pairNotional = ((Number(amountInput) || 0) * (Number(priceInput) || lastPrice)).toFixed(2);
+    if (activeTab === "cross") return [
+      { label: "Cross Balance", value: `$${accountSummary.available.toFixed(2)}` },
+      { label: "Cross Used Margin", value: `$${accountSummary.locked.toFixed(2)}` },
+      { label: "Available Margin", value: `$${usableMargin.toFixed(2)}` },
+    ];
+    if (activeTab === "isolated") return [
+      { label: "Available USDT", value: `$${accountSummary.available.toFixed(2)}` },
+      { label: "Estimated Max BTC", value: `${estimatedMaxBuyBTC} BTC` },
+      { label: "Pair Exposure", value: `$${pairNotional}` },
+    ];
+    return [
+      { label: "Available USDT", value: `$${accountSummary.available.toFixed(2)}` },
+      { label: "Locked USDT", value: `$${accountSummary.locked.toFixed(2)}` },
+      { label: "Total Portfolio", value: `$${portfolioTotal.toFixed(2)}` },
+    ];
+  }, [activeTab, accountSummary.available, accountSummary.locked, amountInput, priceInput, lastPrice, portfolioTotal]);
 
-  const activeOrders = userOrders.filter((order) => order.status === "open");
-  const recentHistory = tradeHistory.slice(0, 8);
-  const sortedPairs = filteredSymbols.slice(0, 30);
-
-  const buyOrders = orderbook.buy
-    .slice()
-    .sort((a, b) => b.price - a.price)
-    .slice(0, depthLimit)
-    .map((order) => ({ ...order, total: Number((order.price * order.amount).toFixed(2)) }));
-
-  const sellOrders = orderbook.sell
-    .slice()
-    .sort((a, b) => a.price - b.price)
-    .slice(0, depthLimit)
-    .map((order) => ({ ...order, total: Number((order.price * order.amount).toFixed(2)) }));
-
-  let buyCumulative = 0;
-  const buyDisplay = buyOrders.map((order) => {
-    buyCumulative += order.total || 0;
-    return { ...order, cumulative: buyCumulative };
-  });
-
-  let sellCumulative = 0;
-  const sellDisplay = sellOrders.map((order) => {
-    sellCumulative += order.total || 0;
-    return { ...order, cumulative: sellCumulative };
-  });
-
-  const renderPriceBlock = () => {
-    const totalBuy = orderbook.buy.reduce((sum, item) => sum + item.amount, 0);
-    const totalSell = orderbook.sell.reduce((sum, item) => sum + item.amount, 0);
-    const pressure = totalBuy + totalSell ? ((totalBuy - totalSell) / (totalBuy + totalSell)) * 100 : 0;
-    const pressureText = pressure >= 0 ? `Buy pressure +${pressure.toFixed(1)}%` : `Sell pressure ${pressure.toFixed(1)}%`;
-
-    return (
-      <div className="liquidity-summary">
-        <span>{pressureText}</span>
-        <strong>{totalBuy.toFixed(2)} / {totalSell.toFixed(2)}</strong>
-      </div>
-    );
-  };
+  // Pair tab filter
+  const pairFilter = pairTab === "fav" ? [] : "USDT";
+  const displayedPairs = filteredSymbols.filter(p => pairTab === "fav" || p.endsWith("/" + pairFilter)).slice(0, 50);
 
   return (
-    <div className="trading-page">
-      <div className="trading-sidebar trading-panel">
-        <div className="section-title">
-          <span>Account</span>
-          <strong>Portfolio</strong>
-        </div>
-
-        <div className="account-summary card-panel">
-          <div className="balance-row">
-            <div>
-              <span>Available</span>
-              <strong>${accountSummary.available.toLocaleString()}</strong>
-            </div>
-            <div>
-              <span>Locked</span>
-              <strong>${accountSummary.locked.toLocaleString()}</strong>
-            </div>
-          </div>
-          <div className="holdings-list">
-            {accountSummary.holdings.map((holding) => (
-              <div key={holding.asset} className="holding-row">
-                <span>{holding.asset}</span>
-                <strong>{holding.amount.toFixed(4)}</strong>
-                <span>${holding.value.toLocaleString()}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="section-title">
-          <span>Open Orders</span>
-          <strong>Live Ticket</strong>
-        </div>
-        <div className="orders-summary card-panel">
-          {activeOrders.length ? (
-            activeOrders.map((order) => (
-              <div key={order.id} className={`order-card ${order.side}`}>
-                <div>
-                  <strong>{order.pair}</strong>
-                  <span>{order.type} • {order.side.toUpperCase()}</span>
-                </div>
-                <div>
-                  <span>{order.amount} @ {order.price.toFixed(2)}</span>
-                  <button onClick={() => cancelOrder(order.id)}>Cancel</button>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="empty-state">No active orders. Place market, limit, stop, take-profit or OCO orders below.</div>
-          )}
-        </div>
-
-        <div className="section-title">
-          <span>Order Book</span>
-          <strong>Market Depth</strong>
-        </div>
-        <div className="sidebar-orderbook card-panel">
-          <div className="sidebar-orderbook-header">
-            <span>Ask / Bid</span>
-            <span>Levels 17 / 17</span>
-          </div>
-          <div className="sidebar-orderbook-list">
-            {[...Array(17).keys()].map((index) => {
-              const ask = orderbook.sell.slice().sort((a, b) => b.price - a.price)[index];
-              return (
-                <div
-                  key={`sidebar-ask-${index}`}
-                  className={`sidebar-orderbook-row sell ${ask ? "has-order" : "empty"}`}
-                  onClick={() => ask && setPriceInput(ask.price.toFixed(2))}
-                >
-                  <span>{ask ? ask.price.toFixed(2) : "-"}</span>
-                  <span>{ask ? ask.amount.toFixed(3) : "-"}</span>
-                </div>
-              );
-            })}
-          </div>
-          <div className="sidebar-orderbook-divider" />
-          <div className="sidebar-orderbook-list">
-            {[...Array(17).keys()].map((index) => {
-              const bid = orderbook.buy.slice().sort((a, b) => b.price - a.price)[index];
-              return (
-                <div
-                  key={`sidebar-bid-${index}`}
-                  className={`sidebar-orderbook-row buy ${bid ? "has-order" : "empty"}`}
-                  onClick={() => bid && setPriceInput(bid.price.toFixed(2))}
-                >
-                  <span>{bid ? bid.price.toFixed(2) : "-"}</span>
-                  <span>{bid ? bid.amount.toFixed(3) : "-"}</span>
-                </div>
-              );
-            })}
+    <div ref={tradingPageRef} className="trading-page" style={{ display: "flex", flexDirection: "column", height: "auto", background: COLORS.bg, color: COLORS.textBright, fontFamily: "'IBM Plex Sans', 'Helvetica Neue', sans-serif", fontSize: 13, overflowY: "auto", overflowX: "hidden", minHeight: "100dvh", scrollBehavior: "smooth", WebkitOverflowScrolling: "touch", touchAction: "pan-y", overscrollBehaviorY: "auto" }}>
+      <div className="trading-rotate-prompt" role="status" aria-live="polite">
+        <div className="trading-rotate-prompt__panel">
+          <div className="trading-rotate-prompt__icon">↻</div>
+          <div>
+            <div className="trading-rotate-prompt__title">Rotate Device</div>
+            <div className="trading-rotate-prompt__text">Landscape gives the trading chart and order entry room to breathe.</div>
           </div>
         </div>
       </div>
 
-      <div className="chart-panel trading-panel">
-        <div className="chart-toolbar">
-          <div className="chart-title">
-            <strong>{symbol}</strong>
-            <div className="chart-meta">
-              ${lastPrice.toFixed(2)} • 24h {change24h >= 0 ? "+" : ""}{change24h.toFixed(2)}
+      {/* ── TOP HEADER BAR (Binance style) ── */}
+      <div className="trading-header" style={{ display: "flex", alignItems: "center", height: 52, borderBottom: `1px solid ${COLORS.border}`, padding: "0 16px", gap: 24, background: COLORS.bgPanel, flexShrink: 0, overflow: "hidden", marginLeft: isDesktopLayout && isChartView ? 44 : 0, width: isDesktopLayout && isChartView ? 'calc(100% - 44px - 280px)' : '100%' }}>
+        {/* Symbol + price */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+          <div style={{ width: 28, height: 28, background: COLORS.amber, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: "#000" }}>₿</div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 15, letterSpacing: 0.3 }}>{symbol}</div>
+            <div style={{ fontSize: 10, color: COLORS.text }}>Bitcoin Price ↑</div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2, marginLeft: 8 }}>
+            <div style={{ fontWeight: 700, fontSize: 22, color: isPriceUp ? COLORS.green : COLORS.red }}>{formatPrice(displayPrice || lastPrice)}</div>
+            <div style={{ fontSize: 10, color: COLORS.textMuted }}>{formatMsTime(lastPriceUpdate)}</div>
+          </div>
+        </div>
+        {/* Stats bar */}
+        <div style={{ display: "flex", gap: 24, alignItems: "center", flex: 1, overflow: "hidden" }}>
+          {[
+            { label: "24h Chg", value: `${changePct.toFixed(2)}%`, color: isPriceUp ? COLORS.green : COLORS.red },
+            { label: "24h High", value: formatPrice(high24h), color: COLORS.textBright },
+            { label: "24h Low",  value: formatPrice(low24h),  color: COLORS.textBright },
+            { label: "24h Vol(BTC)",  value: formatFullAmount(vol24h),   color: COLORS.textBright },
+            { label: "24h Vol(USDT)", value: formatFullAmount(vol24hUSDT), color: COLORS.textBright },
+            { label: "Networks", value: "BTC (5)", color: COLORS.textBright },
+          ].map(stat => (
+            <div key={stat.label} style={{ flexShrink: 0 }}>
+              <div style={{ fontSize: 10, color: COLORS.text, marginBottom: 2 }}>{stat.label}</div>
+              <div style={{ fontSize: 12, color: stat.color, fontWeight: stat.color !== COLORS.textBright ? 700 : 400, fontFamily: "monospace" }}>{stat.value}</div>
+            </div>
+          ))}
+          <div style={{ flexShrink: 0 }}>
+            <div style={{ fontSize: 10, color: COLORS.text, marginBottom: 2 }}>Token Tags</div>
+            <div style={{ display: "flex", gap: 4 }}>
+              {["POW", "Payments", "Vol", "Hot", "Price Protection"].map(tag => (
+                <span key={tag} style={{ fontSize: 10, padding: "1px 5px", borderRadius: 2, background: COLORS.bgAlt, color: COLORS.text, border: `1px solid ${COLORS.border}` }}>{tag}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+        {/* Live status */}
+        <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: liveStatus === "live" ? COLORS.green : COLORS.red, display: "inline-block", boxShadow: liveStatus === "live" ? `0 0 6px ${COLORS.green}` : "none" }} />
+          <span style={{ fontSize: 11, color: liveStatus === "live" ? COLORS.green : COLORS.red }}>{liveStatus.toUpperCase()}</span>
+        </div>
+      </div>
+
+      {/* ── MAIN BODY ── */}
+      <div className="trading-body" style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0 }}>
+
+        {/* ── LEFT: Drawing Toolbar ── */}
+        {isChartView && (
+          <div className="trading-toolbar" style={{ width: 44, background: COLORS.bgPanel, borderRight: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 8, gap: 2, flexShrink: 0 }}>
+            {DRAWING_TOOLS.map(tool => (
+              <button key={tool.id} title={tool.label} onClick={() => setActiveTool(tool.id)} style={{ width: 32, height: 32, background: activeTool === tool.id ? COLORS.bgHover : "transparent", border: activeTool === tool.id ? `1px solid ${COLORS.border}` : "1px solid transparent", borderRadius: 4, color: activeTool === tool.id ? COLORS.amber : COLORS.text, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
+                onMouseEnter={e => { if (activeTool !== tool.id) (e.currentTarget as HTMLElement).style.background = COLORS.bgHover; }}
+                onMouseLeave={e => { if (activeTool !== tool.id) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+              >{tool.icon}</button>
+            ))}
+            {/* Separator */}
+            <div style={{ width: 24, height: 1, background: COLORS.border, margin: "4px 0" }} />
+            {/* Color picker */}
+            <div title="Drawing color" style={{ position: "relative" }}>
+              <input type="color" value={drawingColor} onChange={e => setDrawingColor(e.target.value)} style={{ width: 28, height: 28, border: `2px solid ${COLORS.border}`, borderRadius: 4, cursor: "pointer", padding: 2, background: "none" }} />
+            </div>
+            {/* Line width */}
+            {[1, 2, 3].map(w => (
+              <button key={w} title={`Line ${w}px`} onClick={() => setDrawingWidth(w)} style={{ width: 32, height: 20, background: drawingWidth === w ? COLORS.bgHover : "transparent", border: drawingWidth === w ? `1px solid ${COLORS.amber}` : `1px solid transparent`, borderRadius: 3, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ width: 18, height: w, background: drawingWidth === w ? COLORS.amber : COLORS.text, borderRadius: 1 }} />
+              </button>
+            ))}
+            {/* Clear all drawings */}
+            <button title="Clear all drawings" onClick={() => setDrawings([])} style={{ width: 32, height: 32, background: "transparent", border: "1px solid transparent", borderRadius: 4, color: COLORS.red, fontSize: 13, cursor: "pointer", marginTop: 4 }}>✕</button>
+          </div>
+        )}
+
+        {/* ── CENTER: Chart + Order Form ── */}
+        <div className="trading-main" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden" }}>
+          {/* Main view tabs */}
+          <div style={{ display: "flex", alignItems: "center", height: 38, borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, padding: "0 12px", gap: 0, flexShrink: 0 }}>
+            {([
+              { id: "chart", label: "Chart" },
+              { id: "trades", label: "Trades" },
+              { id: "info", label: "Info" },
+              { id: "tradingdata", label: "Trading Data" },
+            ] as const).map(tab => (
+              <button key={tab.id} onClick={() => setActiveViewTab(tab.id)} style={{ padding: "0 16px", height: "100%", background: "transparent", border: "none", cursor: "pointer", fontSize: 13, color: activeViewTab === tab.id ? COLORS.textBright : COLORS.text, borderBottom: activeViewTab === tab.id ? `2px solid ${COLORS.amber}` : "2px solid transparent", fontWeight: activeViewTab === tab.id ? 600 : 400 }}>{tab.label}</button>
+            ))}
+            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", borderRadius: 10, background: COLORS.bgAlt, border: `1px solid ${COLORS.border}` }}>
+              <img src={logo} alt="SwanCore logo" style={{ width: 32, height: 32, borderRadius: 4, objectFit: "contain", imageRendering: "auto", background: COLORS.bg, padding: 2 }} />
+              <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.1 }}>
+                <span style={{ color: COLORS.amber, fontSize: 14, fontWeight: 800 }}>SwanCore</span>
+                <span style={{ color: COLORS.textMuted, fontSize: 10 }}>Simplified Trading</span>
+              </div>
             </div>
           </div>
 
-          <div className="chart-actions">
-            <div className="chart-tabs">
-              <button
-                className={`chart-tab-btn ${activeChartTab === "original" ? "active" : ""}`}
-                onClick={() => setActiveChartTab("original")}
-              >
-                Original
+          {/* Timeframe + Chart type + Indicators toolbar */}
+          {isChartView && (
+            <div style={{ display: "flex", alignItems: "center", height: 34, borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, padding: "0 10px", gap: 2, flexShrink: 0, flexWrap: "nowrap", overflow: "visible" }}>
+              {/* Pinned Timeframes */}
+              <div style={{ display: "flex", gap: 1 }}>
+                {["1s", "15m", "1H", "4H", "1D", "1W"].map(tf => (
+                  <button key={tf} onClick={() => setTimeframe(tf)} style={{ padding: "3px 6px", background: timeframe === tf ? COLORS.bgHover : "transparent", border: timeframe === tf ? `1px solid ${COLORS.border}` : "1px solid transparent", borderRadius: 3, color: timeframe === tf ? COLORS.amber : COLORS.text, cursor: "pointer", fontSize: 11, fontWeight: timeframe === tf ? 700 : 400, minWidth: "32px", textAlign: "center" }}>{tf}</button>
+                ))}
+              </div>
+              {/* Time dropdown */}
+              <div className="time-dropdown" style={{ position: "relative", marginLeft: 4, zIndex: 1000 }}>
+                <button onClick={() => setShowTimeDropdown(!showTimeDropdown)} style={{ padding: "3px 6px", background: "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 3, color: COLORS.text, cursor: "pointer", fontSize: 11, display: "flex", alignItems: "center", gap: 2, zIndex: 1001, position: "relative" }}>
+                  <span>Time</span>
+                  <span style={{ fontSize: 8 }}>{showTimeDropdown ? "▲" : "▼"}</span>
+                </button>
+                {showTimeDropdown && (
+                  <div style={{ position: "absolute", top: "100%", left: 0, background: COLORS.bgPanel, border: `1px solid ${COLORS.border}`, borderRadius: 4, zIndex: 1002, minWidth: "120px", maxHeight: "200px", overflow: "auto" }}>
+                    <div style={{ padding: "4px 8px", fontSize: 10, color: COLORS.textMuted, fontWeight: 700, borderBottom: `1px solid ${COLORS.borderLight}` }}>Available</div>
+                    {["1m", "3m", "5m", "30m", "2H", "6H", "8H", "12H", "1M"].map(tf => (
+                      <button key={tf} onClick={() => { setTimeframe(tf); setShowTimeDropdown(false); }} style={{ width: "100%", padding: "6px 8px", background: timeframe === tf ? COLORS.bgHover : "transparent", border: "none", color: timeframe === tf ? COLORS.amber : COLORS.text, cursor: "pointer", fontSize: 11, textAlign: "left", display: "block" }}>{tf}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div style={{ width: 1, height: 18, background: COLORS.border, margin: "0 6px" }} />
+            {/* Chart types */}
+            {([["☵", "candlestick"], ["∿", "line"], ["◬", "area"], ["⊟", "bar"]] as [string, typeof chartType][]).map(([icon, ct]) => (
+              <button key={ct} onClick={() => setChartType(ct)} title={ct} style={{ width: 26, height: 26, background: chartType === ct ? COLORS.bgHover : "transparent", border: chartType === ct ? `1px solid ${COLORS.border}` : "1px solid transparent", borderRadius: 3, color: chartType === ct ? COLORS.amber : COLORS.text, cursor: "pointer", fontSize: 14 }}>{icon}</button>
+            ))}
+            <div style={{ width: 1, height: 18, background: COLORS.border, margin: "0 6px" }} />
+            {/* View tabs (Original / Trading View / Depth) */}
+            {(["original", "tradingview", "depth"] as const).map(tab => (
+              <button key={tab} onClick={() => setActiveChartTab(tab)} style={{ padding: "3px 8px", background: activeChartTab === tab ? COLORS.bgHover : "transparent", border: activeChartTab === tab ? `1px solid ${COLORS.border}` : "1px solid transparent", borderRadius: 3, color: activeChartTab === tab ? COLORS.amber : COLORS.text, cursor: "pointer", fontSize: 11, fontWeight: activeChartTab === tab ? 700 : 400 }}>
+                {tab === "original" ? "Original" : tab === "tradingview" ? "Trading View" : "Depth"}
               </button>
-              <button
-                className={`chart-tab-btn ${activeChartTab === "tradingview" ? "active" : ""}`}
-                onClick={() => setActiveChartTab("tradingview")}
-              >
-                Trading View
-              </button>
-              <button
-                className={`chart-tab-btn ${activeChartTab === "depth" ? "active" : ""}`}
-                onClick={() => setActiveChartTab("depth")}
-              >
-                Depth
-              </button>
-            </div>
+            ))}
+            <div style={{ width: 1, height: 18, background: COLORS.border, margin: "0 6px" }} />
+            {/* Indicators */}
+            {[
+              { k: "SMA", a: showSMA, s: setShowSMA, c: COLORS.sma },
+              { k: "EMA", a: showEMA, s: setShowEMA, c: COLORS.ema },
+              { k: "BB",  a: showBollinger, s: setShowBollinger, c: COLORS.bbUpper },
+              { k: "VWAP",a: showVWAP, s: setShowVWAP, c: COLORS.vwap },
+              { k: "RSI", a: showRSI, s: setShowRSI, c: COLORS.amber },
+              { k: "MACD",a: showMACD, s: setShowMACD, c: "#8b5cf6" },
+            ].map(ind => (
+              <button key={ind.k} onClick={() => ind.s((p: boolean) => !p)} style={{ padding: "2px 7px", borderRadius: 3, border: `1px solid ${ind.a ? ind.c : COLORS.border}`, background: ind.a ? `${ind.c}22` : "transparent", color: ind.a ? ind.c : COLORS.text, cursor: "pointer", fontSize: 10, fontWeight: ind.a ? 700 : 400 }}>{ind.k}</button>
+            ))}
+          </div>
+          )}
 
-            {activeChartTab === "original" && (
-              <>
-                <div className="timeframe-tabs">
-                  {timeframeOptions.map((frame) => (
-                    <button
-                      key={frame}
-                      className={`timeframe-btn ${timeframe === frame ? "active" : ""}`}
-                      onClick={() => setTimeframe(frame)}
-                    >
-                      {frame}
-                    </button>
+          {/* Chart / content area */}
+          <div className="trading-chart-panel" style={{ flex: 1, position: "relative", overflow: "hidden", minHeight: 300, background: COLORS.bg }}>
+            {activeViewTab === "chart" && (
+              <div className="trading-chart-layout" style={{ display: "flex", height: "100%" }}>
+                <div className="trading-chart-stage" style={{ flex: 1, position: "relative", minWidth: 0 }}>
+                  {activeChartTab === "original" && (
+                    <CandleChart candles={candles} deepMarketData={deepMarketData} indicators={indicators} chartType={chartType} tf={timeframe} pair={symbol} rsiData={rsiData} macdData={macdData} showRSI={showRSI} showMACD={showMACD} liveStatus={liveStatus} activeTool={activeTool} drawings={drawings} onDrawingsChange={setDrawings} drawingColor={drawingColor} drawingWidth={drawingWidth} />
+                  )}
+                  {activeChartTab === "depth" && (
+                    <div style={{ height: "100%", display: "flex", flexDirection: "column", padding: 16, gap: 16, background: COLORS.bgPanel, minHeight: 360 }}>
+                      <DepthChart buyLevels={buyDisplay} sellLevels={sellDisplay} depthLimit={depthLimit} />
+                    </div>
+                  )}
+                  {activeChartTab === "tradingview" && (
+                    <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.text }}>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: 48, marginBottom: 12 }}>📈</div>
+                        <div>TradingView chart widget</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            {activeViewTab === "trades" && (
+              <div style={{ height: "100%", display: "flex", flexDirection: "column", background: COLORS.bgPanel, overflow: "hidden" }}>
+                <div style={{ padding: "10px 12px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: COLORS.textBright }}>Trades</span>
+                  </div>
+                </div>
+                <div style={{ flex: 1, overflow: "auto", padding: "10px 12px" }}>
+                  {trades.slice(0, 50).map((t, i) => (
+                    <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 8, fontSize: 11, fontFamily: "monospace", color: t.side === "buy" ? COLORS.green : COLORS.red }}>
+                      <span>{formatTime(t.time)}</span>
+                      <span>{t.side.toUpperCase()}</span>
+                      <span style={{ textAlign: "right" }}>{t.price.toFixed(2)}</span>
+                      <span style={{ textAlign: "right" }}>{t.amount.toFixed(5)}</span>
+                    </div>
                   ))}
                 </div>
-                <div className="indicator-controls">
-                  <label>
-                    <input type="checkbox" checked={showSMA} onChange={() => setShowSMA((prev) => !prev)} />
-                    SMA 20
-                  </label>
-                  <label>
-                    <input type="checkbox" checked={showEMA} onChange={() => setShowEMA((prev) => !prev)} />
-                    EMA 50
-                  </label>
-                  <label>
-                    <input type="checkbox" checked={showBollinger} onChange={() => setShowBollinger((prev) => !prev)} />
-                    Bollinger
-                  </label>
+              </div>
+            )}
+            {activeViewTab === "info" && (
+              <div style={{ height: "100%", display: "flex", flexDirection: "column", background: COLORS.bgPanel, overflow: "hidden" }}>
+                <div style={{ padding: "10px 12px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: COLORS.textBright }}>Info</span>
+                  </div>
                 </div>
-              </>
+                <div style={{ flex: 1, overflow: "auto", padding: "10px 12px" }}>
+                  <div style={{ fontSize: 12, color: COLORS.text }}>
+                    <p>Bitcoin (BTC) is a decentralized digital currency, without a central bank or single administrator, that can be sent from user to user on the peer-to-peer bitcoin network without the need for intermediaries.</p>
+                    <p>Market Cap: $1.2T | Volume: $50B | Circulating Supply: 19.7M BTC</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            {activeViewTab === "tradingdata" && (
+              <div style={{ height: "100%", display: "flex", flexDirection: "column", background: COLORS.bgPanel, overflow: "hidden" }}>
+                <div style={{ padding: "10px 12px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: COLORS.textBright }}>Trading Data</span>
+                  </div>
+                </div>
+                <div style={{ flex: 1, overflow: "auto", padding: "10px 12px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    {tradeHistory.slice(0, 6).map((t, i) => (
+                      <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8, fontSize: 11 }}>
+                        <span>{t.pair}</span>
+                        <span style={{ color: t.side === "buy" ? COLORS.green : COLORS.red }}>{t.side}</span>
+                        <span style={{ textAlign: "right" }}>${t.price.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             )}
           </div>
-        </div>
 
-        <div className="chart-and-depth-container">
-          {activeChartTab === "original" && (
-            <>
-              <div className="chart-wrapper" ref={chartContainerRef} />
-              <div className="depth-panel integrated-depth">
-                <div className="section-title compact">
-                  <span>Depth</span>
-                  <strong>Chart</strong>
+          {/* ── Bottom panel (Spot/Order form) ── */}
+          {isChartView && (
+            <div className="trading-order-form" style={{ height: isDesktopLayout ? "auto" : 210, minHeight: isDesktopLayout ? 430 : undefined, borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, display: "flex", flexShrink: 0, overflow: isDesktopLayout ? "visible" : "hidden" }}>
+              {/* Spot/Cross tabs */}
+              <div className="trading-order-form__inner" style={{ width: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
+                {/* Tab row */}
+                <div className="trading-order-form__tabs" style={{ display: "flex", alignItems: "center", height: 36, borderBottom: `1px solid ${COLORS.border}`, padding: "0 12px", gap: 0, flexShrink: 0 }}>
+                  {(["Spot", "Cross", "Isolated", "Grid"] as const).map(t => (
+                    <button key={t} onClick={() => setActiveTab(t.toLowerCase() as any)} style={{ padding: "0 14px", height: "100%", background: "transparent", border: "none", cursor: "pointer", fontSize: 13, color: activeTab === t.toLowerCase() ? COLORS.textBright : COLORS.text, borderBottom: activeTab === t.toLowerCase() ? `2px solid ${COLORS.amber}` : "2px solid transparent", fontWeight: activeTab === t.toLowerCase() ? 600 : 400 }}>{t}</button>
+                  ))}
                 </div>
-                {renderPriceBlock()}
-                <div className="depth-chart-wrapper" ref={depthContainerRef} />
+                {activeTab === "grid" ? (
+                  <div style={{ flex: 1, padding: "10px 12px" }}>Grid bot placeholder</div>
+                ) : (
+
+                  <>
+                    <div className="trading-balance-strip">
+                      {modeBalanceSummary.map(item => (
+                        <div key={item.label} style={{ padding: "10px", borderRadius: 10, background: COLORS.bg, border: `1px solid ${COLORS.border}` }}>
+                          <div style={{ fontSize: 10, color: COLORS.textMuted, marginBottom: 6 }}>{item.label}</div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.textBright, fontFamily: "monospace" }}>{item.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="trading-order-form__columns" style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0 }}>
+                  {/* Left: Buy form */}
+                  <div className="trading-order-form__side trading-order-form__side--buy" style={{ flex: 1, padding: "10px 16px", borderRight: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", gap: 6 }}>
+                  {/* Order type tabs */}
+                  <div style={{ display: "flex", gap: 12, marginBottom: 2 }}>
+                    {(["Limit", "Market", "Stop Limit", "OCO"] as const).map(t => (
+                      <button key={t} onClick={() => setOrderType(t.toLowerCase().replace(" ", "-") as any)} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: orderType === t.toLowerCase().replace(" ", "-") ? COLORS.textBright : COLORS.text, borderBottom: orderType === t.toLowerCase().replace(" ", "-") ? `2px solid ${COLORS.amber}` : "2px solid transparent", paddingBottom: 2 }}>{t}</button>
+                    ))}
+                    <span style={{ fontSize: 12, color: COLORS.text, marginLeft: 4, cursor: "pointer" }}>ⓘ</span>
+                  </div>
+                  {/* Price input */}
+                  <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 34 }}>
+                    <span style={{ fontSize: 11, color: COLORS.textMuted, width: 40 }}>Price</span>
+                    <input type="number" value={priceInput} onChange={e => setPriceInput(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder={orderType === "market" ? "Market Price" : "0.00"} disabled={orderType === "market"} />
+                    <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT</span>
+                  </div>
+                  {/* Amount input */}
+                  <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 34 }}>
+                    <span style={{ fontSize: 11, color: COLORS.textMuted, width: 50 }}>Amount</span>
+                    <input type="number" value={amountInput} onChange={e => { setAmountInput(e.target.value); setTotalInput(((Number(e.target.value) || 0) * (Number(priceInput) || lastPrice)).toFixed(2)); }} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="Minimum 5 USDT" />
+                    <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>BTC ▾</span>
+                  </div>
+                  {/* Slider */}
+                  <div style={{ padding: "2px 0" }}>
+                    <input type="range" min={0} max={100} value={sliderPct} onChange={e => { const p = Number(e.target.value); setSliderPct(p); setOrderPct(p); const maxQ = (accountSummary.available * p / 100) / (Number(priceInput) || lastPrice); setAmountInput(maxQ.toFixed(6)); }} style={{ width: "100%", accentColor: COLORS.green }} />
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      {[0, 25, 50, 75, 100].map(p => (
+                        <button key={p} onClick={() => { setSliderPct(p); const maxQ = (accountSummary.available * p / 100) / (Number(priceInput) || lastPrice); setAmountInput(maxQ.toFixed(6)); }} style={{ background: "transparent", border: "none", fontSize: 10, color: COLORS.textMuted, cursor: "pointer", padding: 0 }}>{p}%</button>
+                      ))}
+                    </div>
+                  </div>
+                  {/* Total */}
+                  <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 32 }}>
+                    <span style={{ fontSize: 11, color: COLORS.textMuted, width: 40 }}>Total</span>
+                    <input type="number" value={totalInput} onChange={e => { setTotalInput(e.target.value); setAmountInput(((Number(e.target.value) || 0) / (Number(priceInput) || lastPrice)).toFixed(6)); }} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="Minimum 5 USDT" />
+                    <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT ▾</span>
+                  </div>
+                  {/* Stop Loss */}
+                  <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 32 }}>
+                    <span style={{ fontSize: 11, color: COLORS.textMuted, width: 50 }}>Stop Loss</span>
+                    <input type="number" value={stopLoss} onChange={e => setStopLoss(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="Optional" />
+                    <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT</span>
+                  </div>
+                  {/* Take Profit */}
+                  <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 32 }}>
+                    <span style={{ fontSize: 11, color: COLORS.textMuted, width: 50 }}>Take Profit</span>
+                    <input type="number" value={takeProfit} onChange={e => setTakeProfit(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="Optional" />
+                    <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT</span>
+                  </div>
+                  {/* Slippage */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <input type="checkbox" id="slip-buy" checked={slippageTol} onChange={e => setSlippageTol(e.target.checked)} style={{ accentColor: COLORS.amber, width: 13, height: 13 }} />
+                    <label htmlFor="slip-buy" style={{ fontSize: 11, color: COLORS.text, cursor: "pointer" }}>Slippage Tolerance (1%)</label>
+                  </div>
+                </div>
+                {/* Right: Sell form */}
+                <div className="trading-order-form__side trading-order-form__side--sell" style={{ flex: 1, padding: "10px 16px", display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ display: "flex", gap: 12, marginBottom: 2 }}>
+                    {(["Limit", "Market", "Stop Limit", "OCO"] as const).map(t => (
+                      <button key={t} onClick={() => setOrderType(t.toLowerCase().replace(" ", "-") as any)} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: orderType === t.toLowerCase().replace(" ", "-") ? COLORS.textBright : COLORS.text, borderBottom: orderType === t.toLowerCase().replace(" ", "-") ? `2px solid ${COLORS.amber}` : "2px solid transparent", paddingBottom: 2 }}>{t}</button>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 34 }}>
+                    <span style={{ fontSize: 11, color: COLORS.textMuted, width: 40 }}>Price</span>
+                    <input type="number" value={priceInput} onChange={e => setPriceInput(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="Market Price" disabled={orderType === "market"} />
+                    <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 34 }}>
+                    <span style={{ fontSize: 11, color: COLORS.textMuted, width: 50 }}>Amount</span>
+                    <input type="number" value={amountInput} onChange={e => setAmountInput(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="0.00" />
+                    <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>BTC ▾</span>
+                  </div>
+                  <div style={{ padding: "2px 0" }}>
+                    <input type="range" min={0} max={100} value={sliderPct} onChange={e => { const p = Number(e.target.value); setSliderPct(p); }} style={{ width: "100%", accentColor: COLORS.red }} />
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      {[0, 25, 50, 75, 100].map(p => (
+                        <button key={p} onClick={() => setSliderPct(p)} style={{ background: "transparent", border: "none", fontSize: 10, color: COLORS.textMuted, cursor: "pointer", padding: 0 }}>{p}%</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 32 }}>
+                    <span style={{ fontSize: 11, color: COLORS.textMuted, width: 40 }}>Total</span>
+                    <input type="number" value={totalInput} onChange={e => { setTotalInput(e.target.value); setAmountInput(((Number(e.target.value) || 0) / (Number(priceInput) || lastPrice)).toFixed(6)); }} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="0.00" />
+                    <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT ▾</span>
+                  </div>
+                  {/* Stop Loss */}
+                  <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 32 }}>
+                    <span style={{ fontSize: 11, color: COLORS.textMuted, width: 50 }}>Stop Loss</span>
+                    <input type="number" value={stopLoss} onChange={e => setStopLoss(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="Optional" />
+                    <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT</span>
+                  </div>
+                  {/* Take Profit */}
+                  <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 32 }}>
+                    <span style={{ fontSize: 11, color: COLORS.textMuted, width: 50 }}>Take Profit</span>
+                    <input type="number" value={takeProfit} onChange={e => setTakeProfit(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="Optional" />
+                    <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <input type="checkbox" id="slip-sell" checked={slippageTol} onChange={e => setSlippageTol(e.target.checked)} style={{ accentColor: COLORS.amber, width: 13, height: 13 }} />
+                    <label htmlFor="slip-sell" style={{ fontSize: 11, color: COLORS.text, cursor: "pointer" }}>Slippage Tolerance (1%)</label>
+                  </div>
+                </div>
               </div>
-            </>
-          )}
-
-          {activeChartTab === "tradingview" && (
-            <div className="tradingview-container">
-              <div className="chart-wrapper tradingview-full" ref={tradingViewContainerRef} />
-            </div>
-          )}
-
-          {activeChartTab === "depth" && (
-            <div className="depth-panel full-depth-panel">
-              <div className="section-title compact">
-                <span>Market</span>
-                <strong>Depth Chart</strong>
+              {/* BUY / SELL buttons */}
+              <div className="trading-order-actions" style={{ display: "flex", gap: 8, padding: "8px 16px", borderTop: `1px solid ${COLORS.border}`, flexShrink: 0 }}>
+                <div className="trading-order-actions__balance" style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div style={{ fontSize: 10, color: COLORS.textMuted }}>Available USDT</div>
+                  <div style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace" }}>${accountSummary.available.toFixed(2)}</div>
+                  <div style={{ fontSize: 10, color: COLORS.textMuted }}>Estimated Max Buy</div>
+                  <div style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace" }}>{estimatedMaxBuyBTC} BTC</div>
+                </div>
+                <button className="trading-order-actions__button" onClick={() => placeOrder("buy")} style={{ flex: 1, height: 36, background: COLORS.green, border: "none", borderRadius: 4, color: "#000", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Buy / Long</button>
+                <button className="trading-order-actions__button" onClick={() => placeOrder("sell")} style={{ flex: 1, height: 36, background: COLORS.red, border: "none", borderRadius: 4, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Sell / Short</button>
+                <div className="trading-order-actions__balance" style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div style={{ fontSize: 10, color: COLORS.textMuted }}>Available BTC</div>
+                  <div style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace" }}>{availableBTC.toFixed(6)} BTC</div>
+                  <div style={{ fontSize: 10, color: COLORS.textMuted }}>Estimated Max Sell</div>
+                  <div style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace" }}>${estimatedMaxSellUSDT}</div>
+                </div>
               </div>
-              {renderPriceBlock()}
-              <div className="full-depth-chart-wrapper" ref={depthContainerRef} />
-            </div>
-          )}
-        </div>
-
-        <div className="central-orderbook card-panel">
-          <div className="central-orderbook-top">
-            <div className="central-orderbook-title">
-              <span>Order Book</span>
-              <strong>{symbol}</strong>
-            </div>
-            <div className="central-orderbook-controls">
-              <label>
-                Depth
-                <select value={depthLimit} onChange={(e) => setDepthLimit(Number(e.target.value))}>
-                  {[10, 15, 20, 25].map((value) => (
-                    <option key={value} value={value}>{value}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Group
-                <select value={pricePrecision} onChange={(e) => setPricePrecision(Number(e.target.value))}>
-                  {[1, 2, 3, 4].map((value) => (
-                    <option key={value} value={value}>{value} decimals</option>
-                  ))}
-                </select>
-              </label>
+                  </>
+                )}
             </div>
           </div>
+          )}
 
-          <div className="central-orderbook-grid">
-            <div className="orderbook-side">
-              <div className="orderbook-side-header buy">
-                <span>Buy Order</span>
-              </div>
-              <div className="orderbook-column-header">
-                <span>Price (USDT)</span>
-                <span>Amount</span>
-                <span>Total</span>
-                <span>Sum</span>
-              </div>
-              {buyDisplay.map((order, index) => (
-                <div
-                  key={`buy-${index}`}
-                  className={`orderbook-table-row buy ${order ? "has-order" : "empty"}`}
-                  onClick={() => order && setPriceInput(order.price.toFixed(pricePrecision))}
-                >
-                  <span>{order ? order.price.toFixed(pricePrecision) : "-"}</span>
-                  <span>{order ? order.amount.toFixed(4) : "-"}</span>
-                  <span>{order ? order.total.toFixed(2) : "-"}</span>
-                  <span>{order ? order.cumulative.toFixed(2) : "-"}</span>
+          {isCompactLayout && isChartView && orderBookPanel("embedded")}
+
+          {/* ── Bottom Tab Bar (Open Orders, History, etc.) ── */}
+          <div ref={bottomScrollRef} className="trading-bottom-panel" style={{ borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, flexShrink: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", height: 36, padding: "0 12px", gap: 0, borderBottom: `1px solid ${COLORS.border}` }}>
+              {[["openorders", "Open Orders(0)"], ["orderhistory", "Order History"], ["tradehistory", "Trade History"], ["holdings", "Holdings"], ["bots", "Bots"]].map(([key, label]) => (
+                <button key={key} onClick={() => setBottomTab(key as any)} style={{ padding: "0 14px", height: "100%", background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: bottomTab === key ? COLORS.textBright : COLORS.text, borderBottom: bottomTab === key ? `2px solid ${COLORS.amber}` : "2px solid transparent", whiteSpace: "nowrap" }}>{label}</button>
+              ))}
+            </div>
+            <div style={{ maxHeight: 120, overflow: "auto" }}>
+              {bottomTab === "openorders" && (
+                activeOrders.length === 0
+                  ? <div style={{ padding: 20, textAlign: "center", color: COLORS.textMuted, fontSize: 12 }}>No open orders</div>
+                  : activeOrders.map(o => (
+                    <div key={o.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr 80px", padding: "6px 14px", fontSize: 11, fontFamily: "monospace", borderBottom: `1px solid ${COLORS.border}` }}>
+                      <span style={{ color: COLORS.text }}>{new Date(o.createdAt * 1000).toLocaleString()}</span>
+                      <span style={{ color: COLORS.textBright }}>{o.pair}</span>
+                      <span style={{ color: o.side === "buy" ? COLORS.green : COLORS.red }}>{o.type} {o.side.toUpperCase()}</span>
+                      <span style={{ color: COLORS.textBright }}>{o.price.toFixed(2)}</span>
+                      <span style={{ color: COLORS.textBright }}>{o.amount.toFixed(4)}</span>
+                      <button onClick={() => cancelOrder(o.id)} style={{ background: "transparent", border: `1px solid ${COLORS.red}`, color: COLORS.red, borderRadius: 3, cursor: "pointer", fontSize: 10, padding: "2px 6px" }}>Cancel</button>
+                    </div>
+                  ))
+              )}
+              {bottomTab === "tradehistory" && tradeHistory.slice(0, 10).map((t, i) => (
+                <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", padding: "6px 14px", fontSize: 11, fontFamily: "monospace", borderBottom: `1px solid ${COLORS.border}` }}>
+                  <span style={{ color: COLORS.text }}>{new Date(t.time * 1000).toLocaleString()}</span>
+                  <span style={{ color: COLORS.textBright }}>{t.pair}</span>
+                  <span style={{ color: t.side === "buy" ? COLORS.green : COLORS.red }}>{t.side.toUpperCase()}</span>
+                  <span style={{ color: COLORS.textBright }}>{t.price.toFixed(2)}</span>
+                  <span style={{ color: COLORS.textBright }}>{t.quantity.toFixed(6)}</span>
+                </div>
+              ))}
+              {bottomTab === "holdings" && accountSummary.holdings.map(h => (
+                <div key={h.asset} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", padding: "6px 14px", fontSize: 11, fontFamily: "monospace", borderBottom: `1px solid ${COLORS.border}` }}>
+                  <span style={{ color: COLORS.textBright }}>{h.asset}</span>
+                  <span style={{ color: COLORS.text }}>{h.amount.toFixed(6)}</span>
+                  <span style={{ color: COLORS.textBright }}>${h.value.toLocaleString()}</span>
                 </div>
               ))}
             </div>
-            <div className="orderbook-side">
-              <div className="orderbook-side-header sell">
-                <span>Sell Order</span>
-              </div>
-              <div className="orderbook-column-header">
-                <span>Price (USDT)</span>
-                <span>Amount</span>
-                <span>Total</span>
-                <span>Sum</span>
-              </div>
-              {sellDisplay.map((order, index) => (
-                <div
-                  key={`sell-${index}`}
-                  className={`orderbook-table-row sell ${order ? "has-order" : "empty"}`}
-                  onClick={() => order && setPriceInput(order.price.toFixed(pricePrecision))}
-                >
-                  <span>{order ? order.price.toFixed(pricePrecision) : "-"}</span>
-                  <span>{order ? order.amount.toFixed(4) : "-"}</span>
-                  <span>{order ? order.total.toFixed(2) : "-"}</span>
-                  <span>{order ? order.cumulative.toFixed(2) : "-"}</span>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
 
-        <div className="section-title order-form-title">
-          <span>Order Ticket</span>
-          <strong>Market + Advanced</strong>
-        </div>
-        <div className="order-form">
-          <div className="input-row split">
-            <div className="order-field">
-              <label>Side</label>
-              <select value={orderSide} onChange={(e) => setOrderSide(e.target.value as "buy" | "sell")}> 
-                <option value="buy">Buy</option>
-                <option value="sell">Sell</option>
-              </select>
-            </div>
-            <div className="order-field">
-              <label>Type</label>
-              <select value={orderType} onChange={(e) => setOrderType(e.target.value as UserOrder["type"])}>
-                <option value="market">Market</option>
-                <option value="limit">Limit</option>
-                <option value="stop-loss">Stop-Loss</option>
-                <option value="take-profit">Take-Profit</option>
-                <option value="oco">OCO</option>
-              </select>
-            </div>
-          </div>
+        {isDesktopLayout && (
+          <aside className="trading-right" style={{ display: "flex", flexDirection: "column", flexShrink: 0, minHeight: 0, width: 280, background: COLORS.bgPanel, borderLeft: `1px solid ${COLORS.border}` }}>
+            {marketPairsPanel()}
+            {orderBookPanel("side")}
+            {marketTradesPanel(false)}
+            {topMoversSection()}
+          </aside>
+        )}
 
-          <div className="input-row split">
-            <div className="order-field">
-              <label>Price</label>
-              <input placeholder="Price" value={priceInput} onChange={(e) => setPriceInput(e.target.value)} />
-            </div>
-            <div className="order-field">
-              <label>Amount</label>
-              <input placeholder="Amount" value={amountInput} onChange={(e) => setAmountInput(e.target.value)} />
-            </div>
-          </div>
-
-          {(orderType === "stop-loss" || orderType === "oco") && (
-            <div className="input-row split">
-              <div className="order-field">
-                <label>Stop Loss</label>
-                <input placeholder="Stop Loss" value={stopLoss} onChange={(e) => setStopLoss(e.target.value)} />
-              </div>
-              <div className="order-field">
-                <label>Take Profit</label>
-                <input placeholder="Take Profit" value={takeProfit} onChange={(e) => setTakeProfit(e.target.value)} />
-              </div>
-            </div>
-          )}
-
-          <div className="trade-actions">
-            <button className="action-btn buy" onClick={() => placeOrder("buy")}>Buy</button>
-            <button className="action-btn sell" onClick={() => placeOrder("sell")}>Sell</button>
-          </div>
-          <button className="secondary-btn" onClick={() => {
-            setPriceInput("");
-            setAmountInput("");
-            setStopLoss("");
-            setTakeProfit("");
-          }}>
-            Clear
-          </button>
-        </div>
-
-        <div className="indicator-summary-grid">
-          <div className="indicator-summary-card">
-            <span>RSI 14</span>
-            <strong>{showRSI ? `${calculateRSI(candles, 14).slice(-1)[0]?.value ?? 0}` : "—"}</strong>
-          </div>
-          <div className="indicator-summary-card">
-            <span>MACD</span>
-            <strong>{showMACD ? `${macdSummary.macd.toFixed(2)} / ${macdSummary.signal.toFixed(2)}` : "—"}</strong>
-          </div>
-          <div className="indicator-summary-card">
-            <span>Bollinger Band</span>
-            <strong>{showBollinger ? `${calculateBollingerBands(candles, 20, 2).upper.slice(-1)[0]?.value ?? 0}` : "—"}</strong>
-          </div>
-        </div>
+        {/* RIGHT PANEL: Market Trades + Pairs */}
+        {isCompactLayout && marketPanel()}
       </div>
 
-      <div className="market-sidebar trading-panel">
-        <div className="section-title">
-          <span>Market Pairs</span>
-          <strong>Search & Sort</strong>
-        </div>
-        <div className="market-search-row">
-          <input type="text" placeholder="Search pair" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-        </div>
-        <div className="sort-buttons">
-          <button className={sortBy === "name" ? "sort-active" : ""} onClick={() => setSortBy("name")}>Name</button>
-          <button className={sortBy === "change" ? "sort-active" : ""} onClick={() => setSortBy("change")}>Move</button>
-          <button className={sortBy === "volume" ? "sort-active" : ""} onClick={() => setSortBy("volume")}>Volume</button>
-        </div>
-
-        <div className="pair-list">
-          {sortedPairs.map((pair) => (
-            <button
-              key={pair}
-              className={`pair-list-item ${pair === symbol ? "active" : ""}`}
-              onClick={() => setSymbol(pair)}
-            >
-              <span>{pair}</span>
-              <strong>{pair === symbol ? "Selected" : "View"}</strong>
-            </button>
-          ))}
-        </div>
-
-        <div className="section-title">
-          <span>Market Trades</span>
-          <strong>Live Feed</strong>
-        </div>
-        <div className="trades-list market-trades">
-          {trades.slice(0, 20).map((trade, index) => (
-            <div
-              className={`trade-row ${trade.side === "sell" ? "price-down" : "price-up"}`}
-              key={`trade-${trade.time}-${trade.price}-${trade.amount}-${index}`}
-            >
-              <strong>${trade.price.toFixed(2)}</strong>
-              <span>{trade.amount.toFixed(4)}</span>
-              <span>{formatTime(trade.time)}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="section-title">
-          <span>Recent History</span>
-          <strong>My Trades</strong>
-        </div>
-        <div className="trade-history-list scrollable">
-          {tradeHistory.slice(0, 7).map((item, index) => (
-            <div
-              key={`history-${item.pair}-${item.time}-${item.price}-${item.quantity}-${index}`} 
-              className="history-row"
-            >
+      {/* ── PORTFOLIO MODAL ── */}
+      {showPortfolioModal && (
+        <div onClick={() => setShowPortfolioModal(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: 520, background: COLORS.bgPanel, border: `1px solid ${COLORS.border}`, borderRadius: 8, overflow: "hidden", maxHeight: "80vh", display: "flex", flexDirection: "column" }}>
+            <div style={{ padding: "16px 20px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <strong>{item.pair}</strong>
-                <span>{item.type}</span>
+                <div style={{ fontSize: 10, color: COLORS.text, marginBottom: 2 }}>Portfolio</div>
+                <div style={{ fontWeight: 700, fontSize: 18 }}>Portfolio Overview</div>
               </div>
+              <button onClick={() => setShowPortfolioModal(false)} style={{ background: "transparent", border: "none", color: COLORS.text, fontSize: 22, cursor: "pointer" }}>×</button>
+            </div>
+            <div style={{ padding: "14px 20px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <span>{item.quantity.toFixed(4)}</span>
-                <strong className={item.side === "sell" ? "price-down" : "price-up"}>${item.price.toFixed(2)}</strong>
+                <div style={{ fontSize: 11, color: COLORS.text }}>Total value</div>
+                <div style={{ fontSize: 20, fontWeight: 700 }}>${portfolioTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })} <span style={{ fontSize: 12, color: COLORS.text }}>USD</span></div>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                {["Withdraw", "Deposit", "Convert"].map(a => (
+                  <button key={a} style={{ padding: "6px 14px", borderRadius: 4, background: a === "Deposit" ? COLORS.amber : "transparent", border: `1px solid ${a === "Deposit" ? COLORS.amber : COLORS.border}`, color: a === "Deposit" ? "#000" : COLORS.textBright, cursor: "pointer", fontWeight: a === "Deposit" ? 700 : 400, fontSize: 12 }}>{a}</button>
+                ))}
               </div>
             </div>
-          ))}
-        </div>
-
-        <div className="section-title">
-          <span>Top Movers</span>
-          <strong>24h</strong>
-        </div>
-        <div className="top-movers">
-          {marketMovers
-            .slice()
-            .sort((a, b) => Math.abs(b.change) - Math.abs(a.change))
-            .slice(0, 5)
-            .map((mover) => (
-              <div className="mover-row" key={mover.pair}>
-                <span>{mover.pair}</span>
-                <strong className={mover.change >= 0 ? "price-up" : "price-down"}>
-                  {mover.change >= 0 ? "+" : ""}{mover.change}%
-                </strong>
+            <div style={{ overflow: "auto", flex: 1 }}>
+              <div style={{ padding: "10px 20px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                {[{ label: "Available", value: `$${accountSummary.available.toLocaleString(undefined, { minimumFractionDigits: 2 })}` }, { label: "Locked", value: `$${accountSummary.locked.toLocaleString(undefined, { minimumFractionDigits: 2 })}` }, { label: "Realized P&L", value: "$0.00" }, { label: "Rewards earned", value: "$0.00 USD" }].map(m => (
+                  <div key={m.label} style={{ background: COLORS.bgAlt, borderRadius: 6, padding: "10px 14px" }}>
+                    <div style={{ fontSize: 11, color: COLORS.text }}>{m.label}</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, marginTop: 4 }}>{m.value}</div>
+                  </div>
+                ))}
               </div>
-            ))}
+              <div style={{ padding: "0 20px 14px" }}>
+                <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>Holdings</div>
+                {accountSummary.holdings.map(h => (
+                  <div key={h.asset} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", padding: "8px 0", borderBottom: `1px solid ${COLORS.border}`, fontSize: 12 }}>
+                    <span style={{ fontWeight: 700 }}>{h.asset}</span>
+                    <span style={{ color: COLORS.text, fontFamily: "monospace" }}>{h.amount.toFixed(6)}</span>
+                    <span style={{ textAlign: "right", fontFamily: "monospace", fontWeight: 600 }}>${h.value.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ padding: "0 20px 14px" }}>
+                <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>Trade History</div>
+                {tradeHistory.slice(0, 8).map((t, i) => (
+                  <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", padding: "5px 0", borderBottom: `1px solid ${COLORS.border}`, fontSize: 11, fontFamily: "monospace" }}>
+                    <span style={{ color: t.side === "buy" ? COLORS.green : COLORS.red }}>{t.side.toUpperCase()}</span>
+                    <span style={{ color: COLORS.textBright }}>{t.pair}</span>
+                    <span style={{ color: COLORS.text }}>{t.quantity.toFixed(6)}</span>
+                    <span style={{ textAlign: "right" }}>${t.price.toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
+
+      <style>{`
+        * { box-sizing: border-box; }
+        body { margin: 0; }
+        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+        input[type=range] { height: 3px; }
+        ::-webkit-scrollbar { width: 3px; height: 3px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #2a2e35; border-radius: 2px; }
+        ::-webkit-scrollbar-thumb:hover { background: #3a3e45; }
+        input:focus { outline: none; border-color: #f0b90b !important; }
+
+        .trading-header { flex-wrap: nowrap; gap: 12px; }
+        .trading-body { display: flex !important; align-items: stretch !important; }
+        .trading-toolbar,
+        .trading-orderbook,
+        .trading-right,
+        .trading-main { display: flex !important; }
+        .trading-toolbar { flex: 0 0 44px !important; width: 44px !important; min-width: 44px !important; flex-direction: column !important; align-items: center !important; justify-content: flex-start !important; padding-top: 8px !important; gap: 2px !important; order: 0 !important; }
+        .trading-main { flex: 1 1 auto !important; min-width: 0 !important; order: 1 !important; }
+        .trading-right { order: 2 !important; }
+        .trading-right > * { order: 0 !important; }
+        .trading-chart-stage,
+        .trading-chart-stage canvas { touch-action: pan-y; }
+        .trading-balance-strip {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 8px;
+          padding: 8px 12px;
+          border-bottom: 1px solid #2a2e35;
+          flex-shrink: 0;
+        }
+        .trading-orderbook--embedded { display: none !important; }
+        .trading-rotate-prompt {
+          display: none;
+          position: fixed;
+          inset: 0;
+          z-index: 4000;
+          align-items: center;
+          justify-content: center;
+          padding: 24px;
+          background: rgba(11, 14, 17, 0.88);
+          backdrop-filter: blur(8px);
+        }
+        .trading-rotate-prompt__panel {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          max-width: 360px;
+          padding: 18px;
+          border: 1px solid #2a2e35;
+          border-radius: 8px;
+          background: #161a1e;
+          box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+        }
+        .trading-rotate-prompt__icon {
+          width: 42px;
+          height: 42px;
+          border-radius: 50%;
+          display: grid;
+          place-items: center;
+          background: rgba(240, 185, 11, 0.12);
+          color: #f0b90b;
+          font-size: 24px;
+          flex: 0 0 auto;
+        }
+        .trading-rotate-prompt__title {
+          color: #eaecef;
+          font-size: 15px;
+          font-weight: 800;
+          margin-bottom: 4px;
+        }
+        .trading-rotate-prompt__text {
+          color: #848e9c;
+          font-size: 12px;
+          line-height: 1.4;
+        }
+
+        @media (min-width: 1024px) {
+          .trading-page { height: auto !important; min-height: 100dvh !important; overflow-y: auto !important; }
+          .trading-body { flex: 1 1 auto !important; flex-wrap: nowrap !important; gap: 0 !important; min-height: 0 !important; overflow: visible !important; }
+          .trading-toolbar { flex: 0 0 44px !important; width: 44px !important; }
+          .trading-main { width: auto !important; min-height: 0 !important; overflow: visible !important; }
+          .trading-chart-panel { flex: 0 0 clamp(300px, 44dvh, 520px) !important; min-height: 300px !important; overflow: hidden !important; }
+          .trading-chart-layout,
+          .trading-chart-stage { height: 100% !important; min-height: 0 !important; }
+          .trading-order-form {
+            height: auto !important;
+            min-height: 430px !important;
+            overflow: visible !important;
+          }
+          .trading-order-form__inner {
+            min-height: 0 !important;
+            overflow: visible !important;
+          }
+          .trading-order-form__columns {
+            flex: 0 0 auto !important;
+            min-height: 0 !important;
+            overflow: visible !important;
+          }
+          .trading-order-form__side {
+            flex: 1 1 0 !important;
+            min-height: 280px !important;
+            overflow: visible !important;
+          }
+          .trading-order-actions {
+            flex: 0 0 auto !important;
+          }
+          .trading-orderbook--side {
+            flex: 0 0 280px !important;
+            width: 280px !important;
+            max-width: 280px !important;
+            min-height: 0 !important;
+            height: auto !important;
+            order: 2 !important;
+            align-self: stretch !important;
+          }
+          .trading-orderbook--embedded { display: none !important; }
+          .trading-bottom-panel { max-height: 160px; overflow: hidden; }
+        }
+
+        @media (min-width: 1024px) and (max-width: 1439px) {
+          .trading-orderbook--side {
+            flex-basis: 248px !important;
+            width: 248px !important;
+            max-width: 248px !important;
+          }
+          .trading-balance-strip { grid-template-columns: repeat(3, minmax(110px, 1fr)); }
+        }
+
+        @media (max-width: 1023px) {
+          html, body, #root { height: auto !important; min-height: 100%; overflow-y: auto !important; }
+          body { overflow: auto !important; }
+          .trading-page {
+            height: auto !important;
+            min-height: 100svh !important;
+            overflow-y: visible !important;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-y: auto;
+            touch-action: pan-y;
+          }
+          .trading-header { flex-wrap: wrap !important; height: auto !important; min-height: 56px !important; padding: 6px 10px !important; gap: 8px !important; overflow: visible !important; }
+          .trading-body {
+            flex-direction: column !important;
+            flex-wrap: nowrap !important;
+            gap: 0 !important;
+            min-height: auto !important;
+            overflow: visible !important;
+            align-items: stretch !important;
+          }
+          .trading-toolbar,
+          .trading-orderbook--side { display: none !important; }
+          .trading-main {
+            flex: 0 0 auto !important;
+            width: 100% !important;
+            min-height: 0 !important;
+            overflow: visible !important;
+            order: 1 !important;
+          }
+          .trading-chart-panel {
+            flex: 0 0 auto !important;
+            min-height: 0 !important;
+            height: auto !important;
+            overflow: visible !important;
+          }
+          .trading-chart-layout { display: block !important; height: auto !important; }
+          .trading-chart-stage {
+            height: clamp(260px, 38dvh, 420px) !important;
+            min-height: 260px !important;
+            width: 100% !important;
+            border-bottom: 1px solid #2a2e35;
+            touch-action: pan-y !important;
+          }
+          .trading-chart-stage canvas {
+            touch-action: pan-y !important;
+          }
+          .trading-order-form {
+            height: auto !important;
+            min-height: 0 !important;
+            overflow: visible !important;
+          }
+          .trading-order-form__inner { min-height: 0 !important; overflow: visible !important; }
+          .trading-balance-strip {
+            grid-template-columns: repeat(3, minmax(126px, 1fr));
+            overflow-x: auto;
+            padding: 8px;
+            -webkit-overflow-scrolling: touch;
+          }
+          .trading-order-form__columns { overflow: visible !important; min-height: 0 !important; }
+          .trading-bottom-panel { order: 4 !important; overflow: visible !important; }
+          .trading-bottom-panel > div:last-child { max-height: none !important; overflow: visible !important; }
+          .trading-orderbook--embedded {
+            display: flex !important;
+            flex: 0 0 auto !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            min-height: 360px !important;
+            height: 360px !important;
+            order: 3 !important;
+            border-left: none !important;
+            border-top: 1px solid #2a2e35 !important;
+          }
+          .trading-market-panel {
+            display: flex !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            min-height: 420px !important;
+            height: auto !important;
+            order: 5 !important;
+            border-left: none !important;
+            border-top: 1px solid #2a2e35 !important;
+          }
+        }
+
+        @media (max-width: 767px) {
+          .trading-header > div:nth-child(2) { width: 100%; overflow-x: auto !important; padding-bottom: 2px; }
+          .trading-header > div:nth-child(2) > div:nth-child(n+5) { display: none !important; }
+          .trading-chart-stage { height: 240px !important; min-height: 240px !important; }
+          .trading-order-form { height: auto !important; min-height: 0 !important; }
+          .trading-order-form__columns { flex-direction: column !important; }
+          .trading-order-form__side {
+            flex: 0 0 auto !important;
+            min-height: 0 !important;
+            padding: 8px 10px !important;
+          }
+          .trading-order-form__side--buy {
+            border-right: none !important;
+            border-bottom: 1px solid #2a2e35 !important;
+          }
+          .trading-order-actions {
+            flex-wrap: wrap !important;
+            padding: 8px 10px !important;
+          }
+          .trading-order-actions__balance { display: none !important; }
+          .trading-order-actions__button {
+            flex: 1 1 calc(50% - 4px) !important;
+            min-width: 120px !important;
+          }
+          .trading-orderbook--embedded { height: 340px !important; min-height: 340px !important; }
+          .trading-bottom-panel > div:first-child { overflow-x: auto; }
+        }
+
+        @media (max-width: 479px) {
+          .trading-header { min-height: 62px !important; }
+          .trading-header button,
+          .trading-header span,
+          .trading-header div { max-width: 100%; }
+          .trading-chart-stage { height: 220px !important; min-height: 220px !important; }
+          .trading-order-form { height: auto !important; min-height: 0 !important; }
+          .trading-order-form__tabs { overflow-x: auto !important; }
+          .trading-order-form__tabs button { padding: 0 10px !important; white-space: nowrap; }
+          .trading-balance-strip { display: none !important; }
+          .trading-order-form__side { min-height: 0 !important; }
+          .trading-order-actions__button { min-width: 0 !important; height: 38px !important; }
+          .trading-orderbook--embedded { height: 320px !important; min-height: 320px !important; }
+        }
+
+        @media (max-width: 1023px) and (orientation: portrait) and (pointer: coarse) {
+          .trading-rotate-prompt { display: none; }
+        }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+      `}</style>
     </div>
   );
 }

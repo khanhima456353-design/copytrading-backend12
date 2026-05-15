@@ -1,0 +1,297 @@
+.admin-page {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: 
+    radial-gradient(circle at top, rgba(120, 200, 255, 0.25), transparent 45%),
+    radial-gradient(circle at top right, rgba(0, 180, 255, 0.18), transparent 55%),
+    radial-gradient(circle at bottom left, rgba(0, 120, 200, 0.20), transparent 60%),
+    linear-gradient(180deg, #0a1a2a 0%, #06121f 60%, #040b14 100%);
+  background-attachment: fixed;
+}
+
+.admin-header,
+.admin-nav,
+.admin-filters,
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.admin-header h1 {
+  margin: 0 0 8px;
+  font-size: 32px;
+  color: #ffffff;
+  font-weight: 700;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.admin-header p {
+  margin: 0;
+  color: #d0e8f2;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.admin-logout,
+.admin-action-btn,
+.admin-nav button,
+.admin-filters button,
+.admin-actions button {
+  background: linear-gradient(135deg, #00b4ff 0%, #0088cc 100%);
+  color: #ffffff;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 15px;
+  box-shadow: 0 4px 12px rgba(0, 180, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+.admin-logout:hover,
+.admin-action-btn:hover,
+.admin-nav button:hover,
+.admin-filters button:hover,
+.admin-actions button:hover {
+  background: linear-gradient(135deg, #00d4ff 0%, #00aadd 100%);
+  box-shadow: 0 6px 16px rgba(0, 180, 255, 0.5);
+  transform: translateY(-2px);
+}
+
+.admin-filters input,
+.admin-filters select {
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 180, 255, 0.3);
+  min-width: 200px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #0a1a2a;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.admin-filters input:focus,
+.admin-filters select:focus {
+  outline: none;
+  border-color: #00b4ff;
+  box-shadow: 0 0 12px rgba(0, 180, 255, 0.4);
+  background: #ffffff;
+}
+
+.admin-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.admin-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(240, 248, 255, 0.92) 100%);
+  border: 1px solid rgba(0, 180, 255, 0.3);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), 0 0 20px rgba(0, 180, 255, 0.15);
+  transition: all 0.3s ease;
+}
+
+.admin-card:hover {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25), 0 0 25px rgba(0, 180, 255, 0.25);
+  transform: translateY(-4px);
+}
+
+.admin-card-large {
+  min-height: 170px;
+}
+
+.admin-card h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 18px;
+  color: #0a1a2a;
+  font-weight: 700;
+}
+
+.admin-card p {
+  margin: 8px 0;
+  color: #00b4ff;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.admin-section {
+  margin: 24px 0;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 180, 255, 0.2);
+  border-radius: 16px;
+  padding: 24px;
+}
+
+.admin-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.admin-section-header h2 {
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 700;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  margin: 0;
+}
+
+.admin-table-wrap {
+  overflow-x: auto;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 4px;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 14px 16px;
+  border: 1px solid rgba(0, 180, 255, 0.2);
+  text-align: left;
+}
+
+.admin-table th {
+  background: rgba(0, 180, 255, 0.15);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 15px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.admin-table td {
+  color: #d0e8f2;
+  font-size: 14px;
+}
+
+.admin-table tbody tr:hover {
+  background: rgba(0, 180, 255, 0.1);
+}
+
+.admin-action-btn {
+  margin-right: 8px;
+}
+
+.admin-error {
+  border: 1px solid rgba(255, 100, 100, 0.5);
+  background: rgba(255, 100, 100, 0.1);
+  color: #ff9999;
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+  font-weight: 500;
+  backdrop-filter: blur(10px);
+}
+
+.login-alert {
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  font-weight: 500;
+  backdrop-filter: blur(10px);
+}
+
+.login-alert.success {
+  background: rgba(100, 255, 150, 0.2);
+  color: #90ff99;
+  border: 1px solid rgba(100, 255, 150, 0.4);
+}
+
+.login-alert.error {
+  background: rgba(255, 100, 100, 0.2);
+  color: #ff9999;
+  border: 1px solid rgba(255, 100, 100, 0.4);
+}
+
+/* Loading and message text */
+.admin-page > p {
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 500;
+  text-align: center;
+  margin: 40px 0;
+}
+
+.admin-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 24px;
+}
+
+.admin-modal {
+  width: min(980px, 100%);
+  max-height: min(90vh, 900px);
+  overflow-y: auto;
+  background: rgba(10, 26, 42, 0.98);
+  border: 1px solid rgba(0, 180, 255, 0.25);
+  border-radius: 20px;
+  padding: 24px;
+  color: #e8f4ff;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+}
+
+.admin-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.admin-modal-header h3 {
+  margin: 0;
+  color: #ffffff;
+  font-size: 22px;
+}
+
+.admin-modal-close {
+  border: none;
+  background: transparent;
+  color: #ffffff;
+  font-size: 28px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.admin-modal-section {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.admin-table-button {
+  padding: 8px 12px;
+  background: #0088cc;
+  color: #ffffff;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.admin-table-button:hover {
+  background: #00aaff;
+}

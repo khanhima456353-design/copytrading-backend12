@@ -9,7 +9,7 @@ function News() {
   useEffect(() => {
     let socket = null;
 
-    const initSocket = async () => {
+    (async () => {
       socket = await getSocket();
 
       const cached = localStorage.getItem("news-cache");
@@ -23,9 +23,7 @@ function News() {
         setNews(safe);
         localStorage.setItem("news-cache", JSON.stringify(safe));
       });
-    };
-
-    initSocket();
+    })();
 
     return () => {
       if (socket) {
@@ -41,7 +39,9 @@ function News() {
 
   return (
     <div className="feed">
-      <h2 className="feed-title">Crypto News (Live)</h2>
+      <h2 className="feed-title">
+        <span style={{ color: "#F0B90B" }}>Swancore</span>'s News
+      </h2>
 
       {news.map((item) => {
         const isOpen = expandedId === item.id;
@@ -56,7 +56,7 @@ function News() {
                   className="avatar"
                   alt="source"
                 />
-                <span className="source">{item.source}</span>
+                <span className="source">Swancore's News</span>
               </div>
 
               <span className="time">{item.time}</span>
@@ -68,14 +68,9 @@ function News() {
                 <img className="card-img" src={item.image} alt="" />
               )}
 
-              <a
-                href={item.url}
-                target="_blank"
-                rel="noreferrer"
-                className="title"
-              >
+              <div className="title">
                 {item.title}
-              </a>
+              </div>
 
               {isOpen ? (
                 <div className="expanded-scroll">

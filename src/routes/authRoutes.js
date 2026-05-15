@@ -5,8 +5,8 @@ const nodemailer = require("nodemailer");
 const router = express.Router();
 const User = require("../../models/User");
 const Otp = require("../../models/Otp");
+const { generateUniqueUserId } = require("../../utils/userIdGenerator");
 const { generateDeviceId } = require("../../utils/otpSecurity");
-const { verifyCaptcha } = require("../../utils/captcha");
 
 // ================= OTP GENERATOR =================
 function generateOTP() {
@@ -24,6 +24,7 @@ function getIp(req) {
 }
 
 // ================= EMAIL TRANSPORT =================
+const { authMiddleware } = require("../middleware/authMiddleware");
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -34,100 +35,102 @@ const transporter = nodemailer.createTransport({
 
 // ================= SEND OTP =================
 router.post("/send-otp", async (req, res) => {
-  const { email, captchaToken } = req.body;
-
-  console.log("📩 captchaToken received:", captchaToken);
+  console.log("🔥 OTP REQUEST RECEIVED:", req.body);
+  console.log("🔥 REQUEST METHOD:", req.method);
+  console.log("🔥 REQUEST URL:", req.url);
+  const { email } = req.body;
 
   const ip = getIp(req);
   const deviceId = generateDeviceId(req);
 
+  console.log("📧 Email:", email);
+  console.log("🌐 IP:", ip);
+  console.log("📱 Device ID:", deviceId);
+
   if (!email) {
+    console.log("❌ No email provided");
     return res.status(400).json({ message: "Email required" });
   }
 
   try {
-  // 🔐 CAPTCHA VERIFY
-  const isHuman = await verifyCaptcha(captchaToken);
+    console.log("🔍 Checking if user exists...");
+    // ✅ CHECK IF USER ALREADY HAS COMPLETE ACCOUNT
+    let user = await User.findOne({ email });
+    console.log("👤 User found:", !!user);
 
-  if (!isHuman) {
-    console.log("❌ CAPTCHA FAILED");
-    return res.status(403).json({ message: "Captcha failed" });
-  }
+    if (user && user.password) {
+      console.log("❌ User already has password");
+      return res.status(400).json({ message: "User already exists. Please login instead." });
+    }
 
-  // ✅ ADD THIS (CREATE USER IF NOT EXISTS)
-  let user = await User.findOne({ email });
+    if (!user) {
+      console.log("🆕 Creating new user...");
+      const userId = await generateUniqueUserId();
+      console.log("🆔 Generated userId:", userId);
+      user = await User.create({ email, userId });
+      console.log("✅ User created:", user._id);
+    }
 
-  if (!user) {
-    user = await User.create({ email });
-  }
+    console.log("🔢 Generating OTP...");
+    const otp = generateOTP();
+    console.log("🔢 OTP generated:", otp);
 
-  const otp = generateOTP();
-  const hashedOtp = await bcrypt.hash(otp, 10);
+    console.log("🔐 Hashing OTP...");
+    const hashedOtp = await bcrypt.hash(otp, 10);
+    console.log("🔐 OTP hashed successfully");
 
-  const expiresAt = Date.now() + 5 * 60 * 1000;
+    const expiresAt = Date.now() + 5 * 60 * 1000;
+    console.log("💾 Saving OTP to database...");
 
-  await Otp.findOneAndUpdate(
-    { email },
-    {
-      email,
-      otp: hashedOtp,
-      ip,
-      deviceId,
-      expiresAt,
-      createdAt: Date.now(),
-      attempts: 0,
-      $inc: { resendCount: 1 },
-    },
-    { upsert: true, new: true }
-  );
+    await Otp.findOneAndUpdate(
+      { email },
+      {
+        email,
+        otp: hashedOtp,
+        ip,
+        deviceId,
+        expiresAt,
+        createdAt: Date.now(),
+        attempts: 0,
+        $inc: { resendCount: 1 },
+      },
+      { upsert: true, new: true }
+    );
+    console.log("💾 OTP saved to database");
 
-  // ================= SEND OTP EMAIL =================
-   transporter.sendMail({
-  from: process.env.EMAIL_USER,
-  to: email,
-  subject: "Your SwanCore Activation Code",
-  html: `
-    <div style="font-family: Arial, sans-serif; line-height:1.6; color:#222;">
-      
-      <p><strong>Welcome to SwanCore. Please confirm your registration using the activation code below.</strong></p>
+    // ================= SEND OTP EMAIL =================
+    console.log("📤 Sending email...");
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Your SwanCore Activation Code",
+      html: `
+        <div style="font-family: Arial, sans-serif; line-height:1.6; color:#222;">
+          
+          <p><strong>Welcome to SwanCore. Please confirm your registration using the activation code below.</strong></p>
 
-      <p><strong>Account activation code:</strong></p>
+          <p><strong>Account activation code:</strong></p>
 
-      <h2 style="color:#f0b90b;">${otp}</h2>
+          <h2 style="color:#f0b90b;">${otp}</h2>
 
-      <p><strong>Security Tips :</strong></p>
-      <ul>
-        <li>Always keep your password safe and private—it’s your key to a secure experience.</li>
-        <li>Your security is our priority.</li>
-        <li>Explore our security tips to keep your account protected.</li>
-      </ul>
+          <p><strong>Security Tips :</strong></p>
+          <ul>
+            <li>Always keep your password safe and private—it’s your key to a secure experience.</li>
+            <li>Your security is our priority.</li>
+            <li>Explore our security tips to keep your account protected.</li>
+          </ul>
 
-      <p>Don’t recognize this activity? Please reset your password and contact support immediately—we’re here to help.</p>
+          <p>Don’t recognize this activity? Please reset your password and contact support immediately—we’re here to help.</p>
+        </div>
+      `,
+    });
+    console.log("✅ Email sent successfully");
 
-      <p style="font-style: italic;">This is an automated message, please do not reply.</p>
-
-      <hr/>
-
-      <p style="text-align:center;"><strong>Stay connected!</strong></p>
-
-      <p style="font-size:12px; color:#666;">
-        Disclaimer:Digital asset markets can be dynamic and exciting, with values that may rise or fall over time. Please make thoughtful and informed decisions when investing. SwanCore is committed to empowering you with knowledge, but investment choices remain your responsibility. Always consider your financial goals, experience, and risk tolerance, and seek independent advice if needed. For more information, please review SwanCore Terms of Use and Risk Warning.
-      </p>
-
-      <p style="font-size:12px;">
-        Kindly note: Stay confident and protected by ensuring you’re engaging with SwanCore. Every step you take with us is carefully designed to keep you secure. Your security is at the heart of everything we do.
-      </p>
-
-    </div>
-  `
-});
-
-// Respond after email is sent successfully
-    res.json({ message: "OTP sent" });
-
-  } catch (err) {
-    console.log(err);
-    // Return error response if any part of the process fails
+    console.log("🎉 OTP process completed successfully");
+    res.status(200).json({ message: "OTP sent successfully" });
+  } catch (error) {
+    console.log("❌ Error in send-otp:", error.message);
+    console.log("Stack:", error.stack);
     res.status(500).json({ message: "Error sending OTP email" });
   }
 });
@@ -183,6 +186,7 @@ router.post("/verify-otp", async (req, res) => {
     await Otp.deleteOne({ email });
 
     return res.json({
+      success: true,
       message: "OTP verified",
       verified: true,
     });
@@ -190,6 +194,56 @@ router.post("/verify-otp", async (req, res) => {
   } catch (err) {
     console.log(err);
     return res.status(500).json({ message: "Verification failed" });
+  }
+});
+
+router.post("/resend-otp", async (req, res) => {
+  const { email, otpId } = req.body;
+
+  if (!email || !otpId) {
+    return res.status(400).json({ success: false, message: "Email and OTP ID required" });
+  }
+
+  try {
+    const record = await Otp.findOne({ email });
+
+    if (!record) {
+      return res.status(404).json({ success: false, message: "OTP request not found" });
+    }
+
+    if ((record.resendCount || 0) >= 3) {
+      return res.status(429).json({ success: false, message: "Resend limit reached" });
+    }
+
+    const otp = generateOTP();
+    const hashedOtp = await bcrypt.hash(otp, 10);
+    const expiresAt = Date.now() + 5 * 60 * 1000;
+
+    record.otp = hashedOtp;
+    record.expiresAt = expiresAt;
+    record.attempts = 0;
+    record.resendCount = (record.resendCount || 0) + 1;
+    record.createdAt = Date.now();
+
+    await record.save();
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Your SwanCore Activation Code",
+      html: `
+        <div style="font-family: Arial, sans-serif; line-height:1.6; color:#222;">
+          <p><strong>Your new SwanCore activation code:</strong></p>
+          <h2 style="color:#f0b90b;">${otp}</h2>
+          <p>If you did not request this, please contact support immediately.</p>
+        </div>
+      `,
+    });
+
+    return res.json({ success: true, message: "OTP resent", otpId });
+  } catch (err) {
+    console.log(err);
+    return res.status(500).json({ success: false, message: "Error resending OTP" });
   }
 });
 
@@ -203,16 +257,223 @@ router.post("/set-password", async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    // Check if user already has a password (already registered)
+    if (user.password) {
+      return res.status(400).json({ message: "User already exists. Please login instead." });
+    }
+
+    // Generate userId if not already set
+    if (!user.userId) {
+      user.userId = await generateUniqueUserId();
+    }
+
     const hashed = await bcrypt.hash(password, 10);
     user.password = hashed;
 
     await user.save();
 
-    res.json({ message: "Password set successfully" });
+    // Generate JWT token
+    const jwt = require("jsonwebtoken");
+    const token = jwt.sign(
+      { userId: user.id, email: user.email },
+      process.env.JWT_SECRET || "SECRET_KEY",
+      { expiresIn: "7d" }
+    );
+
+    res.json({
+      success: true,
+      message: "Password set successfully",
+      sessionToken: token,
+      expiresIn: 7 * 24 * 60 * 60, // 7 days in seconds
+      user: {
+        id: user.id,
+        userId: user.userId,
+        email: user.email
+      }
+    });
 
   } catch (err) {
     console.log(err);
     res.status(500).json({ message: "Error setting password" });
+  }
+});
+
+// ================= REGISTER =================
+router.post("/register", async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ message: "Email and password required" });
+  }
+
+  try {
+    // Check if user already exists and has a password
+    const existingUser = await User.findOne({ email });
+    if (existingUser && existingUser.password) {
+      return res.status(400).json({ message: "User already exists. Please login instead." });
+    }
+
+    // Generate unique userId
+    const userId = await generateUniqueUserId();
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create user or update existing one
+    let user;
+    if (existingUser) {
+      // Update existing user with password and userId
+      existingUser.password = hashedPassword;
+      existingUser.userId = userId;
+      user = await existingUser.save();
+    } else {
+      // Create new user
+      user = await User.create({
+        userId,
+        email,
+        password: hashedPassword
+      });
+    }
+
+    res.status(201).json({
+      message: "User registered successfully",
+      user: {
+        id: user.id,
+        userId: user.userId,
+        email: user.email,
+        createdAt: user.createdAt
+      }
+    });
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// ================= LOGIN =================
+router.post("/login", async (req, res) => {
+  const { password } = req.body;
+  const rawIdentifier = String(req.body.identifier || req.body.email || "").trim();
+
+  if (!rawIdentifier || !password) {
+    return res.status(400).json({ message: "Email and password required" });
+  }
+
+  try {
+    // Check if identifier is email or userId
+    const isEmail = rawIdentifier.includes('@');
+    const identifier = isEmail ? rawIdentifier.toLowerCase() : rawIdentifier.toUpperCase();
+    const query = isEmail ? { email: identifier } : { userId: identifier };
+
+    const user = await User.findOne(query);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (!user.password) {
+      return res.status(400).json({ message: "Please complete registration before logging in." });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+      return res.status(400).json({ message: "Invalid password" });
+    }
+
+    // Generate JWT token
+    const jwt = require("jsonwebtoken");
+    const token = jwt.sign(
+      { userId: user.id, email: user.email, role: user.role },
+      process.env.JWT_SECRET || "SECRET_KEY",
+      { expiresIn: "7d" }
+    );
+
+    user.lastLogin = new Date();
+    await user.save();
+
+    res.json({
+      message: "Login successful",
+      token,
+      user: {
+        id: user.id,
+        userId: user.userId,
+        email: user.email,
+        role: user.role,
+        name: user.name,
+        lastLogin: user.lastLogin
+      }
+    });
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.post("/submit-kyc", authMiddleware, async (req, res) => {
+  try {
+    const { personal, documentType, documentFront, documentBack, selfie } = req.body;
+
+    if (!personal || !documentType || !documentFront || !documentBack || !selfie) {
+      return res.status(400).json({ message: "All KYC fields are required" });
+    }
+
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    user.kycSubmission = {
+      personal: {
+        fullName: personal.fullName || "",
+        dob: personal.dob || "",
+        country: personal.country || "",
+        address: personal.address || "",
+        city: personal.city || ""
+      },
+      documentType,
+      documentFront: {
+        name: documentFront.name || "",
+        type: documentFront.type || "",
+        size: documentFront.size || 0,
+        data: documentFront.data || ""
+      },
+      documentBack: {
+        name: documentBack.name || "",
+        type: documentBack.type || "",
+        size: documentBack.size || 0,
+        data: documentBack.data || ""
+      },
+      selfie: {
+        name: selfie.name || "",
+        type: selfie.type || "",
+        size: selfie.size || 0,
+        data: selfie.data || ""
+      },
+      submittedAt: new Date(),
+      reviewedAt: user.kycSubmission?.reviewedAt || null
+    };
+    user.kycStatus = "pending";
+    user.kycVerified = false;
+
+    await user.save();
+
+    if (global.io) {
+      global.io.emit("kycSubmitted", {
+        userId: user._id,
+        email: user.email,
+        name: user.name,
+        kycStatus: user.kycStatus,
+        submittedAt: user.kycSubmission.submittedAt
+      });
+    }
+
+    return res.json({ success: true, message: "KYC submitted successfully", userId: user._id });
+  } catch (err) {
+    console.error("Submit KYC error:", err);
+    return res.status(500).json({ message: "Error submitting KYC" });
   }
 });
 

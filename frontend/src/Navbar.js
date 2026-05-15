@@ -1,9 +1,23 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import "./navbar.css";
 import logo from "./assets/logo.jpg";
 
 export default function Navbar() {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Hide navbar on login, registration, home, market, news, trade, and the post-signup trading redirect
+  if (
+    location.pathname === "/" ||
+    location.pathname === "/register" ||
+    location.pathname === "/login" ||
+    location.pathname === "/home" ||
+    location.pathname === "/markets" ||
+    location.pathname === "/news" ||
+    location.pathname === "/trade"
+  ) {
+    return null;
+  }
 
   return (
     <div className="navbar">

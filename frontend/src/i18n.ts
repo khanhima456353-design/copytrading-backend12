@@ -1,12 +1,14 @@
-import i18n from "i18next";
+import i18next from "i18next";
 import { initReactI18next } from "react-i18next";
 import translations from "./translations.json";
 
-i18n.use(initReactI18next).init({
+i18next.use(initReactI18next).init({
   resources: translations,
 
-  // 🔥 LOAD SAVED LANGUAGE (IMPORTANT)
-  lng: localStorage.getItem("lang") || "en",
+  lng:
+    typeof window !== "undefined"
+      ? localStorage.getItem("lang") || "en"
+      : "en",
 
   fallbackLng: "en",
 
@@ -15,4 +17,4 @@ i18n.use(initReactI18next).init({
   },
 });
 
-export default i18n;
+export default i18next;
