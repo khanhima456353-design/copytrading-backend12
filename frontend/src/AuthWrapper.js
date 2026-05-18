@@ -1,22 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Navigate } from 'react-router-dom';
 import Landing from './Landing';
-import { isSessionValid, logout } from './services/authService';
+import authService from './services/authService';
 
 const AuthWrapper = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(null);
-
-  useEffect(() => {
-    const valid = isSessionValid();
-    if (!valid) {
-      logout();
-    }
-    setIsAuthenticated(valid);
-  }, []);
-
-  if (isAuthenticated === null) {
-    return null;
-  }
+  const isAuthenticated = authService.isSessionValid();
 
   return isAuthenticated ? <Navigate to="/home" replace /> : <Landing />;
 };

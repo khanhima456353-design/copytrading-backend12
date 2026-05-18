@@ -32,7 +32,7 @@ const ResponsiveHomepage: React.FC = () => {
 
   useEffect(() => {
     // Debounce resize handler to improve performance
-    let resizeTimeout: NodeJS.Timeout;
+    let resizeTimeout: ReturnType<typeof setTimeout>;
 
     const debouncedResizeHandler = () => {
       clearTimeout(resizeTimeout);

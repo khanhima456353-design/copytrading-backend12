@@ -536,6 +536,8 @@ function MarketsScreen({ onNavigate, showTopBar = true, showBottomNav = true }: 
 
 // ─── Account Screen ───────────────────────────────────────────────────────────
 
+import authService from "../services/authService";
+
 export function AccountScreen({ onNavigate, showTopBar = true, showBottomNav = true }: { onNavigate: (s: Screen) => void; showTopBar?: boolean; showBottomNav?: boolean }) {
   const navigate = useNavigate();
   const [userProfile, setUserProfile] = useState<{ kycVerified: boolean; kycStatus: string } | null>(null);
@@ -544,6 +546,11 @@ export function AccountScreen({ onNavigate, showTopBar = true, showBottomNav = t
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  const handleLogout = () => {
+    authService.logout();
+    navigate("/", { replace: true });
+  };
 
   useEffect(() => {
     fetchUserProfile();
@@ -783,10 +790,10 @@ export function AccountScreen({ onNavigate, showTopBar = true, showBottomNav = t
       ))}
 
       {/* Log out */}
-      <div style={styles.logoutRow}>
+      <button style={{ ...styles.logoutRow, textAlign: "left", border: "1px solid rgba(246,70,93,0.12)", background: "rgba(246,70,93,0.06)" }} onClick={handleLogout}>
         <span style={{ fontSize: 18 }}>🚪</span>
         <span style={{ fontSize: 14, color: "#f6465d" }}>Log out</span>
-      </div>
+      </button>
 
       {showBottomNav && <BottomNav active="account" onNavigate={onNavigate} />}
 

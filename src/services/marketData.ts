@@ -28,8 +28,11 @@ const krakenPairs: Record<string, string> = {
 };
 
 const getKrakenPair = (pair: string) => krakenPairs[pair] || "BTCUSDT";
+const getValidPrice = (value: number) => Number.isFinite(value) && value > 0 ? value : 0;
 
-const getBasePrice = (pair: string) => priceMap[pair] || currentPrice;
+export const getBasePrice = (pair: string) => {
+  return getValidPrice(priceMap[pair]) || getValidPrice(currentPrice);
+};
 
 export const loadSymbols = async () => {
   try {
@@ -44,39 +47,6 @@ export const loadSymbols = async () => {
 
 // Load symbols on module load
 loadSymbols();
-
-export const loadSymbols = async () => {
-  try {
-    const url = "https://api.kraken.com/0/public/AssetPairs";
-    const response = await axios.get(url);
-    const pairs = Object.keys(response.data.result).filter(pair => pair.endsWith("USDT"));
-    symbols = pairs.slice(0, 50).map(pair => pair.replace("USDT", "/USDT"));
-  } catch (error) {
-    console.error("Error loading symbols:", error);
-  }
-};
-
-// Load symbols on module load
-loadSymbols();
-
-const timeframeSeconds: Record<string, number> = {
-  "1m": 60,
-  "5m": 300,
-  "15m": 900,
-  "1h": 3600,
-  "4h": 14400,
-  "1d": 86400,
-};
-
-const krakenPairs: Record<string, string> = {
-  "BTC/USDT": "BTCUSDT",
-  "ETH/USDT": "ETHUSDT",
-  "BNB/USDT": "BNBUSDT",
-  "SOL/USDT": "SOLUSDT",
-  "ADA/USDT": "ADAUSDT",
-};
-
-const getKrakenPair = (pair: string) => krakenPairs[pair] || "BTCUSDT";
 
 export const buildOrderBook = async (pair: string, levels = 18) => {
   const symbol = pair.replace("/", "");
@@ -97,7 +67,8 @@ export const buildOrderBook = async (pair: string, levels = 18) => {
   // Update price map with mid price
   if (buy.length > 0 && sell.length > 0) {
     const mid = (buy[0].price + sell[0].price) / 2;
-    priceMap[pair] = mid;
+    const validMid = getValidPrice(mid);
+    if (validMid > 0) priceMap[pair] = validMid;
   }
 
   return { buy, sell };
@@ -119,7 +90,8 @@ export const buildTrades = async (pair: string, count = 40) => {
 
   // Update price map with last trade price
   if (trades.length > 0) {
-    priceMap[pair] = trades[trades.length - 1].price;
+    const lastPrice = getValidPrice(trades[trades.length - 1].price);
+    if (lastPrice > 0) priceMap[pair] = lastPrice;
   }
 
   return trades;
@@ -144,7 +116,8 @@ export const buildCandles = async (pair: string, timeframe: string, limit = 80) 
 
   // Update price map with last close
   if (candles.length > 0) {
-    priceMap[pair] = candles[candles.length - 1].close;
+    const lastClose = getValidPrice(candles[candles.length - 1].close);
+    if (lastClose > 0) priceMap[pair] = lastClose;
   }
 
   return candles;

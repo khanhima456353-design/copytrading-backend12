@@ -1,9 +1,9 @@
 ﻿import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import axios from "axios";
 import logo from "../assets/logo.jpg";
 import "./Trading.css";
-// @ts-ignore
-import { getSocket, getAxios } from "../api";
+import { getAxios } from "../api";
+import { MarketState, subscribeConnectionStatus, subscribeMarketState, isValidPrice } from "../services/marketState";
+import PositionsPanel from "../components/PositionsPanel";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,6 +28,11 @@ type DrawingObject = {
 
 const timeframeOptions = ["1s", "1m", "5m", "15m", "1h", "4h", "1d", "1w"];
 const TF_SECONDS: Record<string, number> = { "1s": 1, "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "4h": 14400, "1d": 86400, "1w": 604800 };
+
+// ─── Trading Constants ────────────────────────────────────────────────────────
+
+const FEE_RATE = 0.001; // 0.1% trading fee
+const MIN_ORDER_TOTAL = 5; // Minimum order total in USDT
 
 const COLORS = {
   bg: "#0b0e11", bgPanel: "#161a1e", bgAlt: "#1a1e24", bgHover: "#1f2530",
@@ -455,7 +460,9 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
         ctx.beginPath(); ctx.moveTo(d.points[0].x, d.points[0].y); ctx.lineTo(d.points[1].x, d.points[1].y); ctx.stroke();
       } else if (d.tool === "hline" && d.points.length >= 1) {
         ctx.beginPath(); ctx.moveTo(0, d.points[0].y); ctx.lineTo(plotW, d.points[0].y); ctx.stroke();
-        ctx.fillStyle = d.color; ctx.font = "10px monospace"; ctx.textAlign = "left"; ctx.fillText(formatPrice(d.points[0].price || 0), 4, d.points[0].y - 3);
+        ctx.fillStyle = d.color; ctx.font = "10px monospace"; ctx.textAlign = "left";
+        const canvasPrice = d.points[0].price ?? NaN;
+        ctx.fillText(isValidPrice(canvasPrice) ? formatPrice(canvasPrice) : "Market price unavailable", 4, d.points[0].y - 3);
       } else if (d.tool === "vline" && d.points.length >= 1) {
         ctx.beginPath(); ctx.moveTo(d.points[0].x, mainPlotTop); ctx.lineTo(d.points[0].x, mainPlotBottom); ctx.stroke();
       } else if (d.tool === "rect" && d.points.length >= 2) {
@@ -826,7 +833,26 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
 type DepthOrder = Order & { cumulative?: number };
 type DepthChartProps = { buyLevels: DepthOrder[]; sellLevels: DepthOrder[]; depthLimit: number };
 
+type DepthHoverState = {
+  x: number;
+  y: number;
+  price: number;
+  size: number;
+  total: number;
+  side: "buy" | "sell";
+  snapX: number;
+  snapY: number;
+};
+
 function DepthChart({ buyLevels, sellLevels, depthLimit }: DepthChartProps) {
+  const [hoverPoint, setHoverPoint] = useState<DepthHoverState | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [priceStepIndex, setPriceStepIndex] = useState(2);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+
+  const priceStepOptions = [0.01, 0.1, 1, 10];
+  const priceStep = priceStepOptions[priceStepIndex];
+
   const chartInfo = useMemo(() => {
     const buy = buyLevels.map((o) => ({ ...o } as DepthOrder)).sort((a, b) => a.price - b.price);
     const sell = sellLevels.map((o) => ({ ...o } as DepthOrder)).sort((a, b) => a.price - b.price);
@@ -853,95 +879,290 @@ function DepthChart({ buyLevels, sellLevels, depthLimit }: DepthChartProps) {
   const hasData = buy.length || sell.length;
   const width = 1000;
   const height = 300;
-  const padding = { left: 64, right: 24, top: 34, bottom: 40 };
+  const padding = { left: 64, right: 24, top: 14, bottom: 46 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
+  const midPrice = bestBid && bestAsk ? (bestBid + bestAsk) / 2 : bestBid || bestAsk;
+  const priceRange = Math.max(1, maxPrice - minPrice);
+  const visibleRange = Math.min(priceRange, priceRange / Math.max(0.5, Math.min(5, zoom)));
+  let displayMin = Math.max(minPrice, midPrice - visibleRange / 2);
+  let displayMax = Math.min(maxPrice, midPrice + visibleRange / 2);
 
-  const normalizeX = (price: number) => padding.left + ((price - minPrice) / Math.max(1, maxPrice - minPrice)) * chartWidth;
+  if (displayMax - displayMin < visibleRange) {
+    if (displayMin === minPrice) {
+      displayMax = Math.min(maxPrice, displayMin + visibleRange);
+    } else if (displayMax === maxPrice) {
+      displayMin = Math.max(minPrice, displayMax - visibleRange);
+    }
+  }
+
+  const normalizeX = (price: number) => padding.left + ((price - displayMin) / Math.max(1, displayMax - displayMin)) * chartWidth;
   const baselineY = height - padding.bottom;
-  const normalizeY = (volume: number) => baselineY - (volume / maxVolume) * chartHeight * 0.92;
+  const normalizeY = (volume: number) => {
+    const unbounded = baselineY - (volume / maxVolume) * chartHeight * 0.92;
+    return Math.min(baselineY, Math.max(padding.top, unbounded));
+  };
 
-  const buildAreaPath = (points: { price: number; cumulative: number }[]) => {
+  const buildBidAreaPath = (points: { price: number; cumulative: number }[]) => {
     if (!points.length) return "";
-    let path = `M ${normalizeX(points[0].price)} ${baselineY} L ${normalizeX(points[0].price)} ${normalizeY(points[0].cumulative)}`;
+    const first = points[0];
+    const last = points[points.length - 1];
+    const minX = normalizeX(first.price);
+    const maxX = normalizeX(last.price);
+    const startY = normalizeY(first.cumulative);
+    let path = `M ${minX} ${baselineY} L ${minX} ${startY}`;
     for (let i = 1; i < points.length; i += 1) {
+      const prev = points[i - 1];
       const curr = points[i];
-      path += ` L ${normalizeX(curr.price)} ${normalizeY(curr.cumulative)}`;
+      const currX = Math.min(maxX, normalizeX(curr.price));
+      const prevY = normalizeY(prev.cumulative);
+      const currY = normalizeY(curr.cumulative);
+      path += ` L ${currX} ${prevY} L ${currX} ${currY}`;
+      if (currX >= maxX) break;
     }
-    path += ` L ${normalizeX(points[points.length - 1].price)} ${baselineY} Z`;
+    path += ` L ${maxX} ${baselineY} Z`;
     return path;
   };
 
-  const buildLinePath = (points: { price: number; cumulative: number }[]) => {
+  const buildAskAreaPath = (points: { price: number; cumulative: number }[]) => {
     if (!points.length) return "";
-    let path = `M ${normalizeX(points[0].price)} ${normalizeY(points[0].cumulative)}`;
+    const first = points[0];
+    const last = points[points.length - 1];
+    const minX = normalizeX(first.price);
+    const maxX = normalizeX(last.price);
+    const startY = normalizeY(first.cumulative);
+    let path = `M ${minX} ${baselineY} L ${minX} ${startY}`;
     for (let i = 1; i < points.length; i += 1) {
+      const prev = points[i - 1];
       const curr = points[i];
-      path += ` L ${normalizeX(curr.price)} ${normalizeY(curr.cumulative)}`;
+      const currX = Math.max(minX, normalizeX(curr.price));
+      const prevY = normalizeY(prev.cumulative);
+      const currY = normalizeY(curr.cumulative);
+      path += ` L ${currX} ${prevY} L ${currX} ${currY}`;
+      if (currX <= minX) continue;
+    }
+    path += ` L ${maxX} ${baselineY} Z`;
+    return path;
+  };
+
+  const buildBidLinePath = (points: { price: number; cumulative: number }[]) => {
+    if (!points.length) return "";
+    const first = points[0];
+    const last = points[points.length - 1];
+    const maxX = normalizeX(last.price);
+    let path = `M ${normalizeX(first.price)} ${normalizeY(first.cumulative)}`;
+    for (let i = 1; i < points.length; i += 1) {
+      const prev = points[i - 1];
+      const curr = points[i];
+      const currX = Math.min(maxX, normalizeX(curr.price));
+      const prevY = normalizeY(prev.cumulative);
+      const currY = normalizeY(curr.cumulative);
+      path += ` L ${currX} ${prevY} L ${currX} ${currY}`;
+      if (currX >= maxX) break;
     }
     return path;
   };
 
-  const buyPath = buildAreaPath(buy.map((level) => ({ price: level.price, cumulative: level.cumulative ?? 0 })));
-  const sellPath = buildAreaPath(sell.map((level) => ({ price: level.price, cumulative: level.cumulative ?? 0 })));
-  const buyLinePath = buildLinePath(buy.map((level) => ({ price: level.price, cumulative: level.cumulative ?? 0 })));
-  const sellLinePath = buildLinePath(sell.map((level) => ({ price: level.price, cumulative: level.cumulative ?? 0 })));
+  const buildAskLinePath = (points: { price: number; cumulative: number }[]) => {
+    if (!points.length) return "";
+    const first = points[0];
+    const minX = normalizeX(first.price);
+    let path = `M ${minX} ${normalizeY(first.cumulative)}`;
+    for (let i = 1; i < points.length; i += 1) {
+      const prev = points[i - 1];
+      const curr = points[i];
+      const currX = Math.max(minX, normalizeX(curr.price));
+      const prevY = normalizeY(prev.cumulative);
+      const currY = normalizeY(curr.cumulative);
+      path += ` L ${currX} ${prevY} L ${currX} ${currY}`;
+    }
+    return path;
+  };
+
+  const buyPath = buildBidAreaPath(buy.map((level) => ({ price: level.price, cumulative: level.cumulative ?? 0 })));
+  const sellPath = buildAskAreaPath(sell.map((level) => ({ price: level.price, cumulative: level.cumulative ?? 0 })));
+  const buyLinePath = buildBidLinePath(buy.map((level) => ({ price: level.price, cumulative: level.cumulative ?? 0 })));
+  const sellLinePath = buildAskLinePath(sell.map((level) => ({ price: level.price, cumulative: level.cumulative ?? 0 })));
 
   const bestBidX = normalizeX(bestBid);
   const bestAskX = normalizeX(bestAsk);
-  const tickPrices = Array.from(new Set([minPrice, bestBid, bestAsk, maxPrice])).filter((p) => p > 0);
+  const midX = (bestBidX + bestAskX) / 2;
+  const spreadPct = bestBid > 0 && bestAsk > 0 ? (((bestAsk - bestBid) / midPrice) * 100).toFixed(2) : "0.00";
+
+  const tickPrices = useMemo(() => {
+    const step = Math.max(priceStep, (displayMax - displayMin) / 4);
+    const startTick = Math.ceil(displayMin / step) * step;
+    const ticks: number[] = [];
+    for (let p = startTick; p <= displayMax + 1e-9; p += step) {
+      ticks.push(Number(p.toFixed(8)));
+      if (ticks.length > 6) break;
+    }
+    [displayMin, displayMax, bestBid, bestAsk, midPrice].forEach((value) => {
+      if (value >= displayMin && value <= displayMax) ticks.push(Number(value.toFixed(8)));
+    });
+    return Array.from(new Set(ticks)).sort((a, b) => a - b);
+  }, [displayMin, displayMax, priceStep, bestBid, bestAsk, midPrice]);
+
+  const allLevels = useMemo(
+    () => [
+      ...buy.map((level) => ({ ...level, side: "buy" as const })),
+      ...sell.map((level) => ({ ...level, side: "sell" as const })),
+    ],
+    [buy, sell]
+  );
+
+  const findNearest = useCallback(
+    (xValue: number) => {
+      if (!allLevels.length) return null;
+      let best: { level: DepthOrder & { side: "buy" | "sell" }; distance: number; x: number } | null = null;
+      for (const level of allLevels) {
+        const currentX = normalizeX(level.price);
+        const distance = Math.abs(currentX - xValue);
+        if (!best || distance < best.distance) {
+          best = { level, distance, x: currentX };
+        }
+      }
+      return best;
+    },
+    [allLevels, normalizeX]
+  );
+
+  const handleMouseMove = useCallback(
+    (event: React.MouseEvent<SVGSVGElement>) => {
+      const svg = svgRef.current;
+      if (!svg) return;
+      const rect = svg.getBoundingClientRect();
+      const relativeX = ((event.clientX - rect.left) / rect.width) * width;
+      const relativeY = ((event.clientY - rect.top) / rect.height) * height;
+      const nearest = findNearest(relativeX);
+      if (!nearest) {
+        setHoverPoint(null);
+        return;
+      }
+      const rawPrice = displayMin + ((relativeX - padding.left) / chartWidth) * (displayMax - displayMin);
+      const displayPrice = Number(Math.min(Math.max(rawPrice, displayMin), displayMax).toFixed(8));
+      const hoverY = normalizeY(nearest.level.cumulative ?? 0);
+      setHoverPoint({
+        x: Math.min(Math.max(relativeX, padding.left + 12), width - padding.right - 12),
+        y: Math.min(Math.max(relativeY, padding.top + 12), baselineY - 12),
+        price: Number(displayPrice.toFixed(8)),
+        size: nearest.level.amount,
+        total: nearest.level.cumulative ?? 0,
+        snapX: nearest.x,
+        snapY: hoverY,
+        side: nearest.level.side,
+      });
+    },
+    [findNearest, normalizeY, baselineY, padding.left, padding.top, width, displayMin, displayMax, chartWidth, height]
+  );
+
+  const tooltipLeft = hoverPoint ? `${Math.min(Math.max((hoverPoint.x / width) * 100, 6), 94)}%` : "0";
 
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+    <div className="depth-chart__wrapper">
+      <div className="depth-chart__header">
         <div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.textBright }}>Depth Chart</div>
-          <div style={{ fontSize: 12, color: COLORS.textMuted }}>Cumulative orderbook curves for the top {depthLimit} levels</div>
+          <div className="depth-chart__title">Depth Chart</div>
+          <div className="depth-chart__subtitle">Cumulative orderbook curves for the top {depthLimit} levels</div>
         </div>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", color: COLORS.textMuted, fontSize: 12 }}>
-          <span style={{ color: COLORS.green }}>Bids {formatVol(bidTotal)}</span>
-          <span style={{ color: COLORS.red }}>Asks {formatVol(askTotal)}</span>
-          <span>Spread {bestAsk > 0 ? formatPrice(bestAsk - bestBid) : "—"}</span>
+        <div className="depth-chart__controls">
+          <div className="depth-chart__control-group">
+            <button className="depth-chart__tool-btn" onClick={() => setZoom((z) => Math.max(0.6, z - 0.2))}>1</button>
+            <button className="depth-chart__tool-btn" onClick={() => setZoom((z) => Math.min(3, z + 0.2))}>+</button>
+            <span className="depth-chart__control-label">Zoom {zoom.toFixed(1)}x</span>
+          </div>
+          <div className="depth-chart__control-group">
+            {priceStepOptions.map((step, index) => (
+              <button
+                key={step}
+                className={`depth-chart__step-btn ${index === priceStepIndex ? "active" : ""}`}
+                onClick={() => setPriceStepIndex(index)}
+              >
+                {step}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
-      <div style={{ flex: 1, minHeight: 280, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 12, display: "flex", flexDirection: "column" }}>
+      <div className="depth-chart__canvas">
+        <div className="depth-chart__mid-pill">
+          <strong>{formatPrice(midPrice)} USDT</strong>
+          <span>Spread {spreadPct}%</span>
+        </div>
+        {hoverPoint && (
+          <div className="depth-chart__tooltip" style={{ left: tooltipLeft, top: `${Math.max(12, hoverPoint.y - 60)}px` }}>
+            <div className="depth-chart__tooltip-label">{hoverPoint.side === "buy" ? "Bid" : "Ask"} depth</div>
+            <div className="depth-chart__tooltip-row">
+              <span>Price</span>
+              <strong>{formatPrice(hoverPoint.price)} USDT</strong>
+            </div>
+            <div className="depth-chart__tooltip-row">
+              <span>Size</span>
+              <strong>{formatVol(hoverPoint.size)} BTC</strong>
+            </div>
+            <div className="depth-chart__tooltip-row">
+              <span>Total</span>
+              <strong>{formatVol(hoverPoint.total)} BTC</strong>
+            </div>
+          </div>
+        )}
         {hasData ? (
-          <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ width: "100%", height: "100%", overflow: "visible" }}>
+          <svg
+            ref={svgRef}
+            viewBox={`0 0 ${width} ${height}`}
+            preserveAspectRatio="none"
+            onMouseMove={handleMouseMove}
+            onMouseLeave={() => setHoverPoint(null)}
+            className="depth-chart__svg"
+          >
             <defs>
               <linearGradient id="depthBidGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={COLORS.green} stopOpacity="0.24" />
-                <stop offset="100%" stopColor={COLORS.green} stopOpacity="0" />
+                <stop offset="0%" stopColor="#02c076" stopOpacity="0.16" />
+                <stop offset="100%" stopColor="#02c076" stopOpacity="0" />
               </linearGradient>
               <linearGradient id="depthAskGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={COLORS.red} stopOpacity="0.24" />
-                <stop offset="100%" stopColor={COLORS.red} stopOpacity="0" />
+                <stop offset="0%" stopColor="#e44b55" stopOpacity="0.16" />
+                <stop offset="100%" stopColor="#e44b55" stopOpacity="0" />
               </linearGradient>
+              <clipPath id="depthClip">
+                <rect x={padding.left} y={padding.top} width={chartWidth} height={chartHeight} />
+              </clipPath>
             </defs>
             <rect x="0" y="0" width={width} height={height} fill="transparent" />
-            <line x1={padding.left} y1={baselineY} x2={width - padding.right} y2={baselineY} stroke={COLORS.border} strokeWidth="1" />
-            {tickPrices.map((price) => (
-              <g key={price}>
-                <line x1={normalizeX(price)} y1={padding.top} x2={normalizeX(price)} y2={baselineY} stroke={COLORS.border} strokeWidth="0.5" />
-              </g>
-            ))}
-            <path d={buyPath} fill="url(#depthBidGrad)" />
-            <path d={sellPath} fill="url(#depthAskGrad)" />
-            <path d={buyLinePath} fill="none" stroke={COLORS.green} strokeWidth="2" strokeLinecap="round" />
-            <path d={sellLinePath} fill="none" stroke={COLORS.red} strokeWidth="2" strokeLinecap="round" />
-            {tickPrices.map((price) => (
-              <g key={`label-${price}`}>
-                <line x1={normalizeX(price)} y1={baselineY} x2={normalizeX(price)} y2={baselineY + 6} stroke={COLORS.textMuted} strokeWidth="1" />
-                <text x={normalizeX(price)} y={baselineY + 20} fill={COLORS.textMuted} fontSize="10" textAnchor="middle">{formatPrice(price)}</text>
-              </g>
-            ))}
-            <text x={padding.left} y={padding.top - 8} fill={COLORS.textMuted} fontSize="10">Depth volume</text>
-            <text x={bestBidX} y={baselineY - 12} fill={COLORS.green} fontSize="10" textAnchor="middle" fontWeight="700">Bid {formatPrice(bestBid)}</text>
-            <text x={bestAskX} y={baselineY - 12} fill={COLORS.red} fontSize="10" textAnchor="middle" fontWeight="700">Ask {formatPrice(bestAsk)}</text>
+            <g clipPath="url(#depthClip)">
+              <rect x={bestBidX} y={padding.top} width={Math.max(bestAskX - bestBidX, 2)} height={baselineY - padding.top} fill="rgba(255,255,255,0.06)" />
+              {tickPrices.map((price) => (
+                <g key={price}>
+                  <line x1={normalizeX(price)} y1={padding.top} x2={normalizeX(price)} y2={baselineY} stroke={COLORS.border} strokeWidth="0.5" />
+                </g>
+              ))}
+              <path d={buyPath} fill="url(#depthBidGrad)" />
+              <path d={sellPath} fill="url(#depthAskGrad)" />
+              <path d={buyLinePath} fill="none" stroke="#26a69a" strokeWidth="2.4" strokeLinecap="round" />
+              <path d={sellLinePath} fill="none" stroke="#ef5350" strokeWidth="2.4" strokeLinecap="round" />
+              <line x1={bestBidX} y1={padding.top} x2={bestBidX} y2={baselineY} stroke="#26a69a" strokeWidth="1" strokeDasharray="3 4" />
+              <line x1={bestAskX} y1={padding.top} x2={bestAskX} y2={baselineY} stroke="#ef5350" strokeWidth="1" strokeDasharray="3 4" />
+              <line x1={midX} y1={padding.top} x2={midX} y2={baselineY} stroke="rgba(255,255,255,0.24)" strokeWidth="1" strokeDasharray="4 4" />
+              {hoverPoint && (
+                <>
+                  <line x1={hoverPoint.x} y1={padding.top} x2={hoverPoint.x} y2={baselineY} stroke="rgba(255,255,255,0.18)" strokeWidth="1" strokeDasharray="2 4" />
+                  <line x1={padding.left} y1={hoverPoint.y} x2={width - padding.right} y2={hoverPoint.y} stroke="rgba(255,255,255,0.12)" strokeWidth="1" strokeDasharray="2 4" />
+                  <circle cx={hoverPoint.snapX} cy={hoverPoint.snapY} r={4} fill={hoverPoint.side === "buy" ? "#02c076" : "#e44b55"} />
+                </>
+              )}
+            </g>
+            <text x={padding.left} y={padding.top - 8} fill={COLORS.textMuted} fontSize="10">
+              Depth volume
+            </text>
+            <text x={bestBidX} y={baselineY - 12} fill="#26a69a" fontSize="10" textAnchor="middle" fontWeight="700">
+              Bid {formatPrice(bestBid)}
+            </text>
+            <text x={bestAskX} y={baselineY - 12} fill="#ef5350" fontSize="10" textAnchor="middle" fontWeight="700">
+              Ask {formatPrice(bestAsk)}
+            </text>
           </svg>
         ) : (
-          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.textMuted, fontSize: 13 }}>
-            No depth data available yet
-          </div>
+          <div className="depth-chart__empty-state">No depth data available yet</div>
         )}
       </div>
     </div>
@@ -963,9 +1184,13 @@ export default function Trading() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredSymbols, setFilteredSymbols] = useState<string[]>([]);
   const [marketMovers, setMarketMovers] = useState<{ pair: string; change: number; volume: number; high: number; low: number }[]>([]);
+  const [marketState, setMarketState] = useState<MarketState | null>(null);
   const [priceInput, setPriceInput] = useState("");
-  const [amountInput, setAmountInput] = useState("");
-  const [totalInput, setTotalInput] = useState("");
+  const [savedManualPriceInput, setSavedManualPriceInput] = useState("");
+  const [buyAmountInput, setBuyAmountInput] = useState("");
+  const [buyTotalInput, setBuyTotalInput] = useState("");
+  const [sellAmountInput, setSellAmountInput] = useState("");
+  const [sellTotalInput, setSellTotalInput] = useState("");
   const [lastPrice, setLastPrice] = useState(0);
   const [displayPrice, setDisplayPrice] = useState(0);
   const [priceUpdateDirection, setPriceUpdateDirection] = useState<"up" | "down">("up");
@@ -987,12 +1212,38 @@ export default function Trading() {
   const [activeChartTab, setActiveChartTab] = useState<"original" | "tradingview" | "depth">("original");
   const [activeViewTab, setActiveViewTab] = useState<"chart" | "orderbook" | "trades" | "info" | "tradingdata">("chart");
   const [orderType, setOrderType] = useState<"limit" | "market" | "stop-limit" | "oco">("limit");
-  const [orderSide, setOrderSide] = useState<"buy" | "sell">("buy");
-  const [stopLoss, setStopLoss] = useState("");
-  const [takeProfit, setTakeProfit] = useState("");
-  const [sliderPct, setSliderPct] = useState(0);
+  const [buyStopLoss, setBuyStopLoss] = useState("");
+  const [buyTakeProfit, setBuyTakeProfit] = useState("");
+  const [sellStopLoss, setSellStopLoss] = useState("");
+  const [sellTakeProfit, setSellTakeProfit] = useState("");
+  const [buySliderPct, setBuySliderPct] = useState(0);
+  const [sellSliderPct, setSellSliderPct] = useState(0);
+  const [orderError, setOrderError] = useState("");
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+  const [pendingOrderSide, setPendingOrderSide] = useState<"buy" | "sell" | null>(null);
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [sortBy, setSortBy] = useState<"name" | "change" | "volume">("name");
   const [depthLimit, setDepthLimit] = useState(saved.depthLimit || 15);
+
+  // ── Toast Notification System ──────────────────────────────────────────────
+  const [toasts, setToasts] = useState<{ id: number; msg: string; type: "success" | "error" | "info" }[]>([]);
+  const toastIdRef = useRef(0);
+  const showToast = useCallback((msg: string, type: "success" | "error" | "info" = "info") => {
+    const id = ++toastIdRef.current;
+    setToasts(prev => [...prev, { id, msg, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+  }, []);
+
+  const handleOrderTypeChange = (type: "limit" | "market" | "stop-limit" | "oco") => {
+    if (type === orderType) return;
+    if (type === "market") {
+      setSavedManualPriceInput(priceInput);
+      setPriceInput("");
+    } else if (orderType === "market") {
+      setPriceInput(savedManualPriceInput);
+    }
+    setOrderType(type);
+  };
   const [liveStatus, setLiveStatus] = useState("offline");
   const [accountSummary, setAccountSummary] = useState<AccountSummary>(createFallbackAccountSummary());
   const [userOrders, setUserOrders] = useState<UserOrder[]>(createFallbackUserOrders());
@@ -1005,7 +1256,6 @@ export default function Trading() {
   const [drawingColor, setDrawingColor] = useState("#f0b90b");
   const [drawingWidth, setDrawingWidth] = useState(1.5);
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
-  const [orderPct, setOrderPct] = useState(0);
   const [slippageTol, setSlippageTol] = useState(false);
   const [activeTab, setActiveTab] = useState<"spot" | "cross" | "isolated" | "grid">("spot");
   const [gridBotActive, setGridBotActive] = useState(false);
@@ -1013,6 +1263,10 @@ export default function Trading() {
   const [gridBotConfig, setGridBotConfig] = useState({ lowerPrice: "", upperPrice: "", gridNum: "10", investAmount: "" });
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== "undefined" ? window.innerWidth : 1200);
   const [orderbookViewMode, setOrderbookViewMode] = useState<"combined" | "bids" | "asks">("combined");
+  const [spread, setSpread] = useState(0);
+  const [spreadPct, setSpreadPct] = useState(0);
+  const prevSpreadRef = useRef<number | null>(null);
+  const [spreadDirection, setSpreadDirection] = useState<'tighten' | 'widen' | 'neutral'>('neutral');
   const tradingPageRef = useRef<HTMLDivElement | null>(null);
   const bottomScrollRef = useRef<HTMLDivElement | null>(null);
   const isChartView = activeViewTab === "chart";
@@ -1037,6 +1291,120 @@ export default function Trading() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showTimeDropdown]);
 
+  useEffect(() => {
+    let mounted = true;
+    console.log("[Trading] subscribeMarketState init", { symbol });
+
+    const unsubscribeConnection = subscribeConnectionStatus((status) => {
+      if (!mounted) return;
+      console.log("[Trading] connection status", { symbol, status });
+      setLiveStatus(status);
+    });
+
+    const unsubscribeMarket = subscribeMarketState(symbol, (state) => {
+      if (!mounted) return;
+      console.log("[Trading] subscribeMarketState callback", { symbol, statePair: state.pair, lastPrice: state.lastPrice, markPrice: state.markPrice, orderbookBids: state.orderbook.bids.length, orderbookAsks: state.orderbook.asks.length });
+      setMarketState(prev => {
+        // Only update if values actually changed
+        if (prev && prev.lastPrice === state.lastPrice && 
+            prev.markPrice === state.markPrice &&
+            prev.orderbook.bids === state.orderbook.bids &&
+            prev.orderbook.asks === state.orderbook.asks &&
+            prev.volume24h === state.volume24h &&
+            prev.high24h === state.high24h &&
+            prev.low24h === state.low24h &&
+            prev.change24h === state.change24h &&
+            prev.changePct === state.changePct) {
+          return prev;
+        }
+        return state;
+      });
+    });
+
+    return () => {
+      mounted = false;
+      unsubscribeConnection();
+      unsubscribeMarket();
+    };
+  }, [symbol]);
+
+  // Refresh account-related data from backend
+  const refreshAccountData = useCallback(async () => {
+    try {
+      const api = await getAxios();
+      
+      // Recalculate balances from trade history to ensure they're fresh
+      await api.post('/api/account/recalculate-balances').catch(() => {
+        // If recalculate fails, just continue with existing balances
+      });
+
+      const [summaryRes, ordersRes, positionsRes, balancesRes, historyRes] = await Promise.all([
+        api.get('/api/account/summary'),
+        api.get('/api/account/open-orders'),
+        api.get('/api/account/positions'),
+        api.get('/api/account/balances'),
+        api.get('/api/trade/history').catch(() => ({ data: [] })),
+      ]);
+      
+      if (summaryRes?.data) setAccountSummary((prev) => ({ ...prev, ...summaryRes.data } as any));
+      if (ordersRes?.data) setUserOrders((ordersRes.data || []).map((o: any) => ({ id: o.orderId, pair: o.pair || o.symbol, type: o.type, side: o.side, price: o.price, amount: o.amount, status: o.status, createdAt: Math.floor(new Date(o.createdAt).getTime()/1000) })));
+      if (historyRes?.data && Array.isArray(historyRes.data)) {
+        setTradeHistory(historyRes.data.map((t: any) => ({
+          time: Math.floor(new Date(t.createdAt || t.time).getTime() / 1000),
+          price: t.price,
+          quantity: t.amount || t.quantity,
+          side: t.side,
+          pair: t.pair || t.symbol || symbol,
+          type: t.type || "market",
+        })));
+      }
+      if (balancesRes?.data) {
+        console.log('Fetched fresh balances:', balancesRes.data);
+      }
+    } catch (err) {
+      console.error('Error refreshing account data:', err);
+      // ignore; keep existing fallback
+    }
+  }, []);
+
+  // Initial load: fetch balances, open orders, and trade history from backend
+  useEffect(() => {
+    refreshAccountData();
+  }, [refreshAccountData]);
+
+  useEffect(() => {
+    if (!marketState) return;
+    setOrderbook({ buy: marketState.orderbook.bids, sell: marketState.orderbook.asks });
+    setTrades(marketState.trades);
+    // Keep local mirror for display only; single source of truth remains marketState.lastPrice
+    setLastPrice(marketState.lastPrice);
+    setHigh24h(marketState.high24h);
+    setLow24h(marketState.low24h);
+    setVol24h(marketState.volume24h);
+    setChange24h(marketState.change24h);
+    setChangePct(marketState.changePct);
+    setLastPriceUpdate(marketState.lastPriceUpdate);
+    setVol24hUSDT(isValidPrice(marketState.lastPrice) ? marketState.volume24h * marketState.lastPrice : 0);
+    // compute spread and direction (widening / tightening)
+    try {
+      const bestBid = marketState.orderbook.bids?.[0]?.price;
+      const bestAsk = marketState.orderbook.asks?.[0]?.price;
+      const newSpread = isValidPrice(bestAsk) && isValidPrice(bestBid) ? Math.max(0, bestAsk - bestBid) : 0;
+      const mid = isValidPrice(bestAsk) && isValidPrice(bestBid)
+        ? (bestAsk + bestBid) / 2
+        : (isValidPrice(marketState.lastPrice) ? marketState.lastPrice : NaN);
+      const newSpreadPct = Number.isFinite(mid) && mid > 0 ? (newSpread / mid) * 100 : 0;
+      const prev = prevSpreadRef.current;
+      if (prev == null) setSpreadDirection('neutral');
+      else if (newSpread > prev) setSpreadDirection('widen');
+      else if (newSpread < prev) setSpreadDirection('tighten');
+      else setSpreadDirection('neutral');
+      prevSpreadRef.current = newSpread;
+      setSpread(newSpread);
+      setSpreadPct(newSpreadPct);
+    } catch (e) {}
+  }, [marketState]);
+
   const indicators = useMemo(() => ({
     sma:  showSMA       ? calcSMA(candles, 7)     : [],
     ema:  showEMA       ? calcEMA(candles, 99)    : [],
@@ -1058,6 +1426,121 @@ export default function Trading() {
   const bidPct = totalBidVol + totalAskVol > 0 ? (totalBidVol / (totalBidVol + totalAskVol) * 100).toFixed(1) : "50.0";
   const askPct = totalBidVol + totalAskVol > 0 ? (totalAskVol / (totalBidVol + totalAskVol) * 100).toFixed(1) : "50.0";
   const activeOrders = userOrders.filter(o => o.status === "open");
+  const pendingLocked = useMemo(() => userOrders
+    .filter(o => o.status === "open" && o.side === "buy")
+    .reduce((sum, order) => sum + order.price * order.amount, 0), [userOrders]);
+  const pendingSellLockedBTC = useMemo(() => userOrders
+    .filter(o => o.status === "open" && o.side === "sell")
+    .reduce((sum, order) => sum + order.amount, 0), [userOrders]);
+  const reservedUSDT = pendingLocked;
+  const freeToTrade = Math.max(0, accountSummary.available - reservedUSDT);
+  const availableBalance = freeToTrade;
+  
+  // Derived balance values (computed before use)
+  const btcHolding = accountSummary.holdings.find(h => h.asset === "BTC")?.amount || 0;
+  const availableBTC = Math.max(0, btcHolding - pendingSellLockedBTC);
+  const portfolioTotal = accountSummary.holdings.reduce((s, h) => s + h.value, availableBalance + pendingLocked);
+
+  const parseNumber = (value: unknown) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  const getEffectivePrice = (input: unknown, lastP: number) => {
+    const p = Number(input);
+    if (Number.isFinite(p) && p > 0) return p;
+    if (isValidPrice(lastP)) return lastP;
+    return null;
+  };
+
+  const limitPrice = Number(priceInput);
+  const marketPrice = isValidPrice(lastPrice) ? lastPrice : NaN;
+  const orderPriceDisplay = orderType === "market"
+    ? (isValidPrice(marketPrice) ? marketPrice.toFixed(2) : "")
+    : priceInput;
+  const buyPrice = orderType === "market" ? marketPrice : (Number.isFinite(limitPrice) && limitPrice > 0 ? limitPrice : NaN);
+  const sellPrice = orderType === "market" ? marketPrice : (Number.isFinite(limitPrice) && limitPrice > 0 ? limitPrice : NaN);
+
+  useEffect(() => {
+    console.log("[Trading] pricing debug", {
+      symbol,
+      orderType,
+      priceInput,
+      savedManualPriceInput,
+      marketStateLastPrice: marketState?.lastPrice,
+      marketPrice,
+      orderPriceDisplay,
+      buyPrice,
+      sellPrice,
+      buyTotalInput,
+      sellTotalInput,
+    });
+  }, [symbol, orderType, priceInput, savedManualPriceInput, marketState?.lastPrice, marketPrice, orderPriceDisplay, buyTotalInput, sellTotalInput]);
+
+  const buyAmount = parseNumber(buyAmountInput || 0);
+  const sellAmount = parseNumber(sellAmountInput || 0);
+  const buyTotal = orderType === "market"
+    ? buyAmount * buyPrice
+    : Number(buyTotalInput || (buyAmount > 0 && isValidPrice(buyPrice) ? buyAmount * buyPrice : 0));
+  const sellTotal = orderType === "market"
+    ? sellAmount * sellPrice
+    : Number(sellTotalInput || (sellAmount > 0 && isValidPrice(sellPrice) ? sellAmount * sellPrice : 0));
+  const buyFee = buyTotal * FEE_RATE;
+  const sellFee = sellTotal * FEE_RATE;
+  const estimatedBuyReceive = buyAmount;
+  const estimatedSellReceive = Math.max(0, sellTotal - sellFee);
+  const buyStop = buyStopLoss ? parseNumber(buyStopLoss) : undefined;
+  const buyTp = buyTakeProfit ? parseNumber(buyTakeProfit) : undefined;
+  const sellStop = sellStopLoss ? parseNumber(sellStopLoss) : undefined;
+  const sellTp = sellTakeProfit ? parseNumber(sellTakeProfit) : undefined;
+  const marketPriceUnavailable = orderType === "market" && !isValidPrice(marketPrice);
+  const buyError = buyAmount <= 0
+    ? "Enter buy amount"
+    : buyTotal < MIN_ORDER_TOTAL
+      ? "Minimum order is 5 USDT"
+      : buyTotal > freeToTrade
+        ? "Insufficient Balance"
+        : marketPriceUnavailable
+          ? "Market price unavailable"
+          : orderType !== "market" && !isValidPrice(buyPrice)
+            ? "Enter valid price"
+            : liveStatus !== "live"
+              ? "Connection is offline"
+              : buyStop && buyStop >= buyPrice
+                ? "Stop Loss must be below entry price"
+                : buyTp && buyTp <= buyPrice
+                  ? "Take Profit must be above entry price"
+                  : "";
+  const sellError = sellAmount <= 0
+    ? "Enter sell amount"
+    : sellAmount > availableBTC
+      ? "Insufficient BTC Balance"
+      : sellTotal < MIN_ORDER_TOTAL
+        ? "Minimum order is 5 USDT"
+        : marketPriceUnavailable
+          ? "Market price unavailable"
+          : orderType !== "market" && !isValidPrice(sellPrice)
+            ? "Enter valid price"
+            : sellStop && sellStop <= sellPrice
+              ? "Stop Loss must be above entry price"
+              : sellTp && sellTp >= sellPrice
+                ? "Take Profit must be below entry price"
+                : "";
+  const isReady = liveStatus === "live" && isValidPrice(marketPrice);
+  const buyDisabled = !!buyError || isPlacingOrder || buyAmount <= 0 || liveStatus !== "live" || (orderType !== "market" && !isValidPrice(buyPrice));
+  const sellDisabled = !!sellError || isPlacingOrder || sellAmount <= 0 || availableBTC <= 0 || liveStatus !== "live" || (orderType !== "market" && !isValidPrice(sellPrice));
+  const buyButtonLabel = !isReady ? "Connecting..." : "Buy / Long";
+  const marketWarning = orderType === "market"
+    ? isValidPrice(marketPrice)
+      ? "Execution price may change due to market volatility."
+      : "Market price unavailable. Check your connection."
+    : "";
+  useEffect(() => {
+    if (availableBTC <= 0 && sellAmountInput) {
+      setSellAmountInput("");
+      setSellTotalInput("");
+      setSellSliderPct(0);
+    }
+  }, [availableBTC, sellAmountInput]);
 
   const orderbookVariant = windowWidth >= 1024 ? "desktop" : windowWidth >= 768 ? "tablet" : "mobile";
   const bidPctNum = parseFloat(bidPct) || 0;
@@ -1104,7 +1587,7 @@ export default function Trading() {
               const ask = askRows[index];
               const bid = bidRows[index];
               return (
-                <div key={index} onClick={() => { const picked = bid || ask; if (picked) setPriceInput(picked.price.toFixed(2)); }} style={{ display: "grid", gridTemplateColumns: "1fr 0.9fr 0.9fr 1fr", padding: "4px 8px", alignItems: "center", minHeight: 24, fontSize: 10, fontFamily: "monospace", color: COLORS.text, background: index % 2 === 0 ? COLORS.bg : "transparent", cursor: bid || ask ? "pointer" : "default" }}>
+                <div key={index} onClick={() => { if (orderType === "market") return; const picked = bid || ask; if (picked) setPriceInput(picked.price.toFixed(2)); }} style={{ display: "grid", gridTemplateColumns: "1fr 0.9fr 0.9fr 1fr", padding: "4px 8px", alignItems: "center", minHeight: 24, fontSize: 10, fontFamily: "monospace", color: COLORS.text, background: index % 2 === 0 ? COLORS.bg : "transparent", cursor: bid || ask ? "pointer" : "default" }}>
                   <span style={{ color: COLORS.textBright, textAlign: "left", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{bid ? bid.amount.toFixed(5) : ""}</span>
                   <span style={{ color: bid ? COLORS.green : COLORS.textMuted, textAlign: "left", whiteSpace: "nowrap" }}>{bid ? bid.price.toFixed(2) : ""}</span>
                   <span style={{ color: ask ? COLORS.red : COLORS.textMuted, textAlign: "right", whiteSpace: "nowrap" }}>{ask ? ask.price.toFixed(2) : ""}</span>
@@ -1131,7 +1614,7 @@ export default function Trading() {
         {header}
         <div style={{ flex: 1, overflow: "auto" }}>
           {rows.map((row, index) => (
-            <div key={index} onClick={() => setPriceInput(row.price.toFixed(2))} style={{ position: "relative", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", padding: "8px 10px", alignItems: "center", minHeight: 32, fontSize: 11, fontFamily: "monospace", color: row.side === "sell" ? COLORS.red : COLORS.green, background: index % 2 === 0 ? COLORS.bg : "transparent", cursor: "pointer" }}>
+            <div key={index} onClick={() => { if (orderType === "market") return; setPriceInput(row.price.toFixed(2)); }} style={{ position: "relative", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", padding: "8px 10px", alignItems: "center", minHeight: 32, fontSize: 11, fontFamily: "monospace", color: row.side === "sell" ? COLORS.red : COLORS.green, background: index % 2 === 0 ? COLORS.bg : "transparent", cursor: "pointer" }}>
               <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.min(100, ((row.total || 0) / Math.max(maxAsk, maxBid)) * 100)}%`, background: row.side === "sell" ? COLORS.redDim : COLORS.greenDim, zIndex: 0 }} />
               <span style={{ position: "relative", zIndex: 1, textAlign: "left" }}>{row.price.toFixed(2)}</span>
               <span style={{ position: "relative", zIndex: 1, textAlign: "center", color: COLORS.textBright }}>{row.amount.toFixed(5)}</span>
@@ -1159,7 +1642,15 @@ export default function Trading() {
       }}
     >
       <div style={{ padding: "8px 10px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <span style={{ fontWeight: 700, fontSize: 13, color: COLORS.textBright }}>Order Book</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontWeight: 700, fontSize: 13, color: COLORS.textBright }}>Order Book</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 11, color: COLORS.textMuted }}>Spread</span>
+            <span style={{ fontWeight: 700, color: spreadDirection === 'tighten' ? COLORS.green : spreadDirection === 'widen' ? COLORS.red : COLORS.text }}>
+              {spread ? `${formatPrice(spread)} (${spreadPct.toFixed(4)}%)` : "—"}
+            </span>
+          </div>
+        </div>
         <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
           {(["combined", "bids", "asks"] as const).map(mode => (
             <button
@@ -1345,110 +1836,137 @@ export default function Trading() {
     }
   };
 
-  const fetchOrderBook = async (sel: string) => {
-    try {
-      const api = await getAxios();
-      const res = await api.get(`/api/market/orderbook/${encodeURIComponent(sel)}`);
-      const book = res.data;
-      let st = 0; const sell = book.sell.map((o: Order) => { st += o.amount; return { ...o, total: st }; });
-      let bt = 0; const buy  = book.buy.map((o: Order)  => { bt += o.amount; return { ...o, total: bt }; });
-      setOrderbook({ buy, sell });
-    } catch { setOrderbook({ buy: [], sell: [] }); }
-  };
-
-  const fetchMarketData = async (sel: string, tf: string) => {
-    try {
-      const api = await getAxios();
-      const [cRes, tRes, dRes, dmRes] = await Promise.all([
-        api.get(`/api/market/candles/${encodeURIComponent(sel)}?timeframe=${tf}`),
-        api.get(`/api/market/trades/${encodeURIComponent(sel)}`),
-        api.get(`/api/market/candles/${encodeURIComponent(sel)}?timeframe=1d`),
-        api.get(`/api/market/deepmarket/${encodeURIComponent(sel)}?timeframe=${tf}`),
-      ]);
-      const raw: Candle[] = cRes.data;
-      const clean = (raw.length ? raw : createFallbackCandles()).map(c => ({ ...c, time: Math.floor(Number(c.time)) })).sort((a, b) => a.time - b.time);
-      setCandles(clean);
-      const liveTrades: Trade[] = tRes.data || [];
-      setTrades(liveTrades.sort((a, b) => b.time - a.time).slice(0, 50));
-      const deepMarketRaw = dmRes.data || [];
-      const deepMarketClean = deepMarketRaw.map((d: any) => ({ time: Math.floor(Number(d.time)), value: Number(d.value) })).sort((a: any, b: any) => a.time - b.time);
-      setDeepMarketData(deepMarketClean);
-      const last = clean[clean.length - 1];
-      if (last) {
-        setLastPrice(last.close); setDisplayPrice(last.close); setPriceInput(last.close.toFixed(2));
-        setLastPriceUpdate(Date.now());
-      }
-      // For 24h data, use 1d candles
-      const dailyRaw: Candle[] = dRes.data;
-      const dailyClean = (dailyRaw.length ? dailyRaw : createFallbackCandles(30, 80000)).map(c => ({ ...c, time: Math.floor(Number(c.time)) })).sort((a, b) => a.time - b.time);
-      if (dailyClean.length) {
-        setHigh24h(Math.max(...dailyClean.map(c => c.high)));
-        setLow24h(Math.min(...dailyClean.map(c => c.low)));
-        setVol24h(dailyClean.reduce((s, c) => s + c.volume, 0));
-        const firstClose = dailyClean[0]?.close || dailyClean[dailyClean.length - 1]?.close;
-        const lastClose = dailyClean[dailyClean.length - 1]?.close || firstClose;
-        setChange24h(+(lastClose - firstClose).toFixed(2));
-        setChangePct(+((lastClose - firstClose) / firstClose * 100).toFixed(2));
-      }
-      setLiveStatus("live");
-    } catch {
-      setLiveStatus("offline");
-      const fb = createFallbackCandles();
-      setCandles(fb); setDeepMarketData([]); setLastPrice(fb[fb.length - 1]?.close || 80721); setPriceInput("80721.22");
-      setHigh24h(80817.99); setLow24h(79920); setVol24h(9305.28); setChange24h(720.52); setChangePct(0.9);
+  const updateOrderPrice = (value: string) => {
+    if (orderType === "market") return;
+    setPriceInput(value);
+    const price = Number(value);
+    if (!value || isNaN(price) || price <= 0) return;
+    if (buyAmountInput) {
+      setBuyTotalInput((Number(buyAmountInput) * price).toFixed(2));
+    }
+    if (sellAmountInput) {
+      setSellTotalInput((Number(sellAmountInput) * price).toFixed(2));
     }
   };
 
-  const krakenPair = useMemo(() => {
-    const [base, quote] = symbol.split("/");
-    const baseMap: Record<string, string> = { BTC: "XBT", ETH: "ETH", LTC: "LTC", XRP: "XRP", ADA: "ADA", DOT: "DOT", SOL: "SOL", USDT: "USDT", USDC: "USDC", BNB: "BNB", AVAX: "AVAX", MATIC: "MATIC" };
-    const quoteMap: Record<string, string> = { USDT: "USDT", USD: "USD", BTC: "XBT", ETH: "ETH" };
-    const baseId = baseMap[base] || base;
-    const quoteId = quoteMap[quote] || quote;
-    return `${baseId}${quoteId}`;
-  }, [symbol]);
+  const updateBuyAmount = (value: string) => {
+    setBuyAmountInput(value);
+    const amount = Number(value);
+    const price = buyPrice;
+    if (!value || isNaN(amount) || !Number.isFinite(price) || price <= 0) {
+      setBuyTotalInput("");
+      return;
+    }
+    setBuyTotalInput((amount * price).toFixed(2));
+    setBuySliderPct(0);
+  };
 
-  const fetch24hData = async (sel: string) => {
+  const updateBuyTotal = (value: string) => {
+    setBuyTotalInput(value);
+    const total = Number(value);
+    const price = buyPrice;
+    if (!value || isNaN(total) || !Number.isFinite(price) || price <= 0) {
+      setBuyAmountInput("");
+      return;
+    }
+    setBuyAmountInput((total / price).toFixed(8));
+    setBuySliderPct(0);
+  };
+
+  const updateSellAmount = (value: string) => {
+    setSellAmountInput(value);
+    const amount = Number(value);
+    const price = sellPrice;
+    if (!value || isNaN(amount) || !Number.isFinite(price) || price <= 0) {
+      setSellTotalInput("");
+      return;
+    }
+    setSellTotalInput((amount * price).toFixed(2));
+    setSellSliderPct(0);
+  };
+
+  const updateSellTotal = (value: string) => {
+    setSellTotalInput(value);
+    const total = Number(value);
+    const price = sellPrice;
+    if (!value || isNaN(total) || !Number.isFinite(price) || price <= 0) {
+      setSellAmountInput("");
+      return;
+    }
+    setSellAmountInput((total / price).toFixed(8));
+    setSellSliderPct(0);
+  };
+
+  const applyBuyPct = (p: number) => {
+    setBuySliderPct(p);
+    const price = orderType === "market" ? marketPrice : getEffectivePrice(priceInput, lastPrice);
+    const total = availableBalance * (p / 100);
+    if (!price) {
+      setBuyAmountInput("");
+      setBuyTotalInput("0.00");
+      return;
+    }
+    const amount = total / price;
+    setBuyAmountInput(amount.toFixed(8));
+    setBuyTotalInput(total.toFixed(2));
+  };
+
+  const applySellPct = (p: number) => {
+    setSellSliderPct(p);
+    const amount = availableBTC * (p / 100);
+    const price = orderType === "market" ? marketPrice : getEffectivePrice(priceInput, lastPrice);
+    setSellAmountInput(amount.toFixed(8));
+    if (!price) { setSellTotalInput("0.00"); return; }
+    setSellTotalInput((amount * price).toFixed(2));
+  };
+
+  const krakenPair = symbol.replace("/", "").replace(/USDT$/, "USD"); // e.g., "BTC/USDT" → "BTCUSD"
+  const estimatedMaxBuyBTC = availableBalance > 0 && Number.isFinite(buyPrice) && buyPrice > 0
+    ? (availableBalance / buyPrice).toFixed(8)
+    : "0.00000000";
+  const estimatedMaxSellUSDT = availableBTC > 0 && Number.isFinite(sellPrice) && sellPrice > 0
+    ? (availableBTC * sellPrice).toFixed(2)
+    : "0.00";
+  const modeBalanceSummary = useMemo(() => {
+    const usableMargin = availableBalance;
+    const effPrice = orderType === "market" ? marketPrice : getEffectivePrice(priceInput, lastPrice);
+    const pairNotional = effPrice ? ((Number(buyAmountInput) || 0) * effPrice).toFixed(2) : "0.00";
+    if (activeTab === "cross") return [
+      { label: "Cross Balance", value: `$${availableBalance.toFixed(2)}` },
+      { label: "Cross Used Margin", value: `$${pendingLocked.toFixed(2)}` },
+      { label: "Available Margin", value: `$${usableMargin.toFixed(2)}` },
+    ];
+    if (activeTab === "isolated") return [
+      { label: "Available USDT", value: `$${availableBalance.toFixed(2)}` },
+      { label: "Estimated Max BTC", value: `${estimatedMaxBuyBTC} BTC` },
+      { label: "Pair Exposure", value: `$${pairNotional}` },
+    ];
+    return [
+      { label: "Available USDT", value: `$${availableBalance.toFixed(2)}` },
+      { label: "Locked USDT", value: `$${pendingLocked.toFixed(2)}` },
+      { label: "Total Portfolio", value: `$${portfolioTotal.toFixed(2)}` },
+    ];
+  }, [activeTab, availableBalance, pendingLocked, buyAmountInput, buyPrice, lastPrice, portfolioTotal]);
+
+  const fetchMarketData = async (sym: string, tf: string) => {
+    // Fetch chart/candle data for the symbol and timeframe
+    // Uses fallback synthetic data if backend endpoint unavailable
     try {
-      const res = await axios.get(`https://api.kraken.com/0/public/Ticker?pair=${krakenPair}`);
-      const result = res.data?.result || {};
-      const tickerKey = Object.keys(result)[0];
-      const ticker = result[tickerKey] || {};
-      const last = parseFloat(ticker.c?.[0] || ticker.a?.[0] || "0") || 0;
-      const high = parseFloat(ticker.h?.[1] || ticker.h?.[0] || "0") || 0;
-      const low = parseFloat(ticker.l?.[1] || ticker.l?.[0] || "0") || 0;
-      const volume = parseFloat(ticker.v?.[1] || ticker.v?.[0] || "0") || 0;
-      const open = parseFloat(ticker.o || "0") || 0;
-      const change = last - open;
-      const changePercent = open ? (change / open) * 100 : 0;
-
-      setHigh24h(high);
-      setLow24h(low);
-      setVol24h(volume);
-      setVol24hUSDT(volume * last);
-      setChange24h(change);
-      setChangePct(changePercent);
-      setLastPrice(last);
-      setDisplayPrice(last);
-      setLastPriceUpdate(Date.now());
-      setLiveStatus("live");
-    } catch {
-      setLiveStatus("offline");
-      setVol24hUSDT(vol24h * lastPrice);
+      const api = await getAxios();
+      const encodedPair = encodeURIComponent(sym);
+      const res = await api.get(`/api/market/candles/${encodedPair}?timeframe=${tf}`);
+      if (res.data?.candles) {
+        setCandles(res.data.candles);
+      } else if (Array.isArray(res.data)) {
+        setCandles(res.data);
+      }
+    } catch (err) {
+      // Backend endpoint unavailable - use fallback synthetic candles
+      setCandles(createFallbackCandles());
     }
   };
 
   useEffect(() => { if (!symbol) return; fetchMarketData(symbol, timeframe); }, [symbol, timeframe]);
-  useEffect(() => {
-    if (!symbol) return;
-    const refreshMarketState = () => {
-      fetchOrderBook(symbol);
-      fetch24hData(symbol);
-    };
-    refreshMarketState();
-    const iv = window.setInterval(refreshMarketState, 1000);
-    return () => window.clearInterval(iv);
-  }, [symbol]);
   useEffect(() => {
     const q = searchQuery.toLowerCase();
     const filtered = symbols.filter(s => s.toLowerCase().includes(q)).sort((a, b) => {
@@ -1459,46 +1977,23 @@ export default function Trading() {
     setFilteredSymbols(filtered);
   }, [searchQuery, symbols, sortBy, marketMovers]);
 
-  useEffect(() => {
-    let socket: any;
-    const init = async () => {
-      socket = await getSocket();
-      socket.on("trade", (trade: any) => {
-        if (trade.pair !== symbol) return;
-        const tradePrice = Number(trade.price), interval = TF_SECONDS[timeframe] || 60, tradeTime = Math.floor(Date.now() / 1000 / interval) * interval;
-        setTrades(prev => [{ time: tradeTime, price: tradePrice, amount: Number(trade.amount), side: trade.side || "buy" }, ...prev.slice(0, 49)]);
-        setCandles(prev => {
-          const next = [...prev]; const last = next[next.length - 1];
-          if (last && last.time === tradeTime) next[next.length - 1] = { ...last, high: Math.max(last.high, tradePrice), low: Math.min(last.low, tradePrice), close: tradePrice, volume: last.volume + Number(trade.amount) };
-          else { next.push({ time: tradeTime, open: tradePrice, high: tradePrice, low: tradePrice, close: tradePrice, volume: Number(trade.amount) }); if (next.length > 1000) next.shift(); }
-          return next;
-        });
-        setLastPrice(tradePrice);
-        setLastPriceUpdate(Date.now());
-        setLiveStatus("live");
-      });
-      socket.on("priceUpdate", (update: any) => {
-        if (update.pair !== symbol) return;
-        const price = Number(update.price);
-        setLastPrice(price);
-        setLastPriceUpdate(update.time || Date.now());
-        setLiveStatus("live");
-        applyDisplayPriceUpdate(price);
-      });
-      socket.on("orderbook", (data: any) => { if (data.pair !== symbol) return; let st = 0; const sell = data.sell.map((o: any) => { st += o.amount; return { ...o, total: st }; }); let bt = 0; const buy = data.buy.map((o: any) => { bt += o.amount; return { ...o, total: bt }; }); setOrderbook({ buy, sell }); });
-      socket.on("balanceUpdate", (data: any) => {
-        const currentUserId = localStorage.getItem("userId");
-        if (data.userId === currentUserId) {
-          setAccountSummary(prev => ({ ...prev, available: data.balance, locked: data.frozenBalance || prev.locked }));
-        }
-      });
-      socket.on("connect", () => setLiveStatus("live"));
-      socket.on("disconnect", () => setLiveStatus("offline"));
-    };
-    init();
-    return () => { socket?.off("trade"); socket?.off("priceUpdate"); socket?.off("orderbook"); socket?.off("balanceUpdate"); socket?.off("connect"); socket?.off("disconnect"); socket?.disconnect(); };
-  }, [symbol, timeframe]);
   useEffect(() => { fetchSymbols(); }, []);
+
+  const fetchProfileBalance = async () => {
+    try {
+      const api = await getAxios();
+      const res = await api.get("/api/profile");
+      if (res.data?.success) {
+        setAccountSummary(prev => ({ ...prev, available: res.data.user.balance || 0 }));
+      }
+    } catch (error) {
+      console.error("Error fetching trading page profile balance:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchProfileBalance();
+  }, []);
 
   const applyDisplayPriceUpdate = useCallback((rawPrice: number) => {
     const state = priceMovementRef.current;
@@ -1535,50 +2030,105 @@ export default function Trading() {
     return () => window.clearInterval(interval);
   }, [lastPrice, applyDisplayPriceUpdate]);
 
-  const placeOrder = async (side: "buy" | "sell") => {
-    if (!priceInput || !amountInput) return;
-    const price = Number(priceInput), amount = Number(amountInput);
-    if (isNaN(price) || isNaN(amount) || amount <= 0) return;
-    const sl = stopLoss ? Number(stopLoss) : undefined;
-    const tp = takeProfit ? Number(takeProfit) : undefined;
-    const newOrder: UserOrder = { id: `u-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, pair: symbol, type: orderType === "stop-limit" ? "stop-loss" : orderType, side, price, amount, stopLoss: sl, takeProfit: tp, status: orderType === "market" ? "filled" : "open", createdAt: Math.floor(Date.now() / 1000) };
-    setUserOrders(prev => [newOrder, ...prev.slice(0, 29)]);
-    setTradeHistory(prev => [{ time: Math.floor(Date.now() / 1000), price, quantity: amount, side, pair: symbol, type: orderType === "market" ? "market" : "limit" }, ...prev.slice(0, 39)]);
-    const cost = price * amount;
-    if (side === "buy") setAccountSummary(prev => ({ ...prev, available: Math.max(0, prev.available - cost) }));
-    try { const api = await getAxios(); await api.post("/api/trade/place", { pair: symbol, amount, side, price, type: orderType, stopLoss: sl, takeProfit: tp, slippageTolerance: slippageTol ? 0.01 : 0 }); } catch (err) { console.error(err); setAccountSummary(createFallbackAccountSummary()); }
-    setAmountInput(""); setTotalInput(""); setStopLoss(""); setTakeProfit(""); setOrderPct(0); setSliderPct(0);
+  const getSideConfig = (side: "buy" | "sell") => {
+    const amount = side === "buy" ? Number(buyAmountInput || 0) : Number(sellAmountInput || 0);
+    const priceVal = orderType === "market"
+      ? (isValidPrice(lastPrice) ? lastPrice : NaN)
+      : (Number.isFinite(Number(priceInput)) && Number(priceInput) > 0 ? Number(priceInput) : NaN);
+    const total = Number((side === "buy" ? buyTotalInput : sellTotalInput)) || (amount > 0 && Number.isFinite(priceVal) ? amount * priceVal : 0);
+    const stopLossValue = side === "buy" ? (buyStopLoss ? Number(buyStopLoss) : undefined) : (sellStopLoss ? Number(sellStopLoss) : undefined);
+    const takeProfitValue = side === "buy" ? (buyTakeProfit ? Number(buyTakeProfit) : undefined) : (sellTakeProfit ? Number(sellTakeProfit) : undefined);
+    return { amount, price: priceVal, total, stopLoss: stopLossValue, takeProfit: takeProfitValue };
+  };
+
+  const openOrderConfirmation = (side: "buy" | "sell") => {
+    const error = side === "buy" ? buyError : sellError;
+    if (error) {
+      setOrderError(error);
+      return;
+    }
+    setOrderError("");
+    setPendingOrderSide(side);
+    setConfirmModalOpen(true);
+  };
+
+  const executeOrder = async (side: "buy" | "sell") => {
+    if (isPlacingOrder) return;
+    const { amount, price, total, stopLoss, takeProfit } = getSideConfig(side);
+    if (!amount || !Number.isFinite(price) || price <= 0 || amount <= 0 || total < MIN_ORDER_TOTAL) {
+      setOrderError("Unable to place order. Check amount and price.");
+      return;
+    }
+
+    // Prevent buy when user available balance is insufficient (client-side guard)
+    if (side === "buy") {
+      if (total > availableBalance) {
+        setOrderError("Insufficient USDT balance");
+        return;
+      }
+    }
+    setIsPlacingOrder(true);
+    setConfirmModalOpen(false);
+    // place order on backend and refresh account data
+    try {
+      const api = await getAxios();
+      const payload: Record<string, unknown> = {
+        symbol,
+        pair: symbol,
+        side,
+        type: orderType,
+        amount,
+        slippageTolerance: slippageTol ? 0.01 : 0,
+      };
+      // Only send price for non-market orders
+      if (orderType !== "market") {
+        payload.price = price;
+      }
+      if (stopLoss) payload.stopLoss = stopLoss;
+      if (takeProfit) payload.takeProfit = takeProfit;
+      const resp = await api.post("/api/trade/place", payload);
+      showToast(`${side === "buy" ? "Buy" : "Sell"} order placed successfully!`, "success");
+      // refresh account info and open orders from backend
+      await refreshAccountData();
+    } catch (err: any) {
+      console.error(err);
+      const serverData = err?.response?.data;
+      const msg = serverData?.error || serverData?.message || err?.message || "Order failed. Please try again.";
+      showToast(msg, "error");
+      // failed to place: refresh to ensure UI matches backend
+      await refreshAccountData();
+    }
+    if (side === "buy") {
+      setBuyAmountInput("");
+      setBuyTotalInput("");
+      setBuyStopLoss("");
+      setBuyTakeProfit("");
+      setBuySliderPct(0);
+    } else {
+      setSellAmountInput("");
+      setSellTotalInput("");
+      setSellStopLoss("");
+      setSellTakeProfit("");
+      setSellSliderPct(0);
+    }
+    setOrderError("");
+    setIsPlacingOrder(false);
   };
   const cancelOrder = async (id: string) => {
-    setUserOrders(prev => prev.map(o => o.id === id ? { ...o, status: "cancelled" } : o));
-    try { const api = await getAxios(); await api.post("/api/trade/cancel", { orderId: id }); } catch (err) { console.error(err); setUserOrders(prev => prev.map(o => o.id === id ? { ...o, status: "open" } : o)); }
+    try {
+      const api = await getAxios();
+      await api.post("/api/trade/cancel", { orderId: id });
+      setUserOrders(prev => prev.filter(o => o.id !== id));
+      showToast("Order cancelled successfully.", "success");
+      await refreshAccountData();
+    } catch (err) {
+      console.error("Cancel failed", err);
+      showToast("Failed to cancel order. Please try again.", "error");
+      // Do not remove the order from UI if the backend cancel fails.
+    }
   };
   const isPriceUp = priceUpdateDirection === "up";
   const is24hPositive = change24h >= 0;
-  const portfolioTotal = accountSummary.holdings.reduce((s, h) => s + h.value, accountSummary.available + accountSummary.locked);
-  const btcHolding = accountSummary.holdings.find(h => h.asset === "BTC")?.amount || 0;
-  const availableBTC = btcHolding;
-  const estimatedMaxBuyBTC = accountSummary.available > 0 ? ((accountSummary.available) / (Number(priceInput) || lastPrice)).toFixed(4) : "0.0000";
-  const estimatedMaxSellUSDT = (availableBTC * (Number(priceInput) || lastPrice)).toFixed(2);
-  const modeBalanceSummary = useMemo(() => {
-    const usableMargin = Math.max(0, accountSummary.available - accountSummary.locked);
-    const pairNotional = ((Number(amountInput) || 0) * (Number(priceInput) || lastPrice)).toFixed(2);
-    if (activeTab === "cross") return [
-      { label: "Cross Balance", value: `$${accountSummary.available.toFixed(2)}` },
-      { label: "Cross Used Margin", value: `$${accountSummary.locked.toFixed(2)}` },
-      { label: "Available Margin", value: `$${usableMargin.toFixed(2)}` },
-    ];
-    if (activeTab === "isolated") return [
-      { label: "Available USDT", value: `$${accountSummary.available.toFixed(2)}` },
-      { label: "Estimated Max BTC", value: `${estimatedMaxBuyBTC} BTC` },
-      { label: "Pair Exposure", value: `$${pairNotional}` },
-    ];
-    return [
-      { label: "Available USDT", value: `$${accountSummary.available.toFixed(2)}` },
-      { label: "Locked USDT", value: `$${accountSummary.locked.toFixed(2)}` },
-      { label: "Total Portfolio", value: `$${portfolioTotal.toFixed(2)}` },
-    ];
-  }, [activeTab, accountSummary.available, accountSummary.locked, amountInput, priceInput, lastPrice, portfolioTotal]);
 
   // Pair tab filter
   const pairFilter = pairTab === "fav" ? [] : "USDT";
@@ -1606,7 +2156,7 @@ export default function Trading() {
             <div style={{ fontSize: 10, color: COLORS.text }}>Bitcoin Price ↑</div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 2, marginLeft: 8 }}>
-            <div style={{ fontWeight: 700, fontSize: 22, color: isPriceUp ? COLORS.green : COLORS.red }}>{formatPrice(displayPrice || lastPrice)}</div>
+            <div style={{ fontWeight: 700, fontSize: 22, color: isPriceUp ? COLORS.green : COLORS.red }}>{isValidPrice(displayPrice) ? formatPrice(displayPrice) : isValidPrice(lastPrice) ? formatPrice(lastPrice) : "Market price unavailable"}</div>
             <div style={{ fontSize: 10, color: COLORS.textMuted }}>{formatMsTime(lastPriceUpdate)}</div>
           </div>
         </div>
@@ -1852,47 +2402,53 @@ export default function Trading() {
                   {/* Order type tabs */}
                   <div style={{ display: "flex", gap: 12, marginBottom: 2 }}>
                     {(["Limit", "Market", "Stop Limit", "OCO"] as const).map(t => (
-                      <button key={t} onClick={() => setOrderType(t.toLowerCase().replace(" ", "-") as any)} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: orderType === t.toLowerCase().replace(" ", "-") ? COLORS.textBright : COLORS.text, borderBottom: orderType === t.toLowerCase().replace(" ", "-") ? `2px solid ${COLORS.amber}` : "2px solid transparent", paddingBottom: 2 }}>{t}</button>
+                      <button key={t} onClick={() => handleOrderTypeChange(t.toLowerCase().replace(" ", "-") as any)} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: orderType === t.toLowerCase().replace(" ", "-") ? COLORS.textBright : COLORS.text, borderBottom: orderType === t.toLowerCase().replace(" ", "-") ? `2px solid ${COLORS.amber}` : "2px solid transparent", paddingBottom: 2 }}>{t}</button>
                     ))}
                     <span style={{ fontSize: 12, color: COLORS.text, marginLeft: 4, cursor: "pointer" }}>ⓘ</span>
                   </div>
                   {/* Price input */}
                   <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 34 }}>
                     <span style={{ fontSize: 11, color: COLORS.textMuted, width: 40 }}>Price</span>
-                    <input type="number" value={priceInput} onChange={e => setPriceInput(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder={orderType === "market" ? "Market Price" : "0.00"} disabled={orderType === "market"} />
+                    <input type="number" value={orderPriceDisplay} onChange={e => updateOrderPrice(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder={orderType === "market" ? "Market Price" : "0.00"} disabled={orderType === "market"} />
                     <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT</span>
                   </div>
                   {/* Amount input */}
                   <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 34 }}>
                     <span style={{ fontSize: 11, color: COLORS.textMuted, width: 50 }}>Amount</span>
-                    <input type="number" value={amountInput} onChange={e => { setAmountInput(e.target.value); setTotalInput(((Number(e.target.value) || 0) * (Number(priceInput) || lastPrice)).toFixed(2)); }} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="Minimum 5 USDT" />
+                    <input type="number" value={buyAmountInput} onChange={e => updateBuyAmount(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="0.0000" />
                     <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>BTC ▾</span>
                   </div>
                   {/* Slider */}
                   <div style={{ padding: "2px 0" }}>
-                    <input type="range" min={0} max={100} value={sliderPct} onChange={e => { const p = Number(e.target.value); setSliderPct(p); setOrderPct(p); const maxQ = (accountSummary.available * p / 100) / (Number(priceInput) || lastPrice); setAmountInput(maxQ.toFixed(6)); }} style={{ width: "100%", accentColor: COLORS.green }} />
+                    <input type="range" min={0} max={100} value={buySliderPct} onChange={e => applyBuyPct(Number(e.target.value))} style={{ width: "100%", accentColor: COLORS.green }} />
                     <div style={{ display: "flex", justifyContent: "space-between" }}>
                       {[0, 25, 50, 75, 100].map(p => (
-                        <button key={p} onClick={() => { setSliderPct(p); const maxQ = (accountSummary.available * p / 100) / (Number(priceInput) || lastPrice); setAmountInput(maxQ.toFixed(6)); }} style={{ background: "transparent", border: "none", fontSize: 10, color: COLORS.textMuted, cursor: "pointer", padding: 0 }}>{p}%</button>
+                        <button key={p} onClick={() => applyBuyPct(p)} style={{ background: "transparent", border: "none", fontSize: 10, color: COLORS.textMuted, cursor: "pointer", padding: 0 }}>{p}%</button>
                       ))}
                     </div>
                   </div>
                   {/* Total */}
                   <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 32 }}>
                     <span style={{ fontSize: 11, color: COLORS.textMuted, width: 40 }}>Total</span>
-                    <input type="number" value={totalInput} onChange={e => { setTotalInput(e.target.value); setAmountInput(((Number(e.target.value) || 0) / (Number(priceInput) || lastPrice)).toFixed(6)); }} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="Minimum 5 USDT" />
+                    <input type="number" value={buyTotalInput} onChange={e => updateBuyTotal(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="Minimum 5 USDT" />
                     <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT ▾</span>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 10, color: COLORS.textMuted, padding: "0 2px" }}>
+                    <div>Available {accountSummary.available.toFixed(2)} USDT</div>
+                    <div>Reserved {reservedUSDT.toFixed(2)} USDT</div>
+                    <div style={{ gridColumn: "1 / span 2", color: COLORS.textBright }}>Free to trade {freeToTrade.toFixed(2)} USDT</div>
+                    <div style={{ gridColumn: "1 / span 2" }}>Minimum Order: 5 USDT</div>
                   </div>
                   {/* Stop Loss */}
                   <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 32 }}>
                     <span style={{ fontSize: 11, color: COLORS.textMuted, width: 50 }}>Stop Loss</span>
-                    <input type="number" value={stopLoss} onChange={e => setStopLoss(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="Optional" />
+                    <input type="number" value={buyStopLoss} onChange={e => setBuyStopLoss(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="Optional" />
                     <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT</span>
                   </div>
                   {/* Take Profit */}
                   <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 32 }}>
                     <span style={{ fontSize: 11, color: COLORS.textMuted, width: 50 }}>Take Profit</span>
-                    <input type="number" value={takeProfit} onChange={e => setTakeProfit(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="Optional" />
+                    <input type="number" value={buyTakeProfit} onChange={e => setBuyTakeProfit(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="Optional" />
                     <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT</span>
                   </div>
                   {/* Slippage */}
@@ -1900,65 +2456,115 @@ export default function Trading() {
                     <input type="checkbox" id="slip-buy" checked={slippageTol} onChange={e => setSlippageTol(e.target.checked)} style={{ accentColor: COLORS.amber, width: 13, height: 13 }} />
                     <label htmlFor="slip-buy" style={{ fontSize: 11, color: COLORS.text, cursor: "pointer" }}>Slippage Tolerance (1%)</label>
                   </div>
+                  {/* Market warning */}
+                  {marketWarning && (
+                    <div style={{ fontSize: 10, color: COLORS.amber, background: COLORS.blueDim, padding: "4px 8px", borderRadius: 3, border: `1px solid ${COLORS.amber}` }}>{marketWarning}</div>
+                  )}
+                  {/* Error message */}
+                  {buyError && buyAmount > 0 && (
+                    <div style={{ fontSize: 10, color: COLORS.red, background: COLORS.redDim, padding: "4px 8px", borderRadius: 3, border: `1px solid ${COLORS.red}` }}>{buyError}</div>
+                  )}
                 </div>
                 {/* Right: Sell form */}
                 <div className="trading-order-form__side trading-order-form__side--sell" style={{ flex: 1, padding: "10px 16px", display: "flex", flexDirection: "column", gap: 6 }}>
                   <div style={{ display: "flex", gap: 12, marginBottom: 2 }}>
                     {(["Limit", "Market", "Stop Limit", "OCO"] as const).map(t => (
-                      <button key={t} onClick={() => setOrderType(t.toLowerCase().replace(" ", "-") as any)} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: orderType === t.toLowerCase().replace(" ", "-") ? COLORS.textBright : COLORS.text, borderBottom: orderType === t.toLowerCase().replace(" ", "-") ? `2px solid ${COLORS.amber}` : "2px solid transparent", paddingBottom: 2 }}>{t}</button>
+                      <button key={t} onClick={() => handleOrderTypeChange(t.toLowerCase().replace(" ", "-") as any)} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: orderType === t.toLowerCase().replace(" ", "-") ? COLORS.textBright : COLORS.text, borderBottom: orderType === t.toLowerCase().replace(" ", "-") ? `2px solid ${COLORS.amber}` : "2px solid transparent", paddingBottom: 2 }}>{t}</button>
                     ))}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 34 }}>
                     <span style={{ fontSize: 11, color: COLORS.textMuted, width: 40 }}>Price</span>
-                    <input type="number" value={priceInput} onChange={e => setPriceInput(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="Market Price" disabled={orderType === "market"} />
+                    <input type="number" value={orderPriceDisplay} onChange={e => updateOrderPrice(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder={orderType === "market" ? "Market Price" : "0.00"} disabled={orderType === "market"} />
                     <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT</span>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 34 }}>
                     <span style={{ fontSize: 11, color: COLORS.textMuted, width: 50 }}>Amount</span>
-                    <input type="number" value={amountInput} onChange={e => setAmountInput(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="0.00" />
+                    <input type="number" value={sellAmountInput} onChange={e => updateSellAmount(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="0.0000" />
                     <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>BTC ▾</span>
                   </div>
                   <div style={{ padding: "2px 0" }}>
-                    <input type="range" min={0} max={100} value={sliderPct} onChange={e => { const p = Number(e.target.value); setSliderPct(p); }} style={{ width: "100%", accentColor: COLORS.red }} />
+                    <input type="range" min={0} max={100} value={sellSliderPct} onChange={e => applySellPct(Number(e.target.value))} style={{ width: "100%", accentColor: COLORS.red }} />
                     <div style={{ display: "flex", justifyContent: "space-between" }}>
                       {[0, 25, 50, 75, 100].map(p => (
-                        <button key={p} onClick={() => setSliderPct(p)} style={{ background: "transparent", border: "none", fontSize: 10, color: COLORS.textMuted, cursor: "pointer", padding: 0 }}>{p}%</button>
+                        <button key={p} onClick={() => applySellPct(p)} style={{ background: "transparent", border: "none", fontSize: 10, color: COLORS.textMuted, cursor: "pointer", padding: 0 }}>{p}%</button>
                       ))}
                     </div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 32 }}>
                     <span style={{ fontSize: 11, color: COLORS.textMuted, width: 40 }}>Total</span>
-                    <input type="number" value={totalInput} onChange={e => { setTotalInput(e.target.value); setAmountInput(((Number(e.target.value) || 0) / (Number(priceInput) || lastPrice)).toFixed(6)); }} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="0.00" />
+                    <input type="number" value={sellTotalInput} onChange={e => updateSellTotal(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="0.00" />
                     <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT ▾</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 10, color: COLORS.textMuted, padding: "0 2px" }}>
+                    <span>Available {availableBTC.toFixed(6)} BTC</span>
+                    <span>Minimum Order: 5 USDT</span>
                   </div>
                   {/* Stop Loss */}
                   <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 32 }}>
                     <span style={{ fontSize: 11, color: COLORS.textMuted, width: 50 }}>Stop Loss</span>
-                    <input type="number" value={stopLoss} onChange={e => setStopLoss(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="Optional" />
+                    <input type="number" value={sellStopLoss} onChange={e => setSellStopLoss(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="Optional" />
                     <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT</span>
                   </div>
                   {/* Take Profit */}
                   <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 32 }}>
                     <span style={{ fontSize: 11, color: COLORS.textMuted, width: 50 }}>Take Profit</span>
-                    <input type="number" value={takeProfit} onChange={e => setTakeProfit(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="Optional" />
+                    <input type="number" value={sellTakeProfit} onChange={e => setSellTakeProfit(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="Optional" />
                     <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT</span>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <input type="checkbox" id="slip-sell" checked={slippageTol} onChange={e => setSlippageTol(e.target.checked)} style={{ accentColor: COLORS.amber, width: 13, height: 13 }} />
                     <label htmlFor="slip-sell" style={{ fontSize: 11, color: COLORS.text, cursor: "pointer" }}>Slippage Tolerance (1%)</label>
                   </div>
+                  {/* Sell error */}
+                  {sellError && sellAmount > 0 && (
+                    <div style={{ fontSize: 10, color: COLORS.red, background: COLORS.redDim, padding: "4px 8px", borderRadius: 3, border: `1px solid ${COLORS.red}` }}>{sellError}</div>
+                  )}
                 </div>
               </div>
               {/* BUY / SELL buttons */}
               <div className="trading-order-actions" style={{ display: "flex", gap: 8, padding: "8px 16px", borderTop: `1px solid ${COLORS.border}`, flexShrink: 0 }}>
                 <div className="trading-order-actions__balance" style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
                   <div style={{ fontSize: 10, color: COLORS.textMuted }}>Available USDT</div>
-                  <div style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace" }}>${accountSummary.available.toFixed(2)}</div>
+                  <div style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace" }}>${availableBalance.toFixed(2)}</div>
                   <div style={{ fontSize: 10, color: COLORS.textMuted }}>Estimated Max Buy</div>
                   <div style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace" }}>{estimatedMaxBuyBTC} BTC</div>
                 </div>
-                <button className="trading-order-actions__button" onClick={() => placeOrder("buy")} style={{ flex: 1, height: 36, background: COLORS.green, border: "none", borderRadius: 4, color: "#000", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Buy / Long</button>
-                <button className="trading-order-actions__button" onClick={() => placeOrder("sell")} style={{ flex: 1, height: 36, background: COLORS.red, border: "none", borderRadius: 4, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Sell / Short</button>
+                <button
+                  className="trading-order-actions__button"
+                  type="button"
+                  onClick={() => openOrderConfirmation("buy")}
+                  disabled={buyDisabled}
+                  style={{
+                    flex: 1,
+                    height: 36,
+                    background: COLORS.green,
+                    border: "none",
+                    borderRadius: 4,
+                    color: "#000",
+                    fontWeight: 700,
+                    fontSize: 13,
+                    cursor: buyDisabled ? "not-allowed" : "pointer",
+                    opacity: buyDisabled ? 0.5 : 1,
+                  }}
+                >{buyButtonLabel}</button>
+                <button
+                  className="trading-order-actions__button"
+                  type="button"
+                  onClick={() => openOrderConfirmation("sell")}
+                  disabled={sellDisabled}
+                  style={{
+                    flex: 1,
+                    height: 36,
+                    background: COLORS.red,
+                    border: "none",
+                    borderRadius: 4,
+                    color: "#fff",
+                    fontWeight: 700,
+                    fontSize: 13,
+                    cursor: sellDisabled ? "not-allowed" : "pointer",
+                    opacity: sellDisabled ? 0.5 : 1,
+                  }}
+                >Sell / Short</button>
                 <div className="trading-order-actions__balance" style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
                   <div style={{ fontSize: 10, color: COLORS.textMuted }}>Available BTC</div>
                   <div style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace" }}>{availableBTC.toFixed(6)} BTC</div>
@@ -1977,7 +2583,7 @@ export default function Trading() {
           {/* ── Bottom Tab Bar (Open Orders, History, etc.) ── */}
           <div ref={bottomScrollRef} className="trading-bottom-panel" style={{ borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, flexShrink: 0 }}>
             <div style={{ display: "flex", alignItems: "center", height: 36, padding: "0 12px", gap: 0, borderBottom: `1px solid ${COLORS.border}` }}>
-              {[["openorders", "Open Orders(0)"], ["orderhistory", "Order History"], ["tradehistory", "Trade History"], ["holdings", "Holdings"], ["bots", "Bots"]].map(([key, label]) => (
+              {[["openorders", `Open Orders(${activeOrders.length})`], ["orderhistory", "Order History"], ["tradehistory", "Trade History"], ["holdings", "Holdings"], ["bots", "Bots"]].map(([key, label]) => (
                 <button key={key} onClick={() => setBottomTab(key as any)} style={{ padding: "0 14px", height: "100%", background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: bottomTab === key ? COLORS.textBright : COLORS.text, borderBottom: bottomTab === key ? `2px solid ${COLORS.amber}` : "2px solid transparent", whiteSpace: "nowrap" }}>{label}</button>
               ))}
             </div>
@@ -2018,6 +2624,9 @@ export default function Trading() {
 
         {isDesktopLayout && (
           <aside className="trading-right" style={{ display: "flex", flexDirection: "column", flexShrink: 0, minHeight: 0, width: 280, background: COLORS.bgPanel, borderLeft: `1px solid ${COLORS.border}` }}>
+            <div style={{ padding: 10 }}>
+              <PositionsPanel />
+            </div>
             {marketPairsPanel()}
             {orderBookPanel("side")}
             {marketTradesPanel(false)}
@@ -2028,6 +2637,72 @@ export default function Trading() {
         {/* RIGHT PANEL: Market Trades + Pairs */}
         {isCompactLayout && marketPanel()}
       </div>
+
+      {/* ── TOAST NOTIFICATIONS ── */}
+      <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 9999, display: "flex", flexDirection: "column", gap: 10, pointerEvents: "none" }}>
+        {toasts.map(t => (
+          <div key={t.id} style={{ padding: "12px 18px", borderRadius: 6, background: t.type === "success" ? "#0ecb81" : t.type === "error" ? "#f6465d" : COLORS.bgPanel, color: t.type === "info" ? COLORS.textBright : "#000", fontWeight: 600, fontSize: 13, boxShadow: "0 4px 20px rgba(0,0,0,0.4)", border: t.type === "info" ? `1px solid ${COLORS.border}` : "none", animation: "fadeIn 0.2s ease", display: "flex", alignItems: "center", gap: 10, minWidth: 260 }}>
+            <span>{t.type === "success" ? "✓" : t.type === "error" ? "✕" : "ℹ"}</span>
+            {t.msg}
+          </div>
+        ))}
+      </div>
+
+      {/* ── ORDER CONFIRMATION MODAL ── */}
+      {confirmModalOpen && pendingOrderSide && (
+        <div onClick={() => setConfirmModalOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: 400, background: COLORS.bgPanel, border: `1px solid ${COLORS.border}`, borderRadius: 10, overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}>
+            {/* Modal Header */}
+            <div style={{ padding: "16px 20px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: pendingOrderSide === "buy" ? COLORS.green : COLORS.red }} />
+                <span style={{ fontWeight: 700, fontSize: 15, color: COLORS.textBright }}>Confirm {pendingOrderSide === "buy" ? "Buy" : "Sell"} Order</span>
+              </div>
+              <button onClick={() => setConfirmModalOpen(false)} style={{ background: "transparent", border: "none", color: COLORS.text, fontSize: 20, cursor: "pointer", lineHeight: 1 }}>×</button>
+            </div>
+            {/* Order Details */}
+            <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 10 }}>
+              {[
+                { label: "Pair", value: symbol },
+                { label: "Order Type", value: orderType.charAt(0).toUpperCase() + orderType.slice(1) },
+                { label: "Side", value: pendingOrderSide === "buy" ? "Buy / Long" : "Sell / Short", color: pendingOrderSide === "buy" ? COLORS.green : COLORS.red },
+                { label: "Price", value: orderType === "market" ? `~${formatPrice(lastPrice)} USDT (Market)` : `${formatPrice(Number(priceInput))} USDT` },
+                { label: "Amount", value: `${pendingOrderSide === "buy" ? buyAmountInput || "0" : sellAmountInput || "0"} BTC` },
+                { label: "Total", value: `~$${pendingOrderSide === "buy" ? (buyTotal || 0).toFixed(2) : (sellTotal || 0).toFixed(2)} USDT` },
+                { label: "Est. Fee (0.1%)", value: `~$${pendingOrderSide === "buy" ? buyFee.toFixed(4) : sellFee.toFixed(4)} USDT`, color: COLORS.amber },
+              ].map(row => (
+                <div key={row.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: `1px solid ${COLORS.border}` }}>
+                  <span style={{ fontSize: 12, color: COLORS.text }}>{row.label}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: (row as any).color || COLORS.textBright, fontFamily: "monospace" }}>{row.value}</span>
+                </div>
+              ))}
+              {orderType === "market" && (
+                <div style={{ background: COLORS.blueDim, border: `1px solid ${COLORS.amber}`, borderRadius: 4, padding: "8px 12px", fontSize: 11, color: COLORS.amber }}>
+                  ⚠ Market orders execute at the best available price. Final price may differ slightly.
+                </div>
+              )}
+              {orderError && (
+                <div style={{ background: COLORS.redDim, border: `1px solid ${COLORS.red}`, borderRadius: 4, padding: "8px 12px", fontSize: 11, color: COLORS.red }}>
+                  {orderError}
+                </div>
+              )}
+            </div>
+            {/* Buttons */}
+            <div style={{ display: "flex", gap: 10, padding: "12px 20px 16px", borderTop: `1px solid ${COLORS.border}` }}>
+              <button onClick={() => setConfirmModalOpen(false)} style={{ flex: 1, height: 40, background: "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 6, color: COLORS.textBright, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+              <button
+                onClick={() => executeOrder(pendingOrderSide)}
+                disabled={isPlacingOrder}
+                style={{ flex: 2, height: 40, background: pendingOrderSide === "buy" ? COLORS.green : COLORS.red, border: "none", borderRadius: 6, color: "#000", fontWeight: 700, fontSize: 14, cursor: isPlacingOrder ? "not-allowed" : "pointer", opacity: isPlacingOrder ? 0.7 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+              >
+                {isPlacingOrder ? (
+                  <><span style={{ width: 14, height: 14, border: "2px solid rgba(0,0,0,0.3)", borderTopColor: "#000", borderRadius: "50%", display: "inline-block", animation: "spin 0.6s linear infinite" }} />Placing...</>
+                ) : `Confirm ${pendingOrderSide === "buy" ? "Buy" : "Sell"}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── PORTFOLIO MODAL ── */}
       {showPortfolioModal && (
@@ -2053,7 +2728,7 @@ export default function Trading() {
             </div>
             <div style={{ overflow: "auto", flex: 1 }}>
               <div style={{ padding: "10px 20px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                {[{ label: "Available", value: `$${accountSummary.available.toLocaleString(undefined, { minimumFractionDigits: 2 })}` }, { label: "Locked", value: `$${accountSummary.locked.toLocaleString(undefined, { minimumFractionDigits: 2 })}` }, { label: "Realized P&L", value: "$0.00" }, { label: "Rewards earned", value: "$0.00 USD" }].map(m => (
+                {[{ label: "Available", value: `$${availableBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}` }, { label: "Locked", value: `$${pendingLocked.toLocaleString(undefined, { minimumFractionDigits: 2 })}` }, { label: "Realized P&L", value: "$0.00" }, { label: "Rewards earned", value: "$0.00 USD" }].map(m => (
                   <div key={m.label} style={{ background: COLORS.bgAlt, borderRadius: 6, padding: "10px 14px" }}>
                     <div style={{ fontSize: 11, color: COLORS.text }}>{m.label}</div>
                     <div style={{ fontSize: 15, fontWeight: 700, marginTop: 4 }}>{m.value}</div>
@@ -2347,6 +3022,7 @@ export default function Trading() {
         }
 
         @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
     </div>
   );

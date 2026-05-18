@@ -1,31 +1,20 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import axios from "axios";
-import { FaEye, FaEyeSlash, FaSpinner } from "react-icons/fa";
+import { FaEye, FaEyeSlash, FaSpinner, FaGoogle } from "react-icons/fa";
 import i18n from "../i18n";
 import logo from "../assets/logo.jpg";
+import authService from "../services/authService";
 import "../styles/Login.css";
-
-interface LoginResponse {
-  success?: boolean;
-  message?: string;
-  token?: string;
-  sessionToken?: string;
-  accessToken?: string;
-  refreshToken?: string;
-  user?: any;
-  expiresIn?: number;
-}
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const loginEndpoint = "/api/auth/login"; // frontend runs on localhost:3000 and proxies /api to backend
 
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const [modal, setModal] = useState<{
@@ -83,7 +72,6 @@ const Login: React.FC = () => {
     e.preventDefault();
     setLoading(true);
 
-    // Validation
     if (!identifier.trim()) {
       showModal("warning", "Email Required", "Please enter your registered email address.");
       setLoading(false);
@@ -103,48 +91,12 @@ const Login: React.FC = () => {
     }
 
     try {
-      const response = await axios.post<LoginResponse>(
-        loginEndpoint,
-        {
-          identifier: identifier.toLowerCase().trim(),
-          email: identifier.toLowerCase().trim(),
-          password: password.trim(),
-        },
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
+      await authService.loginWithPassword(
+        identifier.toLowerCase().trim(),
+        password.trim()
       );
-
-      const authToken =
-        response.data.accessToken || response.data.token || response.data.sessionToken || "";
-      const refreshToken = response.data.refreshToken;
-
-      if (!authToken) {
-        throw new Error(response.data.message || "Login failed. Please try again.");
-      }
-
-      localStorage.setItem("token", authToken);
-      if (refreshToken) {
-        localStorage.setItem("refreshToken", refreshToken);
-      }
-      localStorage.setItem("userEmail", identifier.toLowerCase().trim());
-      localStorage.setItem("userId", response.data.user?.userId || "");
-
-      const expiryMs = response.data.expiresIn
-        ? Number(response.data.expiresIn) * 1000
-        : 7 * 24 * 60 * 60 * 1000;
-      localStorage.setItem(
-        "sessionExpiry",
-        (Date.now() + expiryMs).toString()
-      );
-
       showModal("success", "Login Successful", "Welcome back! Redirecting...");
-
-      setTimeout(() => {
-        navigate("/home"); // Changed from /markets to /home as requested
-      }, 2000);
+      setTimeout(() => navigate("/home"), 500);
     } catch (error: any) {
       const errorMsg =
         error?.response?.data?.message || "Login failed. Please try again.";
@@ -182,32 +134,48 @@ const Login: React.FC = () => {
         </div>
       )}
 
-      {/* ============= LANGUAGE SELECTOR ============= */}
-      <div className="lang-selector">
-        <select
-          value={currentLang}
-          onChange={(e) => toggleLang(e.target.value)}
-          className="lang-select"
-        >
-          {Object.entries(languages).map(([code, name]) => (
-            <option key={code} value={code}>
-              {name}
-            </option>
-          ))}
-        </select>
+      {/* ============= LEFT PANEL (Crypto Visual) ============= */}
+      <div className="login-left">
+        <div className="crypto-bg" />
+        <div className="coin-scene">
+          <div className="coin coin-btc">
+            <span className="coin-symbol">₿</span>
+          </div>
+          <div className="coin coin-eth">
+            <span className="coin-symbol">Ξ</span>
+          </div>
+          <div className="coin coin-small coin-s1" />
+          <div className="coin coin-small coin-s2" />
+        </div>
       </div>
 
-      {/* ============= MAIN FORM ============= */}
-      <div className="login-container">
+      {/* ============= RIGHT PANEL (Form) ============= */}
+      <div className="login-right">
+        {/* Language + Theme selectors */}
+        <div className="top-controls">
+          <select
+            value={currentLang}
+            onChange={(e) => toggleLang(e.target.value)}
+            className="lang-select"
+          >
+            {Object.entries(languages).map(([code, name]) => (
+              <option key={code} value={code}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div className="login-card">
-          <div className="login-header">
+          {/* Logo */}
+          <div className="login-logo-wrap">
             <img src={logo} alt="SwanCore Logo" className="login-logo" />
-            <h1>Welcome Back</h1>
-            <p>Sign in to your SwanCore account</p>
           </div>
 
-          <form onSubmit={handleLogin} className="login-form">
-            {/* Identifier Field */}
+          <h1 className="login-title">Welcome Back!</h1>
+
+          <form onSubmit={handleLogin} className="login-form" noValidate>
+            {/* Email */}
             <div className="form-group">
               <label htmlFor="identifier">Email</label>
               <input
@@ -215,12 +183,12 @@ const Login: React.FC = () => {
                 id="identifier"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                placeholder="Enter your registered email address"
-                required
+                placeholder="Enter your email"
+                autoComplete="email"
               />
             </div>
 
-            {/* Password Field */}
+            {/* Password */}
             <div className="form-group">
               <label htmlFor="password">Password</label>
               <div className="password-input">
@@ -229,20 +197,42 @@ const Login: React.FC = () => {
                   id="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  required
+                  placeholder="••••••••"
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
                   className="password-toggle"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label="Toggle password visibility"
                 >
                   {showPassword ? <FaEyeSlash /> : <FaEye />}
                 </button>
               </div>
             </div>
 
-            {/* Submit Button */}
+            {/* Remember me + Forgot password */}
+            <div className="form-row">
+              <label className="remember-label">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="remember-checkbox"
+                />
+                <span className="checkmark" />
+                Remember me
+              </label>
+              <button
+                type="button"
+                className="forgot-link"
+                onClick={() => navigate("/forgot-password")}
+              >
+                Forgot password?
+              </button>
+            </div>
+
+            {/* Submit */}
             <button type="submit" className="login-btn" disabled={loading}>
               {loading ? (
                 <>
@@ -250,28 +240,45 @@ const Login: React.FC = () => {
                   Signing In...
                 </>
               ) : (
-                "Sign In"
+                "Log In"
               )}
+            </button>
+
+            {/* Divider */}
+            <div className="divider">
+              <span>Or</span>
+            </div>
+
+            {/* Google Sign In */}
+            <button
+              type="button"
+              className="google-btn"
+              onClick={() => {
+                /* plug in Google OAuth here */
+              }}
+            >
+              <FaGoogle className="google-icon" />
+              Sign In with Google
             </button>
           </form>
 
-          {/* Links */}
-          <div className="login-links">
-            <p>
-              Don't have an account?{" "}
-              <a href="/register" className="link">
-                Sign up here
-              </a>
-            </p>
-          </div>
+          {/* Sign up link */}
+          <p className="signup-text">
+            Don't have an account?{" "}
+            <a href="/register" className="signup-link">
+              Sign up
+            </a>
+          </p>
         </div>
-      </div>
 
-      {/* ============= FOOTER ============= */}
-      <div className="login-footer">
-        <span onClick={() => navigate("/cookies")}>Cookies</span>
-        <span>•</span>
-        <span onClick={() => navigate("/privacy")}>Privacy</span>
+        {/* Footer */}
+        <div className="login-footer">
+          <span onClick={() => navigate("/help")}>Help</span>
+          <span className="sep">/</span>
+          <span onClick={() => navigate("/terms")}>Terms</span>
+          <span className="sep">/</span>
+          <span onClick={() => navigate("/privacy")}>Privacy</span>
+        </div>
       </div>
     </div>
   );
