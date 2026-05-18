@@ -1,0 +1,256 @@
+/* =========================================================
+   GLOBAL THEME SYSTEM
+   File: src/styles/theme.css
+========================================================= */
+
+/* =========================================================
+   DARK THEME (DEFAULT)
+========================================================= */
+:root,
+:root[data-theme="dark"] {
+  /* ─────────────────────────────────────
+     BRAND COLORS
+  ───────────────────────────────────── */
+  --primary: #ff8c32;
+  --primary-hover: #F0B90B;
+  --accent: #7b9fff;
+
+  /* ─────────────────────────────────────
+     BACKGROUNDS
+  ───────────────────────────────────── */
+  --bg-light: #f8fafc;
+  --bg-dark: #1E2329;
+
+  --bg-current: #0B0E11;
+
+  /* aliases used in components */
+  --bg: #0B0E11;
+
+  /* ─────────────────────────────────────
+     SURFACES / CARDS
+  ───────────────────────────────────── */
+  --card-light: #ffffff;
+  --card-dark: #2B3139;
+
+  --card-current: #2B3139;
+
+  /* aliases */
+  --surface: #1E2329;
+  --surface-strong: #2B3139;
+
+  /* ─────────────────────────────────────
+     TEXT
+  ───────────────────────────────────── */
+  --text-light: #0f172a;
+  --text-dark: #f8fafc;
+
+  --text-current: #f8fafc;
+
+  /* aliases */
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+
+  /* ─────────────────────────────────────
+     MUTED
+  ───────────────────────────────────── */
+  --muted-light: #64748b;
+  --muted-dark: #94a3b8;
+
+  --muted-current: #94a3b8;
+
+  /* ─────────────────────────────────────
+     BORDERS
+  ───────────────────────────────────── */
+  --border-light: #e2e8f0;
+  --border-dark: #1e293b;
+
+  --border-current: #1e293b;
+
+  /* aliases */
+  --border: #1e293b;
+
+  /* ─────────────────────────────────────
+     EFFECTS
+  ───────────────────────────────────── */
+  --shadow: 0 30px 80px rgba(0, 0, 0, 0.25);
+
+  --transition:
+    all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* =========================================================
+   LIGHT THEME
+========================================================= */
+:root[data-theme="light"] {
+  /* ─────────────────────────────────────
+     BRAND COLORS
+  ───────────────────────────────────── */
+  --primary: #ff8c32;
+  --primary-hover: #F0B90B;
+  --accent: #3b82f6;
+
+  /* ─────────────────────────────────────
+     BACKGROUNDS
+  ───────────────────────────────────── */
+  --bg-current: #f8fafc;
+
+  /* aliases */
+  --bg: #f8fafc;
+
+  /* ─────────────────────────────────────
+     SURFACES / CARDS
+  ───────────────────────────────────── */
+  --card-current: #ffffff;
+
+  /* aliases */
+  --surface: #ffffff;
+  --surface-strong: #f1f5f9;
+
+  /* ─────────────────────────────────────
+     TEXT
+  ───────────────────────────────────── */
+  --text-current: #0f172a;
+
+  /* aliases */
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+
+  /* ─────────────────────────────────────
+     MUTED
+  ───────────────────────────────────── */
+  --muted-current: #64748b;
+
+  /* ─────────────────────────────────────
+     BORDERS
+  ───────────────────────────────────── */
+  --border-current: #e2e8f0;
+
+  /* aliases */
+  --border: #e2e8f0;
+
+  /* ─────────────────────────────────────
+     EFFECTS
+  ───────────────────────────────────── */
+  --shadow: 0 30px 80px rgba(15, 23, 42, 0.12);
+
+  --transition:
+    all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* =========================================================
+   GLOBAL RESET / BASE
+========================================================= */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text-primary);
+  transition: var(--transition);
+  font-family:
+    "DM Sans",
+    "Segoe UI",
+    sans-serif;
+}
+
+/* =========================================================
+   GLOBAL ELEMENTS
+========================================================= */
+body {
+  background: var(--bg);
+  color: var(--text-primary);
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+a:hover {
+  color: var(--primary-hover);
+}
+
+/* =========================================================
+   SCROLLBAR
+========================================================= */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+/* =========================================================
+   INPUTS
+========================================================= */
+input,
+textarea,
+select,
+button {
+  font-family: inherit;
+}
+
+input,
+textarea,
+select {
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  transition: var(--transition);
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+/* =========================================================
+   SELECTION
+========================================================= */
+::selection {
+  background: var(--primary);
+  color: white;
+}
+
+/* =========================================================
+   SMOOTH THEME TRANSITIONS
+========================================================= */
+body,
+div,
+section,
+article,
+aside,
+header,
+footer,
+nav,
+main,
+input,
+textarea,
+button,
+select {
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
+}

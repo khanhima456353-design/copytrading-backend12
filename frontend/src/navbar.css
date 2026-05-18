@@ -1,11 +1,11 @@
-.navbar {
+﻿.navbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 40px;
-
   margin-top: 20px;
 }
+
 /* LEFT SIDE */
 .nav-left {
   display: flex;
@@ -19,7 +19,6 @@
   font-weight: 700;
   font-size: 20px;
   letter-spacing: 0.5px;
-  
 }
 
 /* LINKS */

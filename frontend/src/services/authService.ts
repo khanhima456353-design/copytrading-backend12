@@ -18,6 +18,10 @@ interface AuthResponse {
   refreshToken?: string;
   otpId?: string;
   expiresIn?: number;
+  user?: {
+    userId?: string;
+    [key: string]: any;
+  } | null;
 }
 
 interface SendOtpPayload {
@@ -62,6 +66,7 @@ const clearAuthStorage = (): void => {
   localStorage.removeItem(LEGACY_TOKEN_KEY);
   localStorage.removeItem("refreshToken");
   localStorage.removeItem("userEmail");
+  localStorage.removeItem("userId");
   localStorage.removeItem("sessionExpiry");
 };
 
@@ -244,6 +249,9 @@ export const loginWithPassword = async (
         localStorage.setItem("refreshToken", refreshToken);
       }
       localStorage.setItem("userEmail", email);
+      if (response.data.user?.userId) {
+        localStorage.setItem("userId", response.data.user.userId);
+      }
       const expiryMs = response.data.expiresIn
         ? Number(response.data.expiresIn) * 1000
         : 7 * 24 * 60 * 60 * 1000;

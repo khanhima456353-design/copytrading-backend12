@@ -1,23 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { isSessionValid, logout } from './services/authService';
+import authService from './services/authService';
 
 const ProtectedRoute = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(null);
+  const isAuthenticated = authService.isSessionValid();
 
-  useEffect(() => {
-    const valid = isSessionValid();
-    if (!valid) {
-      logout();
-    }
-    setIsAuthenticated(valid);
-  }, []);
-
-  if (isAuthenticated === null) {
-    return null;
-  }
-
-  return isAuthenticated ? children : <Navigate to="/" replace />;
+  return isAuthenticated ? children : <Navigate to="/login" replace />;
 };
 
 export default ProtectedRoute;

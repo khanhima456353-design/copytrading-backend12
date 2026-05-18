@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { subscribeMarketState } from "../services/marketState";
 
 // ─── Synthetic data generators ───────────────────────────────────────────────
 
@@ -9,13 +10,7 @@ const PAIRS = [
   "OP/USDT","ARB/USDT","APT/USDT","FIL/USDT","INJ/USDT",
 ];
 
-const BASE_PRICES = {
-  "BTC/USDT":67420,"ETH/USDT":3540,"SOL/USDT":178,"BNB/USDT":612,
-  "XRP/USDT":0.618,"ADA/USDT":0.452,"AVAX/USDT":38.2,"DOT/USDT":7.8,
-  "MATIC/USDT":0.71,"LINK/USDT":18.4,"DOGE/USDT":0.162,"LTC/USDT":84.2,
-  "ATOM/USDT":9.1,"UNI/USDT":10.8,"NEAR/USDT":7.4,"OP/USDT":2.64,
-  "ARB/USDT":1.18,"APT/USDT":10.2,"FIL/USDT":5.8,"INJ/USDT":28.6,
-};
+// Note: Removed synthetic BASE_PRICES to ensure market price is sourced only from marketState.
 
 const TF_SECONDS = { "1m":60,"5m":300,"15m":900,"1h":3600,"4h":14400,"1d":86400 };
 
@@ -23,7 +18,7 @@ function generateCandles(pair, tf, count = 1000) {
   const interval = TF_SECONDS[tf] || 60;
   const now = Math.floor(Date.now() / 1000);
   const start = Math.floor((now - count * interval) / interval) * interval;
-  let price = BASE_PRICES[pair] || 100;
+  let price = startPrice;
   const vol = price * 0.012;
   const candles = [];
 
@@ -783,8 +778,12 @@ function OrderBook({ pair, lastPrice }) {
   const [book, setBook] = useState({ bids: [], asks: [] });
 
   useEffect(() => {
-    const basePrice = lastPrice || BASE_PRICES[pair] || 100;
+    const basePrice = Number.isFinite(lastPrice) && lastPrice > 0 ? lastPrice : null;
     const generate = () => {
+      if (!basePrice) {
+        setBook({ bids: [], asks: [] });
+        return;
+      }
       const bids = Array.from({ length: 14 }, (_, i) => {
         const p = basePrice * (1 - (i + 1) * 0.0003 - Math.random() * 0.0002);
         const s = +(Math.random() * 3 + 0.1).toFixed(4);
@@ -849,8 +848,9 @@ function TradesFeed({ pair, lastPrice }) {
   const [trades, setTrades] = useState([]);
 
   useEffect(() => {
-    const base = lastPrice || BASE_PRICES[pair] || 100;
+    const base = Number.isFinite(lastPrice) && lastPrice > 0 ? lastPrice : null;
     const generate = () => {
+      if (!base) return;
       const side = Math.random() > 0.5 ? "buy" : "sell";
       const price = base * (1 + (Math.random() - 0.5) * 0.001);
       const size = +(Math.random() * 2 + 0.01).toFixed(5);
@@ -891,7 +891,8 @@ function OrderForm({ pair, lastPrice }) {
   const [pct, setPct] = useState(0);
 
   useEffect(() => {
-    setPrice((lastPrice || BASE_PRICES[pair] || 100).toFixed(6));
+    if (Number.isFinite(lastPrice) && lastPrice > 0) setPrice(lastPrice.toFixed(6));
+    else setPrice("");
   }, [pair, lastPrice]);
 
   const balance = 12450.25;
@@ -991,7 +992,7 @@ function PairSelector({ selected, onSelect }) {
       <div style={{ flex: 1, overflow: "auto" }}>
         {filtered.map(p => {
           const chg = changes[p] || 0;
-          const price = BASE_PRICES[p] || 0;
+          const price = NaN;
           return (
             <div key={p} onClick={() => onSelect(p)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "5px 10px", cursor: "pointer", background: p === selected ? "rgba(59,130,246,0.1)" : "transparent", borderLeft: p === selected ? `2px solid ${COLORS.blue}` : "2px solid transparent", transition: "background 0.1s" }}>
               <div>
@@ -1023,7 +1024,7 @@ export default function TradingTerminal() {
   const [showVWAP, setShowVWAP] = useState(false);
   const [rightPanel, setRightPanel] = useState("orderbook");
   const [candles, setCandles] = useState([]);
-  const [livePrice, setLivePrice] = useState(0);
+  const [livePrice, setLivePrice] = useState(null);
   const [change24h, setChange24h] = useState({ abs: 0, pct: 0 });
 
   // Generate/reload candles on pair/tf change — 1000 candles
@@ -1033,7 +1034,6 @@ export default function TradingTerminal() {
     const last = data[data.length - 1];
     const first = data[0];
     if (last && first) {
-      setLivePrice(last.close);
       setChange24h({ abs: +(last.close - first.open).toFixed(6), pct: +((last.close - first.open) / first.open * 100).toFixed(2) });
     }
   }, [pair, tf]);
@@ -1051,21 +1051,34 @@ export default function TradingTerminal() {
         const price = last.close * (1 + (Math.random() - 0.499) * 0.0015);
         const vol = +(Math.random() * 0.05 + 0.01).toFixed(5);
 
-        if (last.time === candleTime) {
-          const updated = { ...last, high: Math.max(last.high, price), low: Math.min(last.low, price), close: +price.toFixed(6), volume: +(last.volume + vol).toFixed(5) };
-          const next = [...prev.slice(0, -1), updated];
-          setLivePrice(updated.close);
-          return next;
-        } else {
-          const newCandle = { time: candleTime, open: last.close, high: +price.toFixed(6), low: +price.toFixed(6), close: +price.toFixed(6), volume: vol };
-          const next = [...prev.slice(1), newCandle]; // keep total at 1000
-          setLivePrice(newCandle.close);
-          return next;
-        }
+            if (last.time === candleTime) {
+              const updated = { ...last, high: Math.max(last.high, price), low: Math.min(last.low, price), close: +price.toFixed(6), volume: +(last.volume + vol).toFixed(5) };
+              const next = [...prev.slice(0, -1), updated];
+              return next;
+            } else {
+              const newCandle = { time: candleTime, open: last.close, high: +price.toFixed(6), low: +price.toFixed(6), close: +price.toFixed(6), volume: vol };
+              const next = [...prev.slice(1), newCandle]; // keep total at 1000
+              return next;
+            }
       });
     }, 500);
     return () => clearInterval(iv);
   }, [candles.length > 0, tf]);
+
+  // Subscribe to centralized market state for live price updates
+  useEffect(() => {
+    let lastEmittedPrice = null;
+    const unsub = subscribeMarketState(pair, (state) => {
+      const p = Number(state?.lastPrice);
+      const validPrice = Number.isFinite(p) && p > 0 ? p : null;
+      // Only update if price actually changed
+      if (validPrice !== lastEmittedPrice) {
+        lastEmittedPrice = validPrice;
+        setLivePrice(validPrice);
+      }
+    });
+    return () => { try { unsub && unsub(); } catch (e) {} };
+  }, [pair]);
 
   const indicators = useMemo(() => ({
     sma: showSMA ? calcSMA(candles, 20) : [],

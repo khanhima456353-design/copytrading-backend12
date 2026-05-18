@@ -91,6 +91,7 @@ const sideMenuItems = [
   { label: "Dashboard", icon: "⊞" },
   { label: "Markets",   icon: "📈" },
   { label: "Trade",     icon: "⇄"  },
+  { label: "About",     icon: "ℹ️", link: "/about" },
 ];
 const accountItems = [
   { label: "History",      icon: "🕐" },
@@ -216,6 +217,7 @@ export default function DesktopHomePage() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [newsFeed, setNewsFeed] = useState<NewsItem[]>([]);
   const [balance, setBalance] = useState<number>(0);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
 
   useEffect(() => {
@@ -564,33 +566,106 @@ const fetchUserProfile = async () => {
         }
 
         .dt-menu-btn {
-          width: 38px;
+          position: relative;
+          width: 44px;
           height: 38px;
           border-radius: 10px;
-          border: 1px solid var(--border);
-          background: var(--surface2);
+          border: 1px solid rgba(243,186,47,.35);
+          background: rgba(243,186,47,.08);
           display: inline-flex;
           align-items: center;
           justify-content: center;
           padding: 8px;
-          gap: 4px;
+          gap: 5px;
+          box-shadow: 0 0 16px rgba(243,186,47,.18);
           cursor: pointer;
-          transition: border-color 0.2s, color 0.2s, transform 0.2s;
-          color: var(--text2);
+          transition: border-color 0.3s ease, color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+          color: #F3BA2F;
         }
 
         .dt-menu-btn:hover {
-          border-color: var(--border2);
-          color: var(--text);
-          transform: translateY(-1px);
+          border-color: rgba(243,186,47,.85);
+          color: #fff5d6;
+          background: rgba(243,186,47,.14);
+          box-shadow: 0 0 22px rgba(243,186,47,.6);
+          transform: translateY(-1px) scale(1.04);
         }
 
         .dt-menu-btn span {
           display: block;
-          width: 18px;
+          position: absolute;
+          width: 20px;
           height: 2px;
           border-radius: 999px;
           background: currentColor;
+          transition: transform 0.3s ease, opacity 0.3s ease, top 0.3s ease;
+        }
+
+        .dt-menu-btn span:nth-child(1) { top: 13px; }
+        .dt-menu-btn span:nth-child(2) { top: 20px; }
+        .dt-menu-btn span:nth-child(3) { top: 27px; }
+
+        .dt-menu-btn.open {
+          background: rgba(243,186,47,.16);
+          box-shadow: 0 0 26px rgba(243,186,47,.6);
+        }
+
+        .dt-menu-btn.open span:nth-child(1) {
+          top: 20px;
+          transform: rotate(45deg);
+        }
+
+        .dt-menu-btn.open span:nth-child(2) {
+          opacity: 0;
+        }
+
+        .dt-menu-btn.open span:nth-child(3) {
+          top: 20px;
+          transform: rotate(-45deg);
+        }
+
+        .dt-mobile-menu {
+          position: absolute;
+          top: calc(100% + 14px);
+          right: 0;
+          min-width: 220px;
+          padding: 12px;
+          border-radius: 18px;
+          border: 1px solid rgba(243,186,47,.28);
+          background: rgba(7, 11, 24, .98);
+          backdrop-filter: blur(18px);
+          box-shadow: 0 24px 50px rgba(0,0,0,.45), 0 0 24px rgba(243,186,47,.22);
+          animation: dtMenuFade .28s ease;
+          z-index: 50;
+        }
+
+        .dt-mobile-menu-item {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          width: 100%;
+          padding: 12px 14px;
+          border-radius: 12px;
+          border: 1px solid transparent;
+          background: transparent;
+          color: #f8fafc;
+          cursor: pointer;
+          transition: all .25s ease;
+          text-align: left;
+        }
+
+        .dt-mobile-menu-item:hover,
+        .dt-mobile-menu-item:focus-visible {
+          outline: none;
+          border-color: rgba(243,186,47,.4);
+          background: rgba(243,186,47,.12);
+          transform: translateX(3px);
+          box-shadow: 0 0 16px rgba(243,186,47,.2);
+        }
+
+        @keyframes dtMenuFade {
+          from { opacity: 0; transform: translateY(-10px) scale(.96); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
         }
 
         /* ── Sidebar ── */
@@ -1137,15 +1212,42 @@ const fetchUserProfile = async () => {
                 <span className="dt-notif-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>
               )}
             </button>
+            <div style={{ position: "relative" }}>
             <button
-              className="dt-menu-btn"
-              aria-label="Toggle menu"
-              onClick={toggleSidebar}
+              className={`dt-menu-btn${isMenuOpen ? " open" : ""}`}
+              aria-label="Toggle navigation menu"
+              aria-expanded={isMenuOpen}
+              aria-haspopup="menu"
+              onClick={() => setIsMenuOpen(v => !v)}
             >
               <span />
               <span />
               <span />
             </button>
+            {isMenuOpen && (
+              <div className="dt-mobile-menu" role="menu" aria-label="Main navigation">
+                {sideMenuItems.map((item) => (
+                  <button
+                    key={item.label}
+                    className="dt-mobile-menu-item"
+                    role="menuitem"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      if (item.link) {
+                        navigate(item.link);
+                        return;
+                      }
+                      handleNav(item.label);
+                      setActiveSide(item.label);
+                    }}
+                  >
+                    <span aria-hidden="true">{item.icon}</span>
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            </div>
           </div>
         </header>
 

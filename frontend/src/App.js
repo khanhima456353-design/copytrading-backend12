@@ -30,6 +30,13 @@ import AdminBalances from "./pages/AdminBalances";
 import AuthWrapper from "./AuthWrapper";
 import ProtectedRoute from "./ProtectedRoute";
 
+/* ─────────────────────────────────────
+   DEFAULT THEME
+──────────────────────────────────── */
+if (!document.documentElement.getAttribute("data-theme")) {
+  document.documentElement.setAttribute("data-theme", "dark");
+}
+
 export default function App() {
   return (
     <>
@@ -50,13 +57,30 @@ export default function App() {
         <Route path="/careers" element={<Careers />} />
         <Route path="/imformation" element={<Imformation />} />
         <Route path="/legal/privacy" element={<Privacy />} />
-        <Route path="/trade" element={<Trading />} />
-        <Route path="/verification" element={<Verification />} />
-        <Route path="/home" element={
-          <ProtectedRoute>
-            <ResponsiveHomepage />
-          </ProtectedRoute>
-        } />
+        <Route
+          path="/trade"
+          element={
+            <ProtectedRoute>
+              <Trading />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/verification"
+          element={
+            <ProtectedRoute>
+              <Verification />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/home"
+          element={
+            <ProtectedRoute>
+              <ResponsiveHomepage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/building-trust" element={<BuildingTrust />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin" element={<AdminDashboard />} />

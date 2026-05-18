@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from "express";
+import type { NextFunction, Request, Response } from "express-serve-static-core";
 import jwt from "jsonwebtoken";
 
 interface AuthRequest extends Request {

@@ -1,507 +1,443 @@
-import React, { useEffect, useState } from "react";
+
+import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useTheme } from "./components/theme/ThemeContext";
 import "./landing.css";
-import logo from "./assets/logo.jpg";
-import phone from "./assets/phone.png";
-import forbes from "./assets/logos/forbes.png";
-import fortune from "./assets/logos/fortune.png";
-import cnbc from "./assets/logos/cnbc.png";
-import { Link } from "react-router-dom";
-import { getAPI } from "./api";
 
+import {
+  ShieldCheck,
+  TrendingUp,
+  TrendingDown,
+  Smartphone,
+  Download,
+  CheckCircle2,
+  ArrowRight,
+  PlayCircle,
+  Globe,
+  ChevronDown,
+  Menu,
+  Zap,
+  BarChart3,
+  Users,
+  ArrowUpRight,
+  Mail,
+  Moon,
+  Sun,
+  Lock,
+  ExternalLink
+} from "lucide-react";
 
+/* ============================================================
+   API CONFIGURATION
+   ============================================================ */
+const BASE_URL = process.env.REACT_APP_BASE_URL || "https://api.swancore.com";
 
-/* ✅ REUSABLE TICKER ITEMS */
+/* Structured API Helper */
+const api = axios.create({
+  baseURL: BASE_URL,
+  headers: { "Content-Type": "application/json" }
+});
+
+/* =========================
+   REUSABLE TICKER ITEMS
+========================= */
 const TickerItems = () => (
   <>
     <div className="ticker-item">
-      <img src={forbes} alt="forbes" />
-      <span>Recognized as Forbes' Most Trusted Crypto Exchanges 2025</span>
+      <div className="ticker-icon"><ShieldCheck className="w-5 h-5" /></div>
+      <span>Forbes' Most Trusted Exchange 2025</span>
     </div>
-
-    <div className="ticker-item">
-      <img src={fortune} alt="fortune" />
-      <span>Listed #1 in Fortune's FinTech Innovators Asia 2024</span>
+    <div className="ticker-item border-l">
+      <div className="ticker-icon"><Zap className="w-5 h-5" /></div>
+      <span>#1 FinTech Innovator - Fortune Asia</span>
     </div>
-
-    <div className="ticker-item">
-      <img src={cnbc} alt="cnbc" />
-      <span>Named CNBC’s Top FinTech Companies 2025</span>
+    <div className="ticker-item border-l">
+      <div className="ticker-icon"><BarChart3 className="w-5 h-5" /></div>
+      <span>CNBC Top FinTech Companies 2025</span>
     </div>
   </>
 );
 
 export default function Landing() {
   const navigate = useNavigate();
-  const [coins, setCoins] = useState([]);
-  const [news, setNews] = useState([]);
+  const signupFormRef = useRef(null);
+  const { theme, toggleTheme } = useTheme();
 
-  const [users, setUsers] = useState(315735436);
-  const qrTargetUrl = process.env.REACT_APP_QR_CODE_URL || window.location.origin;
-  const qrImageSrc = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=10&data=${encodeURIComponent(qrTargetUrl)}`;
+  /* State */
+  const [coins, setCoins] = useState([]);
+  const [loadingCoins, setLoadingCoins] = useState(true);
   const [displayUsers, setDisplayUsers] = useState(315735436);
-/* FAQ STATE */
+  const [email, setEmail] = useState("");
+  const [company, setCompany] = useState("");
   const [activeFAQ, setActiveFAQ] = useState(null);
 
   const faqs = [
     {
-      q: "Why is Swancore the best exchange for crypto traders?",
-      a: `Swancore stands out as a premier cryptocurrency exchange by combining deep global liquidity with competitive fees, helping traders execute efficiently across market conditions. The platform brings together Spot, Futures, Earn, and P2P markets in one seamless ecosystem, so users can diversify strategies without switching tools. Real-time price tracking, curated insights on top gainers and losers, and discovery of emerging assets make it easier to spot opportunities as they develop.
-
-Beyond trading, Swancore offers early participation in promising projects through MegaDrop and access to innovative pre-listing opportunities via Alpha—giving users a potential edge before broader market exposure. Backed by strong security infrastructure and an intuitive interface, Swancore delivers both performance and confidence, making it an attractive choice for traders looking to grow and manage their crypto portfolios effectively.`
+      q: "Why is SwanCore the best exchange for crypto traders?",
+      a: "SwanCore combines deep global liquidity with competitive fees, Spot, Futures, Earn, and P2P markets in one seamless ecosystem. We prioritize security with $1B SAFU protection and SOC2 compliance."
     },
     {
-      q: "What products does Swancore provide?",
-      a: `Swancore supports <span class="highlight">Spot</span>, <span class="highlight">Futures</span>, <span class="highlight">Earn</span>, and <span class="highlight">P2P</span>.`
+      q: "What digital assets are supported?",
+      a: "We support over 500+ digital assets including Bitcoin, Ethereum, Solana, and the latest emerging altcoins with high liquidity."
     },
     {
-      q: "How to buy crypto?",
-      a: `Sign up, verify, deposit funds, and start trading instantly.`
+      q: "How secure is my data and funds?",
+      a: "We employ multi-signature cold storage, biometric authentication, and regular third-party audits. Our SAFU fund provides an extra layer of protection."
     },
     {
-      q: "How to track prices?",
-      a: `Use real-time dashboard for <span class="highlight">live market tracking</span>.`
-    },
-    {
-      q: "How to trade?",
-      a: `Choose market → place order → manage positions.`
-    },
-    {
-      q: "How to earn?",
-      a: `Earn via <span class="highlight">staking</span> and savings.`
+      q: "Are there tools for professional traders?",
+      a: "Yes. Our pro dashboard includes advanced order types, algorithmic trading APIs, and sub-millisecond execution speeds."
     }
   ];
 
+  /* =========================
+     EFFECTS
+  ========================= */
   useEffect(() => {
     loadCoins();
-    loadNews();
   }, []);
-
   const loadCoins = async () => {
+    setLoadingCoins(true);
     try {
-      const baseURL = await getAPI();
-      const res = await axios.get(
-        `${baseURL}/api/coins`,
-        {
-          params: {
-            vs_currency: "usd",
-            order: "market_cap_desc",
-            per_page: 5,
-            page: 1
-          }
-        }
-      );
+      // Requirements: GET /api/market/coins (Proxy or Direct)
+      const res = await api.get("/api/market/coins");
       setCoins(res.data || []);
     } catch (err) {
-      console.log("Coins error:", err.message);
+      console.error("Coins error:", err.message);
+      // Fallback for demo
       setCoins([]);
-    }
-  };
-
-  const loadNews = async () => {
-    try {
-      const baseURL = await getAPI();
-      const res = await axios.get(`${baseURL}/api/news`);
-
-      setNews(Array.isArray(res.data) ? res.data.slice(0, 5) : []);
-    } catch (err) {
-      console.log("News error:", err.message);
-      setNews([]);
+    } finally {
+      setLoadingCoins(false);
     }
   };
 
   useEffect(() => {
     const interval = setInterval(() => {
       const increment = Math.floor(Math.random() * 7) + 2;
-
-      setUsers(prev => {
-        const next = prev + increment;
-        animateNumber(prev, next);
-        return next;
-      });
-    }, Math.floor(Math.random() * 2000) + 4000);
-
+      setDisplayUsers(prev => prev + increment);
+    }, 5000);
     return () => clearInterval(interval);
   }, []);
 
-  const animateNumber = (start, end) => {
-    const duration = 800;
-    const steps = 30;
-    const stepTime = duration / steps;
-    let current = 0;
-    const diff = end - start;
+  const redirectToRegister = () => {
+    navigate("/register");
+  };
 
-    const timer = setInterval(() => {
-      current++;
-      const progress = current / steps;
-      const value = Math.floor(start + diff * progress);
-
-      setDisplayUsers(value);
-
-      if (current === steps) {
-        clearInterval(timer);
-        setDisplayUsers(end);
-      }
-    }, stepTime);
+  const scrollToSignup = () => {
+    signupFormRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
   return (
-    <div className="landing">
-
-      
-
-      {/* HERO */}
-      <div className="hero">
-        <div className="hero-left slide-left">
-          <h1 className="big-number">{displayUsers.toLocaleString()}</h1>
-
-          <h2 className="trust-text">
-            USERS <br /> TRUST US
-          </h2>
-
-          <p className="tagline">
-            The World’s Leading Cryptocurrency Exchange
-          </p>
-
-          <div className="badges">
-            <div className="badge">
-              <div className="badge-top">
-                <img src="https://cdn-icons-png.flaticon.com/512/616/616490.png" className="laurel-img" alt="" />
-                <div className="badge-title">No.1</div>
-                <img src="https://cdn-icons-png.flaticon.com/512/616/616490.png" className="laurel-img" alt="" />
+    <div className="landing-root">
+      <header className="navbar">
+        <div className="container nav-content">
+          <div className="nav-left">
+            <Link to="/" className="logo">
+              <div className="logo-box">
+                <ShieldCheck className="w-6 h-6 text-white" />
               </div>
-              <div className="badge-sub">Customer Assets</div>
-            </div>
+              <span className="logo-text">SwanCore</span>
+            </Link>
 
-            <div className="badge">
-              <div className="badge-top">
-                <img src="https://cdn-icons-png.flaticon.com/512/616/616490.png" className="laurel-img" alt="" />
-                <div className="badge-title">No.1</div>
-                <img src="https://cdn-icons-png.flaticon.com/512/616/616490.png" className="laurel-img" alt="" />
+            <nav className="nav-links">
+              <div className="nav-dropdown">
+                Trade <ChevronDown className="w-4 h-4" />
               </div>
-              <div className="badge-sub">Trading Volume</div>
-            </div>
+              <Link to="/markets">Markets</Link>
+              <Link to="/earn">Earn</Link>
+              <Link to="/research">Research</Link>
+            </nav>
           </div>
 
-          <div className="cta">
-            <button className="btn-outline">Up to $100 Bonus</button>
-            <button className="btn-main" onClick={() => navigate("/login")}>
-              Sign Up
+          <div className="nav-right">
+            <button onClick={toggleTheme} className="theme-toggle">
+              {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
-          </div>
-          <div className="socials">
-  <button className="social-box google">
-    <img
-      src="https://www.svgrepo.com/show/475656/google-color.svg"
-      alt="Google"
-    />
-  </button>
-
-  <button className="social-box apple">
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="white"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path d="M16.365 1.43c0 1.14-.47 2.28-1.23 3.12-.8.9-2.1 1.6-3.18 1.5-.13-1.1.5-2.3 1.2-3.08.8-.9 2.2-1.57 3.21-1.54zM20.5 17.5c-.9 2.1-1.9 4.2-3.7 4.24-1.2.02-1.6-.7-3-.7-1.4 0-1.9.68-3.05.72-1.8.06-3.1-2.2-4-4.3-1.8-4.1-.5-10.2 3.4-10.3 1.3-.03 2.5.9 3.3.9.8 0 2.2-1.1 3.7-.94 1.1.04 4.1.45 4.8 4.2-.1.06-2.8 1.7-2.7 5.2.1 4.2 3.7 5.6 3.7 5.6z"/>
-    </svg>
-  </button>
-</div>
-          
-        </div>
-
-        <div className="hero-right">
-
-  {/* Popular Markets */}
-  <div className="card slide-right right-top">
-    <div className="card-header">
-      <span>Popular</span>
-      <span className="link">View More</span>
-    </div>
-
-    <div className="market-list">
-      {coins.map((c) => (
-        <div className="coin" key={c.id}>
-          <div className="coin-name">
-            <img src={c.image} alt="" />
-            {c.symbol.toUpperCase()}
-          </div>
-
-          <div>${c.current_price}</div>
-
-          <div
-            className={
-              c.price_change_percentage_24h > 0
-                ? "green"
-                : "red"
-            }
-          >
-            {c.price_change_percentage_24h?.toFixed(2)}%
-          </div>
-        </div>
-      ))}
-    </div>
-  </div>
-
-  {/* News */}
-  <div className="card slide-right right-bottom">
-    <div className="card-header">
-      <span>News</span>
-
-      <span
-        className="link"
-        onClick={() => navigate("/news")}
-      >
-        View All
-      </span>
-    </div>
-
-    <div className="news-list">
-      {news.length === 0 ? (
-        <div style={{ opacity: 0.6 }}>
-          Loading news...
-        </div>
-      ) : (
-        news.map((n, i) => (
-          <div key={i} className="news-item">
-            {n.title}
-          </div>
-        ))
-      )}
-    </div>
-  </div>
-</div>
-</div>
-      {/* TICKER */}
-      <div className="ticker">
-        <div className="ticker-track">
-          <div className="ticker-content"><TickerItems /></div>
-          <div className="ticker-content"><TickerItems /></div>
-        </div>
-      </div>
-
-      {/* SAFU */}
-      <div className="safu-section">
-        <div className="safu-left">
-          <h2>FUNDS ARE <br /><span>SAFU</span></h2>
-          <p>
-            The Security of User Assets Fund (SAFU) was established in 2018 to protect
-            your funds in rare emergencies. Your security is our priority.
-          </p>
-        </div>
-
-        <div className="safu-right">
-          <p className="safu-top">
-            As of February 2026, the SAFU fund wallet comprises a reserve of
-          </p>
-          <h3>15,000 BTC</h3>
-          <p className="wallet">
-            SAFU Wallet: 1BAuq7Vho2CEKvKJxbfU26LhwQjbCmWQkD
-          </p>
-
-          <div className="safu-stats">
-            <div>
-              <h2>7,488,223</h2>
-              <span>Users helped</span>
+            <div className="nav-auth">
+              <button onClick={() => navigate("/login")} className="btn-ghost">Log in</button>
+              <button onClick={redirectToRegister} className="btn-primary">Sign Up</button>
             </div>
-            <div>
-              <h2>$229,433,449</h2>
-              <span>Funds recovered</span>
-            </div>
+            <button className="mobile-menu"><Menu className="w-6 h-6" /></button>
           </div>
         </div>
-      </div>
-
-      {/* APP DOWNLOAD */}
-      <div className="app-section">
-        <div className="app-container">
-
-          <div className="app-phone">
-            <img src={phone} alt="app" className="phone-img" />
-
-            <div className="app-tabs">
-              <span>Desktop</span>
-              <span>Lite</span>
-              <span className="active">Pro</span>
+      </header>
+      <main>
+        {/* HERO SECTION */}
+        <section className="hero">
+          <div className="container hero-container">
+            <div className="hero-badge">
+              <span className="pulse"></span>
+              Global Trust Benchmark 2025
             </div>
-          </div>
 
-          <div className="app-content">
-            <h2>
-              Trade on the go. Anywhere,<br /> anytime.
-            </h2>
+            <h1 className="hero-title">
+              The world trades here <br />
+              <span className="accent-text italic">{displayUsers.toLocaleString()}</span>
+            </h1>
 
-            <div className="qr-row">
-              <div className="qr-box">
-                <img
-                  src={qrImageSrc}
-                  alt="Download app QR code"
-                />
+            <p className="hero-subtitle">
+              SwanCore is the institutional-grade gateway to digital assets. Deep liquidity, 
+              multi-layer security, and professional execution for everyone.
+            </p>
+
+            <div className="hero-actions">
+              <button onClick={redirectToRegister} className="btn-hero-primary">
+                Start Trading <ArrowRight className="w-6 h-6" />
+              </button>
+              <button onClick={() => navigate("/pro")} className="btn-hero-outline">
+                <PlayCircle className="w-6 h-6" /> Experience Pro
+              </button>
+            </div>
+
+            <div className="hero-social">
+              <div className="trader-avatars">
+                {[1, 2, 3, 4, 5, 6].map(i => (
+                  <img key={i} src={`https://picsum.photos/seed/trader${i}/100/100`} alt="user" />
+                ))}
+                <div className="avatar-plus">+300M</div>
               </div>
-
-              <div className="qr-text">
-                <p className="scan-text">Scan to Download App</p>
-                <p className="platform-text">iOS and Android</p>
+              <div className="partner-logos">
+                <span>FORBES</span>
+                <span>FORTUNE</span>
+                <span>CNBC</span>
+                <span>BLOOMBERG</span>
               </div>
             </div>
+          </div>
+        </section>
 
-            <div className="platforms">
-              <div><span></span><p>MacOS</p></div>
-              <div><span>🪟</span><p>Windows</p></div>
-              <div><span>🐧</span><p>Linux</p></div>
+        {/* LOGO MARQUEE */}
+        <div className="ticker">
+          <div className="ticker-track">
+            <TickerItems />
+            <TickerItems />
+            <TickerItems />
+          </div>
+        </div>
+
+        {/* MARKET DATA SECTION */}
+        <section className="markets-section">
+          <div className="container">
+            <div className="section-header">
+              <div className="header-left">
+                <span className="badge-small">Live Markets</span>
+                <h2>Real-time Intelligence</h2>
+                <p>Monitor the heartbeat of the global crypto economy.</p>
+              </div>
+              <Link to="/markets" className="link-arrow">
+                View Full Markets <ArrowUpRight className="w-5 h-5" />
+              </Link>
+            </div>
+
+            <div className="market-grid">
+              {loadingCoins ? (
+                Array(5).fill(0).map((_, i) => (
+                  <div key={i} className="market-card loading" />
+                ))
+              ) : coins.length > 0 ? (
+                coins.map(coin => (
+                  <div key={coin.id} className="market-card">
+                    <div className="card-top">
+                      <img src={coin.image} alt={coin.name} className="coin-icon" />
+                      <div className="coin-info">
+                        <span className="coin-symbol">{coin.symbol.toUpperCase()}</span>
+                        <span className="coin-name">{coin.name}</span>
+                      </div>
+                    </div>
+                    <div className="card-price">${coin.current_price.toLocaleString()}</div>
+                    <div className={`card-change ${coin.price_change_percentage_24h > 0 ? "up" : "down"}`}>
+                      {coin.price_change_percentage_24h > 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                      {coin.price_change_percentage_24h.toFixed(2)}%
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="no-data">Connect to see live markets.</div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* FEATURES GRID */}
+        <section className="features-section">
+          <div className="container">
+            <div className="features-intro">
+              <span className="accent-label">Engineered for Excellence</span>
+              <h2>The complete stack for digital finance</h2>
+            </div>
+
+            <div className="features-grid">
+              {[
+                { title: "Institutional Spot", desc: "Trade 500+ assets with the world's deepest liquidity pools.", icon: <Globe /> },
+                { title: "Derivatives Pro", desc: "Up to 125x leverage with institutional risk management.", icon: <BarChart3 /> },
+                { title: "Wealth Optimizer", desc: "Automated staking and yield generation on autopilot.", icon: <Zap /> },
+                { title: "$1B SAFU Reserve", desc: "Your assets are protected by our multi-layered SAFU fund.", icon: <ShieldCheck /> },
+                { title: "Direct P2P", desc: "Global marketplace for local currency crypto trading.", icon: <Users /> },
+                { title: "Mobile Terminal", desc: "Desktop power in your pocket. Optimized for iOS/Android.", icon: <Smartphone /> },
+              ].map((item, idx) => (
+                <div key={idx} className="feature-card">
+                  <div className="feature-icon">{item.icon}</div>
+                  <h3>{item.title}</h3>
+                  <p>{item.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* SAFU / SECURITY SECTION */}
+        <section className="safu-section">
+          <div className="container safu-container">
+            <div className="safu-text">
+              <h2 className="safu-title">FUNDS ARE <br /><span>SAFU</span></h2>
+              <p>
+                The Security Asset Fund for Users (SAFU) is an emergency insurance fund established 
+                to protect user interests. Your security is our standard.
+              </p>
+              <div className="safu-stats">
+                <div className="stat">
+                  <h4>15,000 BTC</h4>
+                  <span>Active Reserve</span>
+                </div>
+                <div className="stat">
+                  <h4>7.4M+</h4>
+                  <span>Users Protected</span>
+                </div>
+              </div>
+            </div>
+            <div className="safu-visual">
+              <div className="security-card">
+                <Lock className="w-12 h-12 text-indigo-500 mb-6" />
+                <h3>Enterprise Grade Security</h3>
+                <p>SOC2 Type II Compliant Infrastructure</p>
+                <div className="wallet-address">
+                  <span>Audit Proof:</span>
+                  <code>1BAuq7Vho2CEKvKJxbfU26LhwQWbCmWQkD</code>
+                </div>
+                <button className="btn-safu">Verify Reserves</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* FAQ SECTION */}
+        <section className="faq-section">
+          <div className="container">
+            <div className="faq-header">
+              <span className="badge-small">Support</span>
+              <h2>Common Inquiries</h2>
+            </div>
+            <div className="faq-list">
+              {faqs.map((item, i) => (
+                <div key={i} className={`faq-item ${activeFAQ === i ? "active" : ""}`}>
+                  <button onClick={() => setActiveFAQ(activeFAQ === i ? null : i)} className="faq-trigger">
+                    <span>{item.q}</span>
+                    <ChevronDown className="w-5 h-5 icon-rot" />
+                  </button>
+                  <div className="faq-answer">
+                    <p>{item.a}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* CTA / LEAD CAPTURE */}
+        <section className="cta-section" ref={signupFormRef}>
+          <div className="container cta-container">
+            <div className="cta-text">
+              <h2>Your wealth, <br /><span className="italic accent-text">elevated.</span></h2>
+              <p>Join the elite circle of 315M+ global users. Performance is our promise.</p>
+              <div className="cta-trust-items">
+                <div><strong>$100B+</strong><span>Daily Volume</span></div>
+                <div><strong>180+</strong><span>Nations</span></div>
+              </div>
+            </div>
+
+            <div className="lead-form-box">
+              <h3>Join the Alpha</h3>
+              <p>Priority access and zero-fee onboarding.</p>
+              <form onSubmit={(e) => { e.preventDefault(); redirectToRegister(); }}>
+                <div className="input-group">
+                  <label>Business Email</label>
+                  <input 
+                    type="email" 
+                    placeholder="ceo@enterprise.com" 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required 
+                  />
+                </div>
+                <div className="input-group">
+                  <label>Entity Name</label>
+                  <input 
+                    type="text" 
+                    placeholder="Asset Management Inc." 
+                    value={company}
+                    onChange={(e) => setCompany(e.target.value)}
+                    required 
+                  />
+                </div>
+                <button type="submit" className="btn-lead">
+                  Register Access <ArrowRight className="w-6 h-6" />
+                </button>
+              </form>
+              <div className="form-footer">
+                <ShieldCheck className="w-4 h-4" /> SAFU Secure Infrastructure
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      {/* FOOTER */}
+      <footer className="footer">
+        <div className="container footer-content">
+          <div className="footer-brand">
+            <Link to="/" className="logo">
+              <div className="logo-box"><ShieldCheck className="w-6 h-6 text-white" /></div>
+              <span className="logo-text">SwanCore</span>
+            </Link>
+            <p>Pioneering the next generation of global financial sovereignty.</p>
+            <div className="footer-socials">
+              <Link to="#"><span className="social-icon">X</span></Link>
+              <Link to="#"><span className="social-icon">G</span></Link>
+              <Link to="#"><span className="social-icon">IN</span></Link>
+              <Link to="#"><Mail className="w-5 h-5" /></Link>
             </div>
           </div>
 
-        </div>
-      </div>
-
-      {/* FAQ */}
-<div className="faq-section">
-  <div className="faq-container">
-
-    <h2 className="faq-title">Frequently Asked Questions</h2>
-
-    {faqs.map((item, i) => (
-      <div key={i}>
-
-        {/* QUESTION ROW */}
-        <div
-          className={`faq-item ${activeFAQ === i ? "active" : ""}`}
-          onClick={() => setActiveFAQ(activeFAQ === i ? null : i)}
-        >
-          <div className="faq-left">
-            <div className="faq-number">{i + 1}</div>
-            <div className="faq-question">{item.q}</div>
-          </div>
-
-          <div className="faq-icon">
-            {activeFAQ === i ? "−" : "+"}
+          <div className="footer-links">
+            <div className="footer-col">
+              <h4>Company</h4>
+              <Link to="/about">About</Link>
+              <Link to="/careers">Careers</Link>
+              <Link to="/press">Press</Link>
+            </div>
+            <div className="footer-col">
+              <h4>Products</h4>
+              <Link to="/exchange">Exchange</Link>
+              <Link to="/earn">Earn</Link>
+              <Link to="/pay">SwanPay</Link>
+            </div>
+            <div className="footer-col">
+              <h4>Support</h4>
+              <Link to="/help">Help Center</Link>
+              <Link to="/fees">Fees</Link>
+              <Link to="/api">Market API</Link>
+            </div>
           </div>
         </div>
-
-        {/* ANSWER */}
-        {activeFAQ === i && (
-          <div className="faq-answer">
-            <div dangerouslySetInnerHTML={{ __html: item.a }} />
+        <div className="container footer-bottom">
+          <p>© {new Date().getFullYear()} SWANCORE GLOBAL LTD. ALL SYSTEMS NOMINAL.</p>
+          <div className="footer-meta">
+            <span className="network-status"><span className="pulse"></span> Network Active</span>
+            <div className="lang-selector"><Globe className="w-4 h-4" /> English / Global</div>
           </div>
-        )}
-
-      </div>
-    ))}
-
-  </div>
-</div>
-             
-
-    {/* CTA BANNER */}
-    <div className="cta-banner">
-      <div className="cta-content">
-        <h2>Secure, Low-Fee Trading on SwanCore</h2>
-
-        <button
-          className="cta-btn"
-          onClick={() => navigate("/login")}
-        >
-          Sign Up Now
-        </button>
-      </div>
+        </div>
+      </footer>
     </div>
-
-    {/* ✅ FOOTER */}
-    <div className="footer">
-  <div className="footer-container">
-
-    {/* COLUMN 1 */}
-    <div className="footer-col">
-      <h4>About Us</h4>
-      <span onClick={() => {
-  console.log("clicked about");
-  navigate("/about");
-}}>
-  About
-</span>
-<span
-  className="footer-link"
-  onClick={() => navigate("/careers")}
->
-  Careers
-</span>
-<span
-  className="footer-link"
-  onClick={() => navigate("/imformation")}
->
-  Imformation
-</span>
-      <span
-  className="footer-link"
-  onClick={() => navigate("/building-trust")}
->
-  Building Trust
-</span>
-
-<span
-  className="footer-link"
-  onClick={() => navigate("/legal/privacy")}
->
-  Privacy Notice
-</span>
-      
-      <span>Community</span>
-      <span>Risk Warning</span>
-      <span>Notices</span>
-      <span>Secure Internal Communication Channel</span>
-    </div>
-
-    {/* COLUMN 2 */}
-    <div className="footer-col">
-      <h4>Products</h4>
-      <span>Exchange</span>
-      <span>Buy Crypto</span>
-      <span>Pay</span>
-      <span>Crypto Payments</span>
-      <span>Gift Card</span>
-      <span>Auto-Invest</span>
-      <span>ETH Staking</span>
-      <span>Charity</span>
-    </div>
-
-    {/* COLUMN 3 */}
-    <div className="footer-col">
-      <h4>Business</h4>
-    
-      <span>Institutional & VIP Services</span>
-    
-
-      <h4 className="footer-sub">Learn</h4>
-      <span>Learn & Earn</span>
-      <span>Browse Crypto Prices</span>
-      <span>Bitcoin Price</span>
-      <span>Ethereum Price</span>
-      <span>Ethereum Upgrade (Pectra)</span>
-    </div>
-
-    {/* COLUMN 4 */}
-    <div className="footer-col">
-      <h4>Service</h4>
-      <span>Historical Market Data</span>
-      <span>Trading Insight</span>
-      <span>Proof of Reserves</span>
-
-      <h4 className="footer-sub">Support</h4>
-      <span>24/7 Chat Support</span>
-      <span>Support Center</span>
-      <span>Fees</span>
-      <span>Trading Parameters</span>
-      <span>Law Enforcement Requests</span>
-      <span>How to Raise a Complaint</span>
-    </div>
-
-      </div>
-    </div>
-
-  </div> 
-);
+  );
 }
