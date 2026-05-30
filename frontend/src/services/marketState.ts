@@ -1,6 +1,7 @@
 import { getSocket, getAxios } from "../api";
 import axios from "axios";
 
+
 // ─── Types ────────────────────────────────────────────────────────────────
 
 export type Order            = { price: number; amount: number; total?: number };
@@ -88,6 +89,7 @@ let socketConnected   = false;
 function createEmptyState(pair: string): MarketState {
   return {
     pair,
+
     lastPrice: NaN, markPrice: NaN, bestBid: NaN, bestAsk: NaN,
     spread: NaN, volume24h: NaN, high24h: NaN, low24h: NaN,
     change24h: NaN, changePct: NaN, lastPriceUpdate: Date.now(),
@@ -116,6 +118,7 @@ function safeTimestamp(v: unknown): number | undefined {
 
 function normalizeOrders(raw: any[], ascending = false): Order[] {
   if (!Array.isArray(raw)) return [];
+
   return raw
     .map((item) => {
       const price  = safePrice(item.price  ?? item[0]);
@@ -296,6 +299,7 @@ export function isValidPrice(v: unknown): boolean {
   return Number.isFinite(n) && n > 0;
 }
 
+
 function setConnectionStatus(status: "live" | "offline"): void {
   if ((status === "live") === socketConnected) return;
   socketConnected = status === "live";
@@ -355,11 +359,13 @@ async function initMarketState(): Promise<void> {
 
   const socket = await getSocket();
 
+
   socket.on("connect",    () => setConnectionStatus("live"));
   socket.on("disconnect", () => setConnectionStatus("offline"));
 
   socket.on("trade", (trade: any) => {
     if (!trade?.pair) return;
+
     // Block real trade price updates when simulation is active
     if (isSimulationLocked(trade.pair)) return;
     const price  = safePrice(trade.price);
@@ -377,6 +383,7 @@ async function initMarketState(): Promise<void> {
 
   socket.on("priceUpdate", (update: any) => {
     if (!update?.pair) return;
+
     // Block real Binance price when simulation is active for this pair
     if (isSimulationLocked(update.pair)) return;
     const price     = safePrice(update.price);
@@ -390,6 +397,7 @@ async function initMarketState(): Promise<void> {
 
   socket.on("orderbook", (data: any) => {
     if (!data?.pair) return;
+
     updateMarketState(data.pair, {
       orderbook: {
         bids: normalizeOrders(data.buy  || [], false),
@@ -511,6 +519,7 @@ export function getMarketStateSnapshot(pair: string): MarketState {
   return ensureState(pair);
 }
 
+
 export function updateMarketPrice(pair: string, price: number, time?: number): void {
   if (!pair || !Number.isFinite(price) || price <= 0) return;
   updateMarketState(pair, {
@@ -543,6 +552,7 @@ export function subscribeMarketState(pair: string, subscriber: MarketStateSubscr
     subscribers[pair]?.delete(subscriber);
   };
 }
+
 
 export function subscribeConnectionStatus(subscriber: ConnectionSubscriber): () => void {
   connectionSubscribers.add(subscriber);

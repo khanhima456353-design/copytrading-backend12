@@ -6,6 +6,7 @@ const {
   getKycSubmissions,
   getUsers,
   getUserById,
+
   getUserOpenPositions,
   getUserOpenOrders,
   updateUser,
@@ -24,6 +25,7 @@ const {
   addDeposit,
   getAuditLogs,
   getSettings,
+
   updateTradeSettings,
   adminStartDrift,
   adminStopDrift,
@@ -46,6 +48,7 @@ router.get("/stats", getDashboardStats);
 router.get("/kyc-submissions", getKycSubmissions);
 router.get("/users", getUsers);
 router.get("/user/:id", getUserById);
+
 router.get("/user/:id/positions", getUserOpenPositions);
 router.get("/user/:id/open-orders", getUserOpenOrders);
 router.get("/users/:id/open-orders", getUserOpenOrders);
@@ -73,6 +76,7 @@ router.get("/trades", getAllTrades);
 router.get("/trades/active", getActiveTrades);
 router.post("/trade/update", superAdminMiddleware, updateTradeResult);
 
+
 router.post("/sim/drift/start", adminStartDrift);
 router.post("/sim/drift/stop", adminStopDrift);
 router.get("/sim/drift/:userId/:pair/:positionId", adminDriftStatus);
@@ -85,6 +89,7 @@ router.get("/drift/status/:userId/:pair/:positionId", adminDriftStatus);
 router.get("/audit-logs", getAuditLogs);
 router.get("/settings", getSettings);
 router.post("/settings/trade-loss", updateTradeSettings);
+
 
 // Price override routes
 router.post("/price-override", setPriceOverride);

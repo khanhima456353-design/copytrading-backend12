@@ -1,11 +1,13 @@
-﻿import React from 'react';
+import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from './components/theme/ThemeContext';
 import { ShieldCheck, ChevronDown, Sun, Moon, Menu } from 'lucide-react';
+import './navbar.css';
 
 export default function Navbar({ showAuth = true, minimal = false }) {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
+
   return (
     <header className="navbar">
       <div className="container nav-content">

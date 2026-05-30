@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const positionSchema = new mongoose.Schema({
+
   userId:       { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   pair:         { type: String, required: true },
   // FIX #1 & #8: side field added (positive size = long, but explicit side is safer)

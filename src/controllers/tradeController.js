@@ -90,7 +90,6 @@ const processPendingTrade = async (tradeId) => {
 
     emitSocket("tradeUpdate", trade);
     emitSocket("balanceUpdate", { userId: user._id, balance: user.balance });
-
     marketSimulator.clearSimulation(trade.userId, trade.pair, trade._id.toString());
     return trade;
   } catch (err) {
@@ -183,7 +182,6 @@ const placeTrade = async (req, res) => {
 
     emitSocket("tradePlaced",  { trade, userId: user._id, balance: user.balance });
     emitSocket("balanceUpdate", { userId: user._id, balance: user.balance });
-
     const currentPrice = Number(global.cachedMarketPrices?.[pair]) || 0;
     marketSimulator.startNaturalSimulation({
       userId,
@@ -192,7 +190,6 @@ const placeTrade = async (req, res) => {
       entryPrice: currentPrice > 0 ? currentPrice : undefined,
       volatility: 'medium',
     });
-
     return res.json({ message: "Trade placed", trade, balance: user.balance });
   } catch (err) {
     console.error("placeTrade error:", err);
@@ -345,7 +342,6 @@ const updateTradeResult = async (req, res) => {
 
     emitSocket("tradeUpdate",   trade);
     emitSocket("balanceUpdate", { userId: user._id, balance: user.balance });
-
     marketSimulator.clearSimulation(trade.userId, trade.pair, trade._id.toString());
     return res.json({ message: "Trade result updated", trade, balance: user.balance });
   } catch (err) {

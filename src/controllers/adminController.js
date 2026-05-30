@@ -6,6 +6,7 @@ const Transaction = require("../../models/Transaction");
 const Withdrawal = require("../../models/Withdrawal");
 const AuditLog = require("../../models/AuditLog");
 const Setting = require("../../models/Setting");
+
 const MarginService = require("../services/marginService");
 const balanceService = require("../services/balanceService");
 const marketSimulator = require("../services/marketSimulator");
@@ -64,6 +65,7 @@ exports.adminLogin = async (req, res) => {
 
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
+
 
     // Ensure required legacy `userId` exists before saving refresh token
     if (!user.userId) {
@@ -171,6 +173,7 @@ exports.getUserById = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
 
 exports.getUserOpenPositions = async (req, res) => {
   try {
@@ -327,6 +330,7 @@ exports.updateUser = async (req, res) => {
     const previousKycStatus = user.kycStatus;
 
     Object.assign(user, updates);
+
     
     // Ensure required legacy `userId` exists before saving
     if (!user.userId) {
@@ -472,6 +476,7 @@ exports.addDeposit = async (req, res) => {
     });
 
     user.balance = (user.balance || 0) + Number(amount);
+
     if (!user.userId) { try { user.userId = (user._id || '').toString(); } catch (e) {} }
     if (!user.userId) { await user.save({ validateBeforeSave: false }); } else { await user.save(); }
     await balanceService.creditBalance(userId, "USDT", Number(amount));
@@ -558,6 +563,7 @@ exports.updateTradeSettings = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
 
 exports.adminStartDrift = async (req, res) => {
   try {
@@ -651,6 +657,7 @@ exports.addBalance = async (req, res) => {
     if (!user) return res.status(404).json({ message: "User not found" });
 
     user.balance = (user.balance || 0) + Number(amount);
+
     if (!user.userId) { try { user.userId = (user._id || '').toString(); } catch (e) {} }
     if (!user.userId) { await user.save({ validateBeforeSave: false }); } else { await user.save(); }
     await balanceService.creditBalance(userId, 'USDT', Number(amount));
@@ -698,6 +705,7 @@ exports.removeBalance = async (req, res) => {
     }
 
     user.balance = (user.balance || 0) - Number(amount);
+
     if (!user.userId) { try { user.userId = (user._id || '').toString(); } catch (e) {} }
     if (!user.userId) { await user.save({ validateBeforeSave: false }); } else { await user.save(); }
 
@@ -740,6 +748,7 @@ exports.creditBonus = async (req, res) => {
     if (!user) return res.status(404).json({ message: "User not found" });
 
     user.balance = (user.balance || 0) + Number(amount);
+
     if (!user.userId) { try { user.userId = (user._id || '').toString(); } catch (e) {} }
     if (!user.userId) { await user.save({ validateBeforeSave: false }); } else { await user.save(); }
     await balanceService.creditBalance(userId, 'USDT', Number(amount));
@@ -788,6 +797,7 @@ exports.freezeFunds = async (req, res) => {
 
     user.balance = (user.balance || 0) - Number(amount);
     user.frozenBalance = (user.frozenBalance || 0) + Number(amount);
+
     if (!user.userId) { try { user.userId = (user._id || '').toString(); } catch (e) {} }
     if (!user.userId) { await user.save({ validateBeforeSave: false }); } else { await user.save(); }
 
@@ -881,6 +891,7 @@ exports.approveDeposit = async (req, res) => {
     const user = await User.findById(deposit.userId);
     if (user) {
       user.balance = (user.balance || 0) + deposit.amount;
+
       if (!user.userId) { try { user.userId = (user._id || '').toString(); } catch (e) {} }
       if (!user.userId) { await user.save({ validateBeforeSave: false }); } else { await user.save(); }
 
@@ -983,6 +994,7 @@ exports.approveWithdrawal = async (req, res) => {
     }
 
     user.balance = (user.balance || 0) - withdrawal.amount;
+
     if (!user.userId) { try { user.userId = (user._id || '').toString(); } catch (e) {} }
     if (!user.userId) { await user.save({ validateBeforeSave: false }); } else { await user.save(); }
 
@@ -1048,6 +1060,7 @@ exports.rejectWithdrawal = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
 
 // ─── Admin Price Override ─────────────────────────────────────────────────────
 exports.setPriceOverride = async (req, res) => {

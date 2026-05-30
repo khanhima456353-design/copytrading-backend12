@@ -3,6 +3,7 @@ import logo from "../assets/logo.jpg";
 import "./Trading.css";
 import { getAxios } from "../api";
 import { MarketState, subscribeConnectionStatus, subscribeMarketState, isValidPrice } from "../services/marketState";
+
 import { initializeCandles, resetCandles, updateLatestCandle, getCandles } from "../services/candleEngine";
 import PositionsPanel from "../components/PositionsPanel";
 
@@ -12,6 +13,7 @@ type Trade = { time: number; price: number; amount: number; side: "buy" | "sell"
 type Candle = { time: number; open: number; high: number; close: number; low: number; volume: number };
 type Order = { price: number; amount: number; total?: number };
 type AssetHolding = { asset: string; amount: number; value: number };
+
 type AccountSummary = {
   available: number;
   locked: number;
@@ -27,6 +29,7 @@ type UserOrder = {
   side: "buy" | "sell"; price: number; amount: number; status: "open" | "filled" | "cancelled";
   stopLoss?: number; takeProfit?: number; createdAt: number;
 };
+
 type TradeHistoryItem = { time: number; price: number; quantity: number; side: "buy" | "sell"; pair: string; type: "market" | "limit"; profit?: number; };
 type DrawingTool = "cursor" | "crosshair" | "trendline" | "hline" | "vline" | "rect" | "fib" | "text" | "brush" | "eraser" | "measure" | "pitchfork" | "magnet";
 type DrawingObject = {
@@ -35,6 +38,7 @@ type DrawingObject = {
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
+
 
 const timeframeOptions = ["1s", "1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "1w"];
 const TF_SECONDS: Record<string, number> = {
@@ -121,6 +125,7 @@ function formatFullAmount(v: number) {
 function formatChartTime(ts: number, tf: string) {
   const d = new Date(ts * 1000);
   if (tf === "1d" || tf === "1w") return d.toLocaleDateString([], { month: "short", day: "numeric" });
+
   if (["1h", "2h", "4h", "6h", "8h", "12h"].includes(tf)) {
     return d.toLocaleDateString([], { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
@@ -166,12 +171,14 @@ const createFallbackCandles = (count = 300, startPrice = 80721): Candle[] => {
 };
 
 const createFallbackAccountSummary = (): AccountSummary => ({
+
   available: 0, locked: 0, equity: 0,
   holdings: [{ asset: "BTC", amount: 0, value: 0 }, { asset: "ETH", amount: 0, value: 0 }, { asset: "USDT", amount: 0, value: 0 }],
 });
 const createFallbackUserOrders = (): UserOrder[] => [
   { id: "o-1", pair: "BTC/USDT", type: "limit", side: "buy", price: 79750, amount: 0.12, status: "open", createdAt: Math.floor(Date.now() / 1000) - 4300 },
   { id: "o-2", pair: "BTC/USDT", type: "stop-loss", side: "sell", price: 81200, amount: 0.05, stopLoss: 80000, takeProfit: 82400, status: "open", createdAt: Math.floor(Date.now() / 1000) - 7800 },
+
 ];
 const createFallbackTradeHistory = (): TradeHistoryItem[] => [
   { time: Math.floor(Date.now() / 1000) - 480, price: 80080, quantity: 0.09, side: "buy", pair: "BTC/USDT", type: "market" },
@@ -573,6 +580,7 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
   }, [candles, indicators, chartType, tf, rsiData, macdData, showRSI, showMACD, liveStatus, CHART_WEIGHT, VOL_WEIGHT, SUB_WEIGHT, getMainPlotBounds, getPriceRange, drawings]);
 
   useEffect(() => {
+
     let alive = true;
     const loop = () => { if (!alive) return; draw(); rafRef.current = requestAnimationFrame(loop); };
     rafRef.current = requestAnimationFrame(loop);
@@ -596,6 +604,7 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
 
   // Mouse events (pan, zoom, drawing)
   useEffect(() => {
+
     const canvas = canvasRef.current;
     if (!canvas) return;
     const st = stateRef.current;
@@ -929,6 +938,7 @@ function DepthChart({ buyLevels, sellLevels, depthLimit }: DepthChartProps) {
       displayMin = Math.max(minPrice, displayMax - visibleRange);
     }
   }
+
 
   const normalizeX = (price: number) => padding.left + ((price - displayMin) / Math.max(1, displayMax - displayMin)) * chartWidth;
   const baselineY = height - padding.bottom;

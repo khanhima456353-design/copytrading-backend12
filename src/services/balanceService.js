@@ -1,4 +1,5 @@
 /**
+
  * balanceService.js - Unified balance layer (reads/writes Wallet model only)
  * Drop-in replacement — all existing callers unchanged.
  */
@@ -75,6 +76,7 @@ const initializeBalances = async (userId, initialUSDT = 0) => {
   }
 };
 
+
 const getBalances = async (userId) => {
   try {
     await ensureWallets(userId, 0);
@@ -93,6 +95,7 @@ const getBalances = async (userId) => {
   }
 };
 
+
 const recalculateBalancesFromHistory = async (userId, initialDeposit = 0) => {
   try {
     await ensureWallets(userId, initialDeposit);
@@ -102,6 +105,7 @@ const recalculateBalancesFromHistory = async (userId, initialDeposit = 0) => {
     throw err;
   }
 };
+
 
 const lockBalance = async (userId, currency, amount) => {
   if (currency !== "USDT") return;
@@ -198,6 +202,7 @@ module.exports = {
   recalculateBalancesFromHistory,
   lockBalance,
   unlockBalance,
+
   consumeLockedBalance,
   creditBalance
 };

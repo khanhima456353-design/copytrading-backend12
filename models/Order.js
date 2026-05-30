@@ -14,6 +14,7 @@ const orderSchema = new mongoose.Schema(
     filled: { type: Number, default: 0 },
     filledQuantity: { type: Number, default: 0 },
     stopPrice: { type: Number },
+
     stopLoss: { type: Number },
     takeProfit: { type: Number },
     total: { type: Number },

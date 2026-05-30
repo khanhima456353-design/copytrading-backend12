@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getSocket } from "../api";
 import { getAdminStats, getAdminKycSubmissions, getAdminUserById, logoutAdmin } from "../services/adminService";
+
 import AdminSimPanel from "../components/AdminSimPanel";
 import "../styles/Admin.css";
 
@@ -12,6 +13,7 @@ const AdminDashboard: React.FC = () => {
   const [kycSubmissions, setKycSubmissions] = useState<any[]>([]);
   const [selectedKycUser, setSelectedKycUser] = useState<any>(null);
   const [showKycModal, setShowKycModal] = useState(false);
+
   const [adminSimulatorVisible, setAdminSimulatorVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'simulator'>('dashboard');
   const [loadingKyc, setLoadingKyc] = useState(false);
@@ -111,6 +113,7 @@ const AdminDashboard: React.FC = () => {
         <button onClick={() => navigate("/admin/deposits")}>Deposits</button>
         <button onClick={() => navigate("/admin/withdrawals")}>Withdrawals</button>
         <button onClick={() => navigate("/admin/balances")}>Balances</button>
+
         <button
           onClick={() => setActiveTab(activeTab === 'simulator' ? 'dashboard' : 'simulator')}
           style={{ background: activeTab === 'simulator' ? '#1a7fd4' : undefined }}
@@ -231,6 +234,7 @@ const AdminDashboard: React.FC = () => {
               </table>
             </div>
           </section>
+
           <AdminSimPanel
             visible={adminSimulatorVisible}
             onClose={() => setAdminSimulatorVisible(false)}

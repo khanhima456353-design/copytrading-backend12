@@ -67,6 +67,11 @@ router.post("/send-otp", async (req, res) => {
     return res.status(400).json({ message: "Email required" });
   }
 
+  if (process.env.DEBUG_OTP === "true") {
+    const maskedEmail = String(email).replace(/^(.{2})(.*)(?=@)/, "$1***");
+    console.debug("send-otp debug:", { email: maskedEmail });
+  }
+
   try {
     let user = await User.findOne({ email });
 
@@ -87,13 +92,17 @@ router.post("/send-otp", async (req, res) => {
     await Otp.findOneAndUpdate(
       { email },
       {
-        email,
-        otp: hashedOtp,
-        ip,
-        deviceId,
-        expiresAt,
-        createdAt: Date.now(),
-        attempts: 0,
+        $set: {
+          email,
+          otp: hashedOtp,
+          ip,
+          deviceId,
+          expiresAt,
+          attempts: 0,
+        },
+        $setOnInsert: {
+          createdAt: Date.now(),
+        },
         $inc: { resendCount: 1 },
       },
       { upsert: true, returnDocument: "after" }
@@ -119,9 +128,11 @@ router.post("/send-otp", async (req, res) => {
       `,
     });
 
+    console.log("send-otp request completed");
     res.status(200).json({ message: "OTP sent successfully" });
   } catch (error) {
-    console.error("send-otp error:", error.message);
+    const errorMessage = typeof error === "string" ? error : error?.message || "Unknown error";
+    console.error("send-otp error:", errorMessage);
     res.status(500).json({ message: "Error sending OTP email" });
   }
 });
@@ -203,7 +214,6 @@ router.post("/resend-otp", async (req, res) => {
 
     const otp = generateOTP();
     const hashedOtp = await bcrypt.hash(otp, 10);
-
     record.otp = hashedOtp;
     record.expiresAt = Date.now() + 5 * 60 * 1000;
     record.attempts = 0;
@@ -236,6 +246,10 @@ router.post("/resend-otp", async (req, res) => {
 router.post("/set-password", async (req, res) => {
   const { email, password } = req.body;
 
+  if (!email || !password) {
+    return res.status(400).json({ message: "Email and password required" });
+  }
+
   try {
     const user = await User.findOne({ email });
 
@@ -254,7 +268,6 @@ router.post("/set-password", async (req, res) => {
     user.password = await bcrypt.hash(password, 10);
     await user.save();
 
-    // Ensure wallet exists for this user
     await initUserWallet(user._id);
 
     const jwt = require("jsonwebtoken");
@@ -275,7 +288,6 @@ router.post("/set-password", async (req, res) => {
         email: user.email
       }
     });
-
   } catch (err) {
     console.error("set-password error:", err.message);
     res.status(500).json({ message: "Error setting password" });
@@ -308,7 +320,6 @@ router.post("/register", async (req, res) => {
       user = await User.create({ userId, email, password: hashedPassword });
     }
 
-    // Auto-initialize wallet for new user
     await initUserWallet(user._id);
 
     res.status(201).json({
@@ -357,9 +368,7 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ message: "Invalid password" });
     }
 
-    // Ensure wallet exists (for users registered before this update)
     await initUserWallet(user._id);
-
     const jwt = require("jsonwebtoken");
     const token = jwt.sign(
       { userId: user.id, email: user.email, role: user.role },

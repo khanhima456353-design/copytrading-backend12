@@ -158,6 +158,7 @@ let socketAuthToken = null;
  * @returns {Promise<any>}
  */
 export async function getSocket() {
+
   const apiUrl = await getAPIBase();
   const targetSocketBaseURL = makeWSURL(apiUrl);
   const currentToken = localStorage.getItem("token") || localStorage.getItem("adminToken");

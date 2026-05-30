@@ -43,6 +43,7 @@ const userSchema = new mongoose.Schema(
       reviewedAt: { type: Date }
     },
     lastLogin: { type: Date },
+
 isVerified: { type: Boolean, default: false },
 refreshToken: { type: String },
 driftConfig: {

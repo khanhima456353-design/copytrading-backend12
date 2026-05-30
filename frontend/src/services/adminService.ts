@@ -69,6 +69,7 @@ export async function getAdminUserById(userId: string) {
   return response.data;
 }
 
+
 export async function getAdminUserOpenPositions(userId: string) {
   const response = await adminClient.get(`/api/admin/user/${userId}/positions`);
   return response.data;
@@ -185,6 +186,7 @@ export async function updateAdminUser(userId: string, updates: Record<string, an
   return response.data;
 }
 
+
 // --- Trade simulation --------------------------------------------------------
 
 /**
@@ -257,6 +259,7 @@ export function getAdminToken() {
 export function isAdminAuthenticated() {
   return Boolean(getAdminToken());
 }
+
 
 export async function setAdminPriceOverride(userId: string, pair: string, price: number) {
   return adminClient.post('/api/admin/price-override', { userId, pair, price });

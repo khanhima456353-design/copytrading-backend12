@@ -47,6 +47,7 @@
   --coin-gold: #F0B90B;
 }
 
+
 :root[data-theme="light"] .login-right {
   background: var(--bg-current);
   color: var(--text-current);
@@ -85,6 +86,7 @@
   flex: 1 1 55%;
   min-height: 100vh;
   overflow: hidden;
+
   background: var(--bg-current);
 }
 
@@ -155,6 +157,7 @@
   border: 1px solid rgba(240,185,11,0.1);
 }
 
+
 .coin-btc .coin-symbol {
   font-size: 150px !important;
 }
@@ -172,6 +175,7 @@
   border: 1px solid rgba(123,159,255,0.12);
   color: var(--accent);
 }
+
 
 .coin-eth .coin-symbol {
   font-size: 90px !important;
@@ -215,6 +219,7 @@
   text-shadow: 0 2px 12px rgba(0,0,0,0.6);
   user-select: none;
   line-height: 1;
+
   font-size: 770px;
 }
 
@@ -253,6 +258,7 @@
   justify-content: center;
   padding: 48px 40px;
   min-height: 100vh;
+
   background: var(--surface);
   position: relative;
 }
@@ -341,6 +347,7 @@
 }
 
 .form-group input {
+
   width: "100%";
     background: "var(--surface)";
     border: "1px solid var(--border)";
@@ -412,6 +419,7 @@
 .remember-checkbox {
   appearance: none;
   -webkit-appearance: none;
+
   width: 20px;
   height: 16px;
   border: 1.5px solid var(--border-current);
@@ -715,6 +723,7 @@
   .login-card {
     max-width: 100%;
   }
+
 }
 @media (min-width: 768px) {
   body:has(.login-page) .container {

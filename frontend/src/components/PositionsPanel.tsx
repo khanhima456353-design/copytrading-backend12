@@ -149,7 +149,7 @@ export default function PositionsPanel({ serverPositions }: PositionsPanelProps)
   const meterColor = marginRatio >= 85 ? COLORS.red : marginRatio >= 60 ? COLORS.amber : COLORS.green;
 
   return (
-    <div style={{ background: COLORS.bgPanel, border: `1px solid ${COLORS.border}`, padding: 6, fontSize: 11, color: COLORS.text }}>
+    <div style={{ background: COLORS.bgPanel, border: `1px solid ${COLORS.border}`, padding: 10, fontSize: 12, color: COLORS.text }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <div>
           <div style={{ fontSize: 11, color: COLORS.text }}>Total Equity</div>
