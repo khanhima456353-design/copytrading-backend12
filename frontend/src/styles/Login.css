@@ -47,8 +47,7 @@
   --coin-gold: #F0B90B;
 }
 
-<<<<<<< HEAD
-=======
+
 :root[data-theme="light"] .login-right {
   background: var(--bg-current);
   color: var(--text-current);
@@ -60,7 +59,6 @@
 }
 
 
->>>>>>> main
 /* ---------- RESET ---------- */
 *,
 *::before,
@@ -88,11 +86,8 @@
   flex: 1 1 55%;
   min-height: 100vh;
   overflow: hidden;
-<<<<<<< HEAD
-  background: radial-gradient(ellipse at 60% 50%, #1a1f27 0%, #0B0E11 70%);
-=======
+
   background: var(--bg-current);
->>>>>>> main
 }
 
 :root[data-theme="light"] .login-left {
@@ -162,13 +157,11 @@
   border: 1px solid rgba(240,185,11,0.1);
 }
 
-<<<<<<< HEAD
-=======
+
 .coin-btc .coin-symbol {
   font-size: 150px !important;
 }
 
->>>>>>> main
 /* Ethereum */
 .coin-eth {
   width: 140px;
@@ -183,8 +176,7 @@
   color: var(--accent);
 }
 
-<<<<<<< HEAD
-=======
+
 .coin-eth .coin-symbol {
   font-size: 90px !important;
 }
@@ -198,7 +190,6 @@
   color: #26A17B;
 }
 
->>>>>>> main
 /* Small decorative coins */
 .coin-small {
   background: linear-gradient(145deg, #22272e 0%, #161a1f 100%);
@@ -228,10 +219,8 @@
   text-shadow: 0 2px 12px rgba(0,0,0,0.6);
   user-select: none;
   line-height: 1;
-<<<<<<< HEAD
-=======
+
   font-size: 770px;
->>>>>>> main
 }
 
 /* Float animation */
@@ -269,11 +258,8 @@
   justify-content: center;
   padding: 48px 40px;
   min-height: 100vh;
-<<<<<<< HEAD
-  background: var(--bg-current);
-=======
+
   background: var(--surface);
->>>>>>> main
   position: relative;
 }
 
@@ -361,17 +347,7 @@
 }
 
 .form-group input {
-<<<<<<< HEAD
-  background: var(--card-current);
-  border: 1px solid var(--border-current);
-  border-radius: 10px;
-  padding: 13px 16px;
-  font-size: 14px;
-  color: var(--text-current);
-  outline: none;
-  transition: var(--transition);
-  width: 100%;
-=======
+
   width: "100%";
     background: "var(--surface)";
     border: "1px solid var(--border)";
@@ -382,7 +358,6 @@
     outline: "none";
     transition: "border-color .2s";
     boxSizing: "border-box" as const;
->>>>>>> main
 }
 
 .form-group input::placeholder {
@@ -444,11 +419,8 @@
 .remember-checkbox {
   appearance: none;
   -webkit-appearance: none;
-<<<<<<< HEAD
-  width: 16px;
-=======
+
   width: 20px;
->>>>>>> main
   height: 16px;
   border: 1.5px solid var(--border-current);
   border-radius: 4px;
@@ -751,9 +723,7 @@
   .login-card {
     max-width: 100%;
   }
-<<<<<<< HEAD
-}
-=======
+
 }
 @media (min-width: 768px) {
   body:has(.login-page) .container {
@@ -800,4 +770,3 @@ body:has(.login-page) .navbar { height: 72px; }
 body:has(.login-page) .navbar { height: 75px; }
 
 body:has(.login-page) .navbar { height: 78px; }
->>>>>>> main

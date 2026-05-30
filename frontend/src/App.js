@@ -59,15 +59,11 @@ export default function App() {
         <Route path="/legal/privacy" element={<Privacy />} />
         <Route
           path="/trade"
-<<<<<<< HEAD
           element={
             <ProtectedRoute>
               <Trading />
             </ProtectedRoute>
           }
-=======
-          element={<Trading />}
->>>>>>> main
         />
         <Route
           path="/verification"

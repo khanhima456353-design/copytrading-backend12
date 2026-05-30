@@ -61,7 +61,7 @@ router.get("/summary", authMiddleware, async (req: AuthRequest, res: Response) =
     res.json({ available, locked, holdings });
   } catch (error) {
     console.error("Account summary error:", error);
-    res.status(500).json({ message: "Server error", error });
+    res.status(500).json({ message: "Server error" });
   }
 });
 
@@ -92,7 +92,7 @@ router.get("/open-orders", authMiddleware, async (req: AuthRequest, res: Respons
     res.json(normalized);
   } catch (error) {
     console.error("Open orders error:", error);
-    res.status(500).json({ message: "Server error", error });
+    res.status(500).json({ message: "Server error" });
   }
 });
 
@@ -109,7 +109,7 @@ router.get("/positions", authMiddleware, async (req: AuthRequest, res: Response)
     res.json(positions);
   } catch (error) {
     console.error("Positions error:", error);
-    res.status(500).json({ message: "Server error", error });
+    res.status(500).json({ message: "Server error" });
   }
 });
 
@@ -143,7 +143,7 @@ router.get("/balances", authMiddleware, async (req: AuthRequest, res: Response) 
     res.json(balances);
   } catch (error) {
     console.error("Balances error:", error);
-    res.status(500).json({ message: "Server error", error });
+    res.status(500).json({ message: "Server error" });
   }
 });
 
@@ -178,7 +178,7 @@ router.post("/recalculate-balances", authMiddleware, async (req: AuthRequest, re
     });
   } catch (error) {
     console.error("Recalculate balances error:", error);
-    res.status(500).json({ message: "Server error", error });
+    res.status(500).json({ message: "Server error" });
   }
 });
 

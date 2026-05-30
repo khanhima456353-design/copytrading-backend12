@@ -10,7 +10,7 @@ export const followUser = async (
   res: Response
 ) => {
   try {
-    const { userIdToFollow } = req.body;
+    const userIdToFollow = String(req.body.userIdToFollow || "").trim();
 
     if (!req.userId) {
       return res.status(401).json({
@@ -18,9 +18,38 @@ export const followUser = async (
       });
     }
 
+    if (!userIdToFollow) {
+      return res.status(400).json({
+        message: "Target user ID is required"
+      });
+    }
+
     if (req.userId === userIdToFollow) {
       return res.status(400).json({
         message: "You cannot follow yourself"
+      });
+    }
+
+    const targetUser = await prisma.user.findUnique({
+      where: { id: userIdToFollow }
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({
+        message: "User to follow not found"
+      });
+    }
+
+    const existingFollow = await prisma.follow.findFirst({
+      where: {
+        followerId: req.userId,
+        followingId: userIdToFollow
+      }
+    });
+
+    if (existingFollow) {
+      return res.status(409).json({
+        message: "Already following this user"
       });
     }
 
@@ -36,9 +65,9 @@ export const followUser = async (
     });
 
   } catch (error) {
+    console.error(error);
     res.status(500).json({
-      message: "Server error",
-      error
+      message: "Server error"
     });
   }
 };

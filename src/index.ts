@@ -21,6 +21,9 @@ const io = new Server(server, {
   cors: { origin: "*" }
 });
 
+// Publish Socket.IO instance globally for route/controller broadcasts
+global.io = io;
+
 // Middleware
 app.use(cors());
 app.use(express.json());

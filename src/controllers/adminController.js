@@ -6,15 +6,13 @@ const Transaction = require("../../models/Transaction");
 const Withdrawal = require("../../models/Withdrawal");
 const AuditLog = require("../../models/AuditLog");
 const Setting = require("../../models/Setting");
-<<<<<<< HEAD
-=======
+
 const MarginService = require("../services/marginService");
 const balanceService = require("../services/balanceService");
 const marketSimulator = require("../services/marketSimulator");
 const Trade = require("../../models/Trade");
 const Order = require("../../models/Order");
 const Position = require("../../models/Position");
->>>>>>> main
 const { generateAccessToken, generateRefreshToken } = require("../../utils/auth");
 
 const emitSocket = (event, payload = {}) => {
@@ -68,10 +66,7 @@ exports.adminLogin = async (req, res) => {
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
 
-<<<<<<< HEAD
-    user.refreshToken = refreshToken;
-    await user.save();
-=======
+
     // Ensure required legacy `userId` exists before saving refresh token
     if (!user.userId) {
       try {
@@ -88,7 +83,6 @@ exports.adminLogin = async (req, res) => {
     } else {
       await user.save();
     }
->>>>>>> main
 
     res.json({
       success: true,
@@ -180,8 +174,7 @@ exports.getUserById = async (req, res) => {
   }
 };
 
-<<<<<<< HEAD
-=======
+
 exports.getUserOpenPositions = async (req, res) => {
   try {
     const { id } = req.params;
@@ -271,7 +264,6 @@ exports.getUserOpenOrders = async (req, res) => {
   }
 };
 
->>>>>>> main
 exports.getDashboardStats = async (req, res) => {
   try {
     const totalUsers = await User.countDocuments();
@@ -338,9 +330,7 @@ exports.updateUser = async (req, res) => {
     const previousKycStatus = user.kycStatus;
 
     Object.assign(user, updates);
-<<<<<<< HEAD
-    await user.save();
-=======
+
     
     // Ensure required legacy `userId` exists before saving
     if (!user.userId) {
@@ -357,7 +347,6 @@ exports.updateUser = async (req, res) => {
     } else {
       await user.save();
     }
->>>>>>> main
 
     const nowKycVerified = Boolean(user.kycVerified);
     const nowKycStatus = user.kycStatus;
@@ -487,13 +476,7 @@ exports.addDeposit = async (req, res) => {
     });
 
     user.balance = (user.balance || 0) + Number(amount);
-<<<<<<< HEAD
-    await user.save();
 
-    emitSocket("balanceUpdate", {
-  userId: user._id,
-  balance: user.balance
-=======
     if (!user.userId) { try { user.userId = (user._id || '').toString(); } catch (e) {} }
     if (!user.userId) { await user.save({ validateBeforeSave: false }); } else { await user.save(); }
     await balanceService.creditBalance(userId, "USDT", Number(amount));
@@ -502,7 +485,6 @@ exports.addDeposit = async (req, res) => {
   userId: user._id,
   balance: user.balance,
   available: user.balance
->>>>>>> main
 });
 
     await createBalanceTransaction({
@@ -582,8 +564,7 @@ exports.updateTradeSettings = async (req, res) => {
   }
 };
 
-<<<<<<< HEAD
-=======
+
 exports.adminStartDrift = async (req, res) => {
   try {
     const {
@@ -663,7 +644,6 @@ exports.adminDriftStatus = async (req, res) => {
   }
 };
 
->>>>>>> main
 exports.addBalance = async (req, res) => {
   try {
     const { userId, amount, description } = req.body;
@@ -677,17 +657,12 @@ exports.addBalance = async (req, res) => {
     if (!user) return res.status(404).json({ message: "User not found" });
 
     user.balance = (user.balance || 0) + Number(amount);
-<<<<<<< HEAD
-    await user.save();
 
-    emitSocket("balanceUpdate", { userId: user._id, balance: user.balance });
-=======
     if (!user.userId) { try { user.userId = (user._id || '').toString(); } catch (e) {} }
     if (!user.userId) { await user.save({ validateBeforeSave: false }); } else { await user.save(); }
     await balanceService.creditBalance(userId, 'USDT', Number(amount));
 
     emitSocket("balanceUpdate", { userId: user._id, balance: user.balance, available: user.balance });
->>>>>>> main
 
     await createBalanceTransaction({
       userId,
@@ -730,12 +705,9 @@ exports.removeBalance = async (req, res) => {
     }
 
     user.balance = (user.balance || 0) - Number(amount);
-<<<<<<< HEAD
-    await user.save();
-=======
+
     if (!user.userId) { try { user.userId = (user._id || '').toString(); } catch (e) {} }
     if (!user.userId) { await user.save({ validateBeforeSave: false }); } else { await user.save(); }
->>>>>>> main
 
     emitSocket("balanceUpdate", { userId: user._id, balance: user.balance });
 
@@ -776,17 +748,12 @@ exports.creditBonus = async (req, res) => {
     if (!user) return res.status(404).json({ message: "User not found" });
 
     user.balance = (user.balance || 0) + Number(amount);
-<<<<<<< HEAD
-    await user.save();
 
-    emitSocket("balanceUpdate", { userId: user._id, balance: user.balance });
-=======
     if (!user.userId) { try { user.userId = (user._id || '').toString(); } catch (e) {} }
     if (!user.userId) { await user.save({ validateBeforeSave: false }); } else { await user.save(); }
     await balanceService.creditBalance(userId, 'USDT', Number(amount));
 
     emitSocket("balanceUpdate", { userId: user._id, balance: user.balance, available: user.balance });
->>>>>>> main
 
     await createBalanceTransaction({
       userId,
@@ -830,12 +797,9 @@ exports.freezeFunds = async (req, res) => {
 
     user.balance = (user.balance || 0) - Number(amount);
     user.frozenBalance = (user.frozenBalance || 0) + Number(amount);
-<<<<<<< HEAD
-    await user.save();
-=======
+
     if (!user.userId) { try { user.userId = (user._id || '').toString(); } catch (e) {} }
     if (!user.userId) { await user.save({ validateBeforeSave: false }); } else { await user.save(); }
->>>>>>> main
 
     emitSocket("balanceUpdate", { userId: user._id, balance: user.balance, frozenBalance: user.frozenBalance });
 
@@ -927,12 +891,9 @@ exports.approveDeposit = async (req, res) => {
     const user = await User.findById(deposit.userId);
     if (user) {
       user.balance = (user.balance || 0) + deposit.amount;
-<<<<<<< HEAD
-      await user.save();
-=======
+
       if (!user.userId) { try { user.userId = (user._id || '').toString(); } catch (e) {} }
       if (!user.userId) { await user.save({ validateBeforeSave: false }); } else { await user.save(); }
->>>>>>> main
 
       emitSocket("balanceUpdate", { userId: user._id, balance: user.balance });
 
@@ -1033,12 +994,9 @@ exports.approveWithdrawal = async (req, res) => {
     }
 
     user.balance = (user.balance || 0) - withdrawal.amount;
-<<<<<<< HEAD
-    await user.save();
-=======
+
     if (!user.userId) { try { user.userId = (user._id || '').toString(); } catch (e) {} }
     if (!user.userId) { await user.save({ validateBeforeSave: false }); } else { await user.save(); }
->>>>>>> main
 
     emitSocket("balanceUpdate", { userId: user._id, balance: user.balance });
 
@@ -1102,8 +1060,7 @@ exports.rejectWithdrawal = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
-<<<<<<< HEAD
-=======
+
 
 // ─── Admin Price Override ─────────────────────────────────────────────────────
 exports.setPriceOverride = async (req, res) => {
@@ -1222,4 +1179,3 @@ exports.removePriceOverride = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
->>>>>>> main

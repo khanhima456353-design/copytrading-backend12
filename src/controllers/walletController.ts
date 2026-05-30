@@ -11,6 +11,7 @@ export const depositFunds = async (
 ) => {
   try {
     const { amount } = req.body;
+    const depositAmount = Number(amount);
 
     if (!req.userId) {
       return res.status(401).json({
@@ -18,31 +19,41 @@ export const depositFunds = async (
       });
     }
 
-    await prisma.deposit.create({
-      data: {
-        userId: req.userId,
-        amount
-      }
-    });
+    if (!Number.isFinite(depositAmount) || depositAmount <= 0) {
+      return res.status(400).json({
+        message: "Invalid deposit amount"
+      });
+    }
 
-    const updatedUser = await prisma.user.update({
-      where: { id: req.userId },
-      data: {
-        balance: {
-          increment: amount
+    const [, updatedUser] = await prisma.$transaction([
+      prisma.deposit.create({
+        data: {
+          userId: req.userId,
+          amount: depositAmount
         }
-      }
-    });
+      }),
+      prisma.user.update({
+        where: { id: req.userId },
+        data: {
+          balance: {
+            increment: depositAmount
+          }
+        }
+      })
+    ]);
 
     res.json({
       message: "Deposit successful",
       balance: updatedUser.balance
     });
 
-  } catch (error) {
+  } catch (error: any) {
+    console.error(error);
+    if (error?.code === "P2025") {
+      return res.status(404).json({ message: "User not found" });
+    }
     res.status(500).json({
-      message: "Server error",
-      error
+      message: "Server error"
     });
   }
 };
@@ -67,9 +78,9 @@ export const getBalance = async (
     });
 
   } catch (error) {
+    console.error(error);
     res.status(500).json({
-      message: "Server error",
-      error
+      message: "Server error"
     });
   }
 };

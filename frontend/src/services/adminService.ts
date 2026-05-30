@@ -69,8 +69,7 @@ export async function getAdminUserById(userId: string) {
   return response.data;
 }
 
-<<<<<<< HEAD
-=======
+
 export async function getAdminUserOpenPositions(userId: string) {
   const response = await adminClient.get(`/api/admin/user/${userId}/positions`);
   return response.data;
@@ -81,7 +80,6 @@ export async function getAdminUserOpenOrders(userId: string) {
   return response.data;
 }
 
->>>>>>> main
 export async function getAdminUserDeposits(userId: string) {
   const response = await adminClient.get("/api/admin/deposits", {
     params: { userId },
@@ -188,8 +186,7 @@ export async function updateAdminUser(userId: string, updates: Record<string, an
   return response.data;
 }
 
-<<<<<<< HEAD
-=======
+
 // --- Trade simulation --------------------------------------------------------
 
 /**
@@ -250,7 +247,6 @@ export async function getAdminDriftStatus(userId: string, pair: string, position
 
 // --- Auth helpers ------------------------------------------------------------
 
->>>>>>> main
 export function logoutAdmin() {
   localStorage.removeItem("adminToken");
   localStorage.removeItem("adminEmail");
@@ -263,8 +259,7 @@ export function getAdminToken() {
 export function isAdminAuthenticated() {
   return Boolean(getAdminToken());
 }
-<<<<<<< HEAD
-=======
+
 
 export async function setAdminPriceOverride(userId: string, pair: string, price: number) {
   return adminClient.post('/api/admin/price-override', { userId, pair, price });
@@ -272,4 +267,3 @@ export async function setAdminPriceOverride(userId: string, pair: string, price:
 export async function clearAdminPriceOverride(userId: string, pair: string) {
   return adminClient.delete('/api/admin/price-override', { data: { userId, pair } });
 }
->>>>>>> main

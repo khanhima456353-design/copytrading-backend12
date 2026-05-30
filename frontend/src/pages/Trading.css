@@ -3487,92 +3487,7 @@ select:focus-visible {
   display:grid;
   grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
   gap:16px;
-<<<<<<< HEAD
-}
 
-.balance-card,
-.trade-card,
-.market-card {
-  background:linear-gradient(180deg,#161a1e,#11151a);
-  border:1px solid rgba(255,255,255,.06);
-  border-radius:14px;
-  box-shadow:0 8px 24px rgba(0,0,0,.22);
-}
-
-.buy-button,
-.sell-button,
-button[type="submit"]{
-  min-height:48px;
-  border-radius:12px;
-  font-weight:700;
-}
-
-input,select{
-  min-height:44px;
-  border-radius:10px;
-}
-
-@media (max-width:1024px){
-  .trading-root{
-    overflow:auto;
-  }
-
-  .trading-header{
-    flex-wrap:wrap;
-    height:auto;
-    padding:12px;
-    gap:12px;
-  }
-
-  .header-stats{
-    width:100%;
-    overflow:auto;
-    padding-bottom:6px;
-  }
-}
-
-@media (max-width:768px){
-  .trade-panels,
-  .order-entry-grid,
-  .trading-grid{
-    grid-template-columns:1fr;
-  }
-
-  .trading-header{
-    padding:10px;
-  }
-
-  .header-symbol__price{
-    font-size:18px;
-  }
-
-  .header-stat__value{
-    font-size:11px;
-  }
-}
-
-@media (max-width:480px){
-  html{
-    font-size:12px;
-  }
-
-  .trading-header{
-    gap:8px;
-  }
-
-  .header-symbol{
-    width:100%;
-    justify-content:space-between;
-  }
-
-  .header-stats{
-    gap:12px;
-  }
-
-  .buy-button,
-  .sell-button{
-    width:100%;
-=======
 }
 
 .balance-card,
@@ -4160,6 +4075,5 @@ input,select{
 
   .trading-page.trading-dashboard .trading-chart-panel.trading-dashboard__chart-panel {
     min-height: 260px !important;
->>>>>>> main
   }
 }

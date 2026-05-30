@@ -43,11 +43,7 @@ const userSchema = new mongoose.Schema(
       reviewedAt: { type: Date }
     },
     lastLogin: { type: Date },
-<<<<<<< HEAD
-    isVerified: { type: Boolean, default: false },
-    refreshToken: { type: String }
-  },
-=======
+
 isVerified: { type: Boolean, default: false },
 refreshToken: { type: String },
 driftConfig: {
@@ -62,7 +58,6 @@ driftConfig: {
   startedAt:      { type: Date }
 }
 },
->>>>>>> main
   { timestamps: true }
 );
 

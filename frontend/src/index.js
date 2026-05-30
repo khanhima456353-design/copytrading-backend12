@@ -11,23 +11,13 @@ import { ThemeProvider } from "./components/theme/ThemeContext";
 // Components
 import App from "./App";
 import Navbar from "./Navbar";
-<<<<<<< HEAD
-=======
 import authService from "./services/authService";
->>>>>>> main
 import "./styles/theme.css";
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 
 function AppLayout() {
   const location = useLocation();
-<<<<<<< HEAD
-  const showNavbar = location.pathname !== "/" && location.pathname !== "/register";
-
-  return (
-    <div className="app-layout">
-      {showNavbar && <Navbar />}
-=======
   const isTradingPage = location.pathname === "/trade";
   const isAuthenticated = authService.isSessionValid();
   const showNavbar =
@@ -38,7 +28,6 @@ function AppLayout() {
   return (
     <div className="app-layout">
       {showNavbar && <Navbar showAuth={true} minimal={location.pathname === "/login"} />}
->>>>>>> main
       <App />
     </div>
   );

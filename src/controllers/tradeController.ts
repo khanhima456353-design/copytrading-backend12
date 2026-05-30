@@ -1,6 +1,9 @@
 import type { Request, Response } from "express-serve-static-core";
+import prisma from "../lib/prisma";
 
-// Use require for JS Mongoose models
+// NOTE: this controller historically used Mongoose models; for place/cancel
+// trades we now use Prisma to keep IDs and balances consistent with the
+// Prisma data layer. Mongoose models are left unused for now.
 const User  = require("../../models/User");
 const Trade = require("../../models/Trade");
 
@@ -32,32 +35,31 @@ export const placeTrade = async (req: AuthRequest, res: Response) => {
     if (!side)
       return res.status(400).json({ message: "Invalid trade data: side (buy/sell) is required" });
 
-    // Atomic balance deduction — only succeeds when balance >= amount
-    const user = await User.findOneAndUpdate(
-      { _id: userId, balance: { $gte: numAmount } },
-      { $inc: { balance: -numAmount } },
-      { new: true }
-    );
+    // Load user from Prisma and check balance
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(400).json({ message: "User not found" });
+    if ((user.balance || 0) < numAmount) return res.status(400).json({ message: "Insufficient balance" });
 
-    if (!user) {
-      const exists = await User.exists({ _id: userId });
-      return res.status(400).json({
-        message: exists ? "Insufficient balance" : "User not found",
-      });
-    }
-
-    const trade = await Trade.create({
-      userId,
-      pair:   String(tradePair),
-      amount: numAmount,
-      status: "pending",
-      notes:  JSON.stringify({ side, type: type || "market", price, stopLoss, takeProfit }),
+    // Decrement balance then create trade via Prisma
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { balance: { decrement: numAmount } }
     });
 
-    return res.json({ message: "Trade placed", trade, balance: user.balance });
+    const trade = await prisma.trade.create({
+      data: {
+        userId,
+        pair: String(tradePair),
+        amount: numAmount,
+        status: "pending",
+        notes: JSON.stringify({ side, type: type || "market", price, stopLoss, takeProfit })
+      }
+    });
+
+    return res.json({ message: "Trade placed", trade, balance: updatedUser.balance });
   } catch (err: any) {
     console.error("placeTrade error:", err);
-    return res.status(500).json({ message: "Server error", error: err.message });
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
@@ -100,8 +102,8 @@ export const cancelTrade = async (req: AuthRequest, res: Response) => {
     if (!req.userId) return res.status(401).json({ message: "Unauthorized" });
     if (!orderId)    return res.status(400).json({ message: "Missing orderId" });
 
-    const trade = await Trade.findById(orderId);
-    if (!trade) return res.json({ error: "order not found" });
+    const trade = await prisma.trade.findUnique({ where: { id: orderId } });
+    if (!trade) return res.status(404).json({ error: "order not found" });
 
     if (String(trade.userId) !== String(req.userId))
       return res.status(403).json({ message: "Forbidden" });
@@ -109,15 +111,21 @@ export const cancelTrade = async (req: AuthRequest, res: Response) => {
     if (trade.status === "closed" || trade.status === "cancelled")
       return res.status(400).json({ message: "Order cannot be cancelled" });
 
-    trade.status = "cancelled";
-    await trade.save();
+    const updatedTrade = await prisma.trade.update({
+      where: { id: orderId },
+      data: { status: "cancelled" }
+    });
 
-    // Refund the balance
-    await User.findByIdAndUpdate(req.userId, { $inc: { balance: trade.amount } });
+    // Refund the balance via Prisma
+    await prisma.user.update({
+      where: { id: req.userId },
+      data: { balance: { increment: trade.amount } }
+    });
 
-    return res.json({ message: "Order cancelled", trade });
+    return res.json({ message: "Order cancelled", trade: updatedTrade });
   } catch (err: any) {
-    return res.status(500).json({ message: "Server error", error: err.message });
+    console.error("cancelTrade error:", err);
+    return res.status(500).json({ message: "Server error" });
   }
 };
 

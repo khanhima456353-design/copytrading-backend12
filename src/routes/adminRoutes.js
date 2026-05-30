@@ -6,11 +6,9 @@ const {
   getKycSubmissions,
   getUsers,
   getUserById,
-<<<<<<< HEAD
-=======
+
   getUserOpenPositions,
   getUserOpenOrders,
->>>>>>> main
   updateUser,
   deleteUser,
   addBalance,
@@ -27,16 +25,13 @@ const {
   addDeposit,
   getAuditLogs,
   getSettings,
-<<<<<<< HEAD
-  updateTradeSettings
-=======
+
   updateTradeSettings,
   adminStartDrift,
   adminStopDrift,
   adminDriftStatus,
   setPriceOverride,
   removePriceOverride
->>>>>>> main
 } = require("../controllers/adminController");
 const {
   getAllTrades,
@@ -53,14 +48,12 @@ router.get("/stats", getDashboardStats);
 router.get("/kyc-submissions", getKycSubmissions);
 router.get("/users", getUsers);
 router.get("/user/:id", getUserById);
-<<<<<<< HEAD
-=======
+
 router.get("/user/:id/positions", getUserOpenPositions);
 router.get("/user/:id/open-orders", getUserOpenOrders);
 router.get("/users/:id/open-orders", getUserOpenOrders);
 router.get("/user/:id/open-order", getUserOpenOrders);
 router.get("/users/:id/open-order", getUserOpenOrders);
->>>>>>> main
 router.patch("/user/:id", updateUser);
 router.delete("/user/:id", deleteUser);
 
@@ -83,8 +76,7 @@ router.get("/trades", getAllTrades);
 router.get("/trades/active", getActiveTrades);
 router.post("/trade/update", superAdminMiddleware, updateTradeResult);
 
-<<<<<<< HEAD
-=======
+
 router.post("/sim/drift/start", adminStartDrift);
 router.post("/sim/drift/stop", adminStopDrift);
 router.get("/sim/drift/:userId/:pair/:positionId", adminDriftStatus);
@@ -94,16 +86,13 @@ router.post("/drift/start", adminStartDrift);
 router.post("/drift/stop", adminStopDrift);
 router.get("/drift/status/:userId/:pair/:positionId", adminDriftStatus);
 
->>>>>>> main
 router.get("/audit-logs", getAuditLogs);
 router.get("/settings", getSettings);
 router.post("/settings/trade-loss", updateTradeSettings);
 
-<<<<<<< HEAD
-=======
+
 // Price override routes
 router.post("/price-override", setPriceOverride);
 router.delete("/price-override", removePriceOverride);
 
->>>>>>> main
 module.exports = router;

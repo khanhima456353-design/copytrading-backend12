@@ -1,5 +1,7 @@
 import axios from "axios";
 
+const binanceClient = axios.create({ timeout: 2000 });
+
 export let symbols = ["BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "ADA/USDT"];
 
 export let currentPrice = 30000;
@@ -36,10 +38,12 @@ export const getBasePrice = (pair: string) => {
 
 export const loadSymbols = async () => {
   try {
-    const url = "https://api.kraken.com/0/public/AssetPairs";
-    const response = await axios.get(url);
-    const pairs = Object.keys(response.data.result).filter(pair => pair.endsWith("USDT"));
-    symbols = pairs.slice(0, 50).map(pair => pair.replace("USDT", "/USDT"));
+    const url = "https://api.binance.com/api/v3/exchangeInfo";
+    const response = await binanceClient.get(url);
+    const pairs = (response.data.symbols || [])
+      .filter((item: any) => typeof item.symbol === "string" && item.symbol.endsWith("USDT"))
+      .map((item: any) => item.symbol.replace(/USDT$/, "/USDT"));
+    symbols = pairs.slice(0, 50);
   } catch (error) {
     console.error("Error loading symbols:", error);
   }
@@ -51,7 +55,7 @@ loadSymbols();
 export const buildOrderBook = async (pair: string, levels = 18) => {
   const symbol = pair.replace("/", "");
   const url = `https://api.binance.com/api/v3/depth?symbol=${symbol}&limit=${levels}`;
-  const response = await axios.get(url);
+  const response = await binanceClient.get(url);
   const data = response.data;
   if (!data.bids || !data.asks) throw new Error("Invalid orderbook response");
 
@@ -77,7 +81,7 @@ export const buildOrderBook = async (pair: string, levels = 18) => {
 export const buildTrades = async (pair: string, count = 40) => {
   const symbol = pair.replace("/", "");
   const url = `https://api.binance.com/api/v3/trades?symbol=${symbol}&limit=${count}`;
-  const response = await axios.get(url);
+  const response = await binanceClient.get(url);
   const data = response.data;
   if (!Array.isArray(data)) throw new Error("Invalid trades response");
 
@@ -101,7 +105,7 @@ export const buildCandles = async (pair: string, timeframe: string, limit = 80) 
   const symbol = pair.replace("/", "");
   const interval = timeframe === "1m" ? "1m" : timeframe === "5m" ? "5m" : timeframe === "15m" ? "15m" : timeframe === "1h" ? "1h" : timeframe === "4h" ? "4h" : "1d";
   const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
-  const response = await axios.get(url);
+  const response = await binanceClient.get(url);
   const data = response.data;
   if (!Array.isArray(data)) throw new Error("Invalid candles response");
 

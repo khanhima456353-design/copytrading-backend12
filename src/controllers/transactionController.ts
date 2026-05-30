@@ -12,6 +12,7 @@ export const addProfit = async (
 ) => {
   try {
     const { userId, amount, description } = req.body;
+    const amt = Number(amount);
 
     if (!req.userId) {
       return res.status(401).json({
@@ -19,7 +20,7 @@ export const addProfit = async (
       });
     }
 
-    if (!amount || amount <= 0) {
+    if (!Number.isFinite(amt) || amt <= 0) {
       return res.status(400).json({
         message: "Invalid amount"
       });
@@ -40,7 +41,7 @@ export const addProfit = async (
       where: { id: userId },
       data: {
         balance: {
-          increment: amount
+          increment: amt
         }
       }
     });
@@ -50,7 +51,7 @@ export const addProfit = async (
       data: {
         userId,
         type: "profit",
-        amount: Number(amount),
+        amount: amt,
         description: description || "Profit added by admin",
         createdBy: req.userId
       }
@@ -63,9 +64,9 @@ export const addProfit = async (
     });
 
   } catch (error) {
+    console.error(error);
     res.status(500).json({
-      message: "Server error",
-      error
+      message: "Server error"
     });
   }
 };
@@ -77,6 +78,7 @@ export const deductLoss = async (
 ) => {
   try {
     const { userId, amount, description } = req.body;
+    const amt = Number(amount);
 
     if (!req.userId) {
       return res.status(401).json({
@@ -84,44 +86,39 @@ export const deductLoss = async (
       });
     }
 
-    if (!amount || amount <= 0) {
+    if (!Number.isFinite(amt) || amt <= 0) {
       return res.status(400).json({
         message: "Invalid amount"
       });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId }
+    const updateResult = await prisma.user.updateMany({
+      where: { id: userId, balance: { gte: amt } },
+      data: { balance: { decrement: amt } }
     });
 
-    if (!user) {
-      return res.status(404).json({
-        message: "User not found"
-      });
-    }
-
-    if (user.balance < amount) {
+    if (updateResult.count === 0) {
       return res.status(400).json({
         message: "Insufficient balance"
       });
     }
 
-    // Update user balance
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data: {
-        balance: {
-          decrement: amount
-        }
-      }
+    const updatedUser = await prisma.user.findUnique({
+      where: { id: userId }
     });
+
+    if (!updatedUser) {
+      return res.status(400).json({
+        message: "Insufficient balance"
+      });
+    }
 
     // Create transaction record
     const transaction = await prisma.transaction.create({
       data: {
         userId,
         type: "loss",
-        amount: Number(amount),
+        amount: amt,
         description: description || "Loss deducted by admin",
         createdBy: req.userId
       }
@@ -134,9 +131,9 @@ export const deductLoss = async (
     });
 
   } catch (error) {
+    console.error(error);
     res.status(500).json({
-      message: "Server error",
-      error
+      message: "Server error"
     });
   }
 };
@@ -163,9 +160,9 @@ export const getUserTransactions = async (
     });
 
   } catch (error) {
+    console.error(error);
     res.status(500).json({
-      message: "Server error",
-      error
+      message: "Server error"
     });
   }
 };
@@ -192,9 +189,9 @@ export const getAllTransactions = async (
     });
 
   } catch (error) {
+    console.error(error);
     res.status(500).json({
-      message: "Server error",
-      error
+      message: "Server error"
     });
   }
 };
@@ -223,9 +220,9 @@ export const getUserTransactionHistory = async (
     });
 
   } catch (error) {
+    console.error(error);
     res.status(500).json({
-      message: "Server error",
-      error
+      message: "Server error"
     });
   }
 };

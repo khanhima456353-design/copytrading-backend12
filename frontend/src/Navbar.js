@@ -1,60 +1,13 @@
-<<<<<<< HEAD
-﻿import React from "react";
-import { NavLink, Link, useNavigate } from "react-router-dom";
-import authService from "./services/authService";
-import ThemeToggle from "./components/theme/ThemeToggle";
-import "./navbar.css";
-import logo from "./assets/logo.jpg";
-=======
-﻿import React from 'react';
+import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from './components/theme/ThemeContext';
 import { ShieldCheck, ChevronDown, Sun, Moon, Menu } from 'lucide-react';
->>>>>>> main
+import './navbar.css';
 
 export default function Navbar({ showAuth = true, minimal = false }) {
   const navigate = useNavigate();
-<<<<<<< HEAD
-  const isLoggedIn = authService.isSessionValid();
-
-  return (
-    <header className="navbar">
-      <div className="navbar__brand">
-        <Link to="/" className="logo-box">
-          <img src={logo} alt="SwanCore logo" className="logo-img" />
-          <span className="logo-text">SwanCore</span>
-        </Link>
-      </div>
-
-      <nav className="navbar__links" aria-label="Primary navigation">
-        <NavLink to="/markets" className={({ isActive }) => (isActive ? "nav-item active" : "nav-item")}>
-          Markets
-        </NavLink>
-        <NavLink to="/discover" className={({ isActive }) => (isActive ? "nav-item active" : "nav-item")}>
-          Discover
-        </NavLink>
-        <NavLink to="/news" className={({ isActive }) => (isActive ? "nav-item active" : "nav-item")}>
-          News
-        </NavLink>
-        <NavLink to="/about" className={({ isActive }) => (isActive ? "nav-item active" : "nav-item")}>
-          About
-        </NavLink>
-        <NavLink to="/trade" className={({ isActive }) => (isActive ? "nav-item active" : "nav-item")}>
-          Trade
-        </NavLink>
-      </nav>
-
-      <div className="navbar__actions">
-        <ThemeToggle />
-        {!isLoggedIn ? (
-          <>
-            <button className="nav-btn" onClick={() => navigate("/login")}>Login</button>
-            <button className="nav-btn nav-btn--primary" onClick={() => navigate("/register")}>Register</button>
-          </>
-        ) : null}
-      </div>
-=======
   const { theme, toggleTheme } = useTheme();
+
   return (
     <header className="navbar">
       <div className="container nav-content">
@@ -86,7 +39,6 @@ export default function Navbar({ showAuth = true, minimal = false }) {
           <button className="mobile-menu"><Menu className="w-6 h-6" /></button>
         </div>
       </div>
->>>>>>> main
     </header>
   );
 }
