@@ -2,6 +2,10 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getSocket } from "../api";
 import { getAdminStats, getAdminKycSubmissions, getAdminUserById, logoutAdmin } from "../services/adminService";
+<<<<<<< HEAD
+=======
+import AdminSimPanel from "../components/AdminSimPanel";
+>>>>>>> main
 import "../styles/Admin.css";
 
 const AdminDashboard: React.FC = () => {
@@ -11,6 +15,11 @@ const AdminDashboard: React.FC = () => {
   const [kycSubmissions, setKycSubmissions] = useState<any[]>([]);
   const [selectedKycUser, setSelectedKycUser] = useState<any>(null);
   const [showKycModal, setShowKycModal] = useState(false);
+<<<<<<< HEAD
+=======
+  const [adminSimulatorVisible, setAdminSimulatorVisible] = useState(false);
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'simulator'>('dashboard');
+>>>>>>> main
   const [loadingKyc, setLoadingKyc] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -108,9 +117,29 @@ const AdminDashboard: React.FC = () => {
         <button onClick={() => navigate("/admin/deposits")}>Deposits</button>
         <button onClick={() => navigate("/admin/withdrawals")}>Withdrawals</button>
         <button onClick={() => navigate("/admin/balances")}>Balances</button>
+<<<<<<< HEAD
       </div>
 
       {loading ? (
+=======
+        <button
+          onClick={() => setActiveTab(activeTab === 'simulator' ? 'dashboard' : 'simulator')}
+          style={{ background: activeTab === 'simulator' ? '#1a7fd4' : undefined }}
+        >
+          Trade Simulator
+        </button>
+      </div>
+
+      {activeTab === 'simulator' ? (
+        <div style={{ padding: '0', marginTop: 0 }}>
+          <AdminSimPanel
+            visible={true}
+            onClose={() => setActiveTab('dashboard')}
+            inline={true}
+          />
+        </div>
+      ) : loading ? (
+>>>>>>> main
         <p>Loading dashboard...</p>
       ) : error ? (
         <div className="admin-error">{error}</div>
@@ -214,6 +243,13 @@ const AdminDashboard: React.FC = () => {
               </table>
             </div>
           </section>
+<<<<<<< HEAD
+=======
+          <AdminSimPanel
+            visible={adminSimulatorVisible}
+            onClose={() => setAdminSimulatorVisible(false)}
+          />
+>>>>>>> main
           {showKycModal && selectedKycUser && (
             <div className="admin-modal-backdrop" onClick={closeKycModal}>
               <div className="admin-modal" onClick={(e) => e.stopPropagation()}>

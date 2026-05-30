@@ -14,9 +14,23 @@ const orderSchema = new mongoose.Schema(
     filled: { type: Number, default: 0 },
     filledQuantity: { type: Number, default: 0 },
     stopPrice: { type: Number },
+<<<<<<< HEAD
     total: { type: Number },
     feeRate: { type: Number, default: 0 },
     riskParameters: { type: mongoose.Schema.Types.Mixed },
+=======
+    stopLoss: { type: Number },
+    takeProfit: { type: Number },
+    total: { type: Number },
+    exitPrice: { type: Number },
+    realizedPnl: { type: Number, default: 0 },
+    openedAt: { type: Date, default: Date.now },
+    closedAt: { type: Date },
+    feeRate: { type: Number, default: 0 },
+    riskParameters: { type: mongoose.Schema.Types.Mixed },
+    leverage: { type: Number, default: 1 },
+    positionSide: { type: String, enum: ['long', 'short'], default: 'long' },
+>>>>>>> main
     status: {
       type: String,
       enum: ['open', 'filled', 'cancelled', 'partially_filled', 'rejected'],

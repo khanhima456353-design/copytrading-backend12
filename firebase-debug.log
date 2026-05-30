@@ -1,0 +1,19 @@
+[debug] [2026-05-26T17:45:00.386Z] ----------------------------------------------------------------------
+[debug] [2026-05-26T17:45:00.390Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\HP\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js init
+[debug] [2026-05-26T17:45:00.391Z] CLI Version:   15.18.0
+[debug] [2026-05-26T17:45:00.391Z] Platform:      win32
+[debug] [2026-05-26T17:45:00.391Z] Node Version:  v24.14.1
+[debug] [2026-05-26T17:45:00.391Z] Time:          Tue May 26 2026 20:45:00 GMT+0300 (Eastern European Summer Time)
+[debug] [2026-05-26T17:45:00.391Z] ----------------------------------------------------------------------
+[debug] 
+[info] 
+     ######## #### ########  ######## ########     ###     ######  ########
+     ##        ##  ##     ## ##       ##     ##  ##   ##  ##       ##
+     ######    ##  ########  ######   ########  #########  ######  ######
+     ##        ##  ##    ##  ##       ##     ## ##     ##       ## ##
+     ##       #### ##     ## ######## ########  ##     ##  ######  ########
+
+You're about to initialize a Firebase project in this directory:
+
+  C:\Users\HP\Desktop\copytrading-backend12
+

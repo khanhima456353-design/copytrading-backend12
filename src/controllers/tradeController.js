@@ -17,6 +17,10 @@ const Trade       = require("../../models/Trade");
 const Transaction = require("../../models/Transaction");
 const AuditLog    = require("../../models/AuditLog");
 const Setting     = require("../../models/Setting");
+<<<<<<< HEAD
+=======
+const marketSimulator = require("../services/marketSimulator");
+>>>>>>> main
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const getSettingValue = async (key, defaultValue) => {
@@ -90,6 +94,10 @@ const processPendingTrade = async (tradeId) => {
     emitSocket("tradeUpdate", trade);
     emitSocket("balanceUpdate", { userId: user._id, balance: user.balance });
 
+<<<<<<< HEAD
+=======
+    marketSimulator.clearSimulation(trade.userId, trade.pair, trade._id.toString());
+>>>>>>> main
     return trade;
   } catch (err) {
     // Roll back claim so a retry is possible on next cron tick
@@ -182,6 +190,18 @@ const placeTrade = async (req, res) => {
     emitSocket("tradePlaced",  { trade, userId: user._id, balance: user.balance });
     emitSocket("balanceUpdate", { userId: user._id, balance: user.balance });
 
+<<<<<<< HEAD
+=======
+    const currentPrice = Number(global.cachedMarketPrices?.[pair]) || 0;
+    marketSimulator.startNaturalSimulation({
+      userId,
+      pair: trade.pair,
+      positionId: trade._id.toString(),
+      entryPrice: currentPrice > 0 ? currentPrice : undefined,
+      volatility: 'medium',
+    });
+
+>>>>>>> main
     return res.json({ message: "Trade placed", trade, balance: user.balance });
   } catch (err) {
     console.error("placeTrade error:", err);
@@ -249,6 +269,12 @@ const getActiveTrades = async (req, res) => {
 const updateTradeResult = async (req, res) => {
   try {
     const { tradeId, resultType, amount, notes } = req.body;
+<<<<<<< HEAD
+=======
+    // If `keepPending` is true, do not auto-close or apply balance deltas.
+    // This is used by the admin simulator which only stamps an outcome.
+    const keepPending = Boolean(req.body.keepPending);
+>>>>>>> main
     const adminId = req.userId;
 
     if (!adminId) return res.status(401).json({ message: "Unauthorized" });
@@ -263,7 +289,40 @@ const updateTradeResult = async (req, res) => {
     const balanceDelta = trade.status === "pending"
       ? trade.amount + newProfit
       : newProfit - oldProfit;
+<<<<<<< HEAD
 
+=======
+    if (keepPending) {
+      // Stamp an admin suggestion without closing the trade or changing
+      // balances. Store suggestion metadata on the trade document so the
+      // user-side close flow can respect admin suggestions if desired.
+      trade.adminSuggested = {
+        resultType,
+        amount: Number(amount),
+        notes: notes || `Admin suggested ${resultType} of $${Number(amount).toFixed(2)}`,
+        adminId,
+        suggestedAt: new Date()
+      };
+      trade.adminReviewedBy = adminId;
+      trade.adminReviewedAt = new Date();
+      await trade.save();
+
+      await createAdminAuditLog({
+        adminId,
+        action:     "admin_suggest_trade_result",
+        targetType: "trade",
+        targetId:   trade._id,
+        details:    `Admin suggested ${resultType} ${amount} for trade ${tradeId}`,
+        metadata:   { resultType, amount: Number(amount) },
+      });
+
+      emitSocket("tradeSuggestion", { tradeId: trade._id, suggestion: trade.adminSuggested });
+
+      return res.json({ message: "Admin suggestion recorded", trade });
+    }
+
+    // Proceed with the existing behavior: close trade and apply balance delta.
+>>>>>>> main
     trade.status          = "closed";
     trade.profit          = newProfit;
     trade.resultType      = resultType;
@@ -303,6 +362,10 @@ const updateTradeResult = async (req, res) => {
     emitSocket("tradeUpdate",   trade);
     emitSocket("balanceUpdate", { userId: user._id, balance: user.balance });
 
+<<<<<<< HEAD
+=======
+    marketSimulator.clearSimulation(trade.userId, trade.pair, trade._id.toString());
+>>>>>>> main
     return res.json({ message: "Trade result updated", trade, balance: user.balance });
   } catch (err) {
     console.error(err);

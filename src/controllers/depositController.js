@@ -6,6 +6,10 @@ const {
   sendDepositApprovedNotification,
   sendDepositRejectedNotification
 } = require("../../utils/emailNotifications");
+<<<<<<< HEAD
+=======
+const balanceService = require("../services/balanceService");
+>>>>>>> main
 
 // User requests a deposit (creates pending deposit request)
 const requestDeposit = async (req, res) => {
@@ -136,6 +140,10 @@ const approveDeposit = async (req, res) => {
       { $inc: { balance: deposit.amount } },
       { new: true }
     );
+<<<<<<< HEAD
+=======
+    await balanceService.creditBalance(deposit.userId, "USDT", deposit.amount);
+>>>>>>> main
 
     await Transaction.create({
       userId: deposit.userId,
@@ -224,4 +232,8 @@ module.exports = {
   getPendingDeposits,
   approveDeposit,
   rejectDeposit
+<<<<<<< HEAD
 };
+=======
+};
+>>>>>>> main

@@ -43,9 +43,26 @@ const userSchema = new mongoose.Schema(
       reviewedAt: { type: Date }
     },
     lastLogin: { type: Date },
+<<<<<<< HEAD
     isVerified: { type: Boolean, default: false },
     refreshToken: { type: String }
   },
+=======
+isVerified: { type: Boolean, default: false },
+refreshToken: { type: String },
+driftConfig: {
+  active:         { type: Boolean, default: false },
+  pair:           { type: String, default: "" },
+  direction:      { type: String, enum: ["profit", "loss", ""], default: "" },
+  outcomePercent: { type: Number, default: 0 },
+  positionSide:   { type: String, enum: ["long", "short", ""], default: "" },
+  speed:          { type: String, default: "normal" },
+  volatility:     { type: String, default: "low" },
+  positionId:     { type: String, default: "" },
+  startedAt:      { type: Date }
+}
+},
+>>>>>>> main
   { timestamps: true }
 );
 

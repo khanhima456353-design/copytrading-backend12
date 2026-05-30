@@ -6,6 +6,11 @@ import i18n from "../i18n";
 import logo from "../assets/logo.jpg";
 import authService from "../services/authService";
 import "../styles/Login.css";
+<<<<<<< HEAD
+=======
+import { SiTether, SiRipple } from "react-icons/si";
+import '../landing.css';
+>>>>>>> main
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -113,6 +118,13 @@ const Login: React.FC = () => {
   };
 
   return (
+<<<<<<< HEAD
+=======
+  <>
+
+    
+
+>>>>>>> main
     <div className="login-page">
       {/* ============= MODAL ============= */}
       {modal.type && (
@@ -144,8 +156,13 @@ const Login: React.FC = () => {
           <div className="coin coin-eth">
             <span className="coin-symbol">Ξ</span>
           </div>
+<<<<<<< HEAD
           <div className="coin coin-small coin-s1" />
           <div className="coin coin-small coin-s2" />
+=======
+          <div className="coin coin-small coin-s1"><SiRipple className="coin-symbol" /></div>
+<div className="coin coin-small coin-s2"><SiTether className="coin-symbol" /></div>
+>>>>>>> main
         </div>
       </div>
 
@@ -280,7 +297,13 @@ const Login: React.FC = () => {
           <span onClick={() => navigate("/privacy")}>Privacy</span>
         </div>
       </div>
+<<<<<<< HEAD
     </div>
+=======
+
+    </div>
+  </>
+>>>>>>> main
   );
 };
 
