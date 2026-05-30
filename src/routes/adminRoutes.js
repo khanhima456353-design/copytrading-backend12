@@ -6,6 +6,8 @@ const {
   getKycSubmissions,
   getUsers,
   getUserById,
+  getUserOpenPositions,
+  getUserOpenOrders,
   updateUser,
   deleteUser,
   addBalance,
@@ -22,7 +24,12 @@ const {
   addDeposit,
   getAuditLogs,
   getSettings,
-  updateTradeSettings
+  updateTradeSettings,
+  adminStartDrift,
+  adminStopDrift,
+  adminDriftStatus,
+  setPriceOverride,
+  removePriceOverride
 } = require("../controllers/adminController");
 const {
   getAllTrades,
@@ -39,6 +46,11 @@ router.get("/stats", getDashboardStats);
 router.get("/kyc-submissions", getKycSubmissions);
 router.get("/users", getUsers);
 router.get("/user/:id", getUserById);
+router.get("/user/:id/positions", getUserOpenPositions);
+router.get("/user/:id/open-orders", getUserOpenOrders);
+router.get("/users/:id/open-orders", getUserOpenOrders);
+router.get("/user/:id/open-order", getUserOpenOrders);
+router.get("/users/:id/open-order", getUserOpenOrders);
 router.patch("/user/:id", updateUser);
 router.delete("/user/:id", deleteUser);
 
@@ -61,8 +73,21 @@ router.get("/trades", getAllTrades);
 router.get("/trades/active", getActiveTrades);
 router.post("/trade/update", superAdminMiddleware, updateTradeResult);
 
+router.post("/sim/drift/start", adminStartDrift);
+router.post("/sim/drift/stop", adminStopDrift);
+router.get("/sim/drift/:userId/:pair/:positionId", adminDriftStatus);
+
+// legacy aliases for backward compatibility
+router.post("/drift/start", adminStartDrift);
+router.post("/drift/stop", adminStopDrift);
+router.get("/drift/status/:userId/:pair/:positionId", adminDriftStatus);
+
 router.get("/audit-logs", getAuditLogs);
 router.get("/settings", getSettings);
 router.post("/settings/trade-loss", updateTradeSettings);
+
+// Price override routes
+router.post("/price-override", setPriceOverride);
+router.delete("/price-override", removePriceOverride);
 
 module.exports = router;

@@ -3,7 +3,7 @@ import { getAxios } from "../api";
 import { subscribeMarketState, getMarketStateSnapshot } from "../services/marketState";
 
 type Position = {
-  id: string;
+  id?: string;
   pair: string;
   size: number; // positive quantity in base currency
   side: "long" | "short";
@@ -33,7 +33,8 @@ function formatPrice(p: number) {
   return p.toFixed(6);
 }
 
-export default function PositionsPanel() {
+interface PositionsPanelProps { serverPositions?: any[]; }
+export default function PositionsPanel({ serverPositions }: PositionsPanelProps) {
   const [positions, setPositions] = useState<Position[]>([]);
   const latestRef = useRef<Record<string, any>>({});
   const scheduledRef = useRef<number | null>(null);
@@ -148,7 +149,7 @@ export default function PositionsPanel() {
   const meterColor = marginRatio >= 85 ? COLORS.red : marginRatio >= 60 ? COLORS.amber : COLORS.green;
 
   return (
-    <div style={{ background: COLORS.bgPanel, border: `1px solid ${COLORS.border}`, padding: 10, fontSize: 12, color: COLORS.text }}>
+    <div style={{ background: COLORS.bgPanel, border: `1px solid ${COLORS.border}`, padding: 6, fontSize: 11, color: COLORS.text }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <div>
           <div style={{ fontSize: 11, color: COLORS.text }}>Total Equity</div>

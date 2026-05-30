@@ -6,6 +6,12 @@ const Transaction = require("../../models/Transaction");
 const Withdrawal = require("../../models/Withdrawal");
 const AuditLog = require("../../models/AuditLog");
 const Setting = require("../../models/Setting");
+const MarginService = require("../services/marginService");
+const balanceService = require("../services/balanceService");
+const marketSimulator = require("../services/marketSimulator");
+const Trade = require("../../models/Trade");
+const Order = require("../../models/Order");
+const Position = require("../../models/Position");
 const { generateAccessToken, generateRefreshToken } = require("../../utils/auth");
 
 const emitSocket = (event, payload = {}) => {
@@ -59,8 +65,22 @@ exports.adminLogin = async (req, res) => {
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
 
+    // Ensure required legacy `userId` exists before saving refresh token
+    if (!user.userId) {
+      try {
+        user.userId = (user._id || '').toString();
+      } catch (e) {
+        // fallback: don't block saving — will use save without validation
+      }
+    }
+
     user.refreshToken = refreshToken;
-    await user.save();
+    // If userId was still missing for some reason, skip validation to avoid failing login
+    if (!user.userId) {
+      await user.save({ validateBeforeSave: false });
+    } else {
+      await user.save();
+    }
 
     res.json({
       success: true,
@@ -152,6 +172,95 @@ exports.getUserById = async (req, res) => {
   }
 };
 
+exports.getUserOpenPositions = async (req, res) => {
+  try {
+    const { id } = req.params;
+    // Use the live Position collection as the source of truth for open trades.
+    // Fall back to pending Trade documents only if the user has no active
+    // Position records.
+    const positionsDocs = await Position.find({ userId: id, size: { $ne: 0 } }).sort({ updatedAt: -1 });
+
+    if (positionsDocs.length > 0) {
+      const positions = positionsDocs.map((p) => {
+        const positionSide = p.side || (p.size < 0 ? 'short' : 'long');
+        const markPrice = marketSimulator.getSimulationPrice(id, p.pair, p._id?.toString()) || 0;
+        const quantity = Math.abs(p.size || 0);
+        const unrealizedPnl = Number.isFinite(p.entryPrice) && Number.isFinite(markPrice)
+          ? (positionSide === 'short' ? -1 : 1) * (markPrice - p.entryPrice) * quantity * (p.leverage || 1)
+          : 0;
+        const roePct = p.margin ? (unrealizedPnl / p.margin) * 100 : 0;
+
+        return {
+          id: p._id,
+          _id: p._id,
+          pair: p.pair,
+          side: positionSide,
+          entryPrice: p.entryPrice,
+          quantity,
+          amount: p.margin || Math.abs(p.size * p.entryPrice),
+          leverage: p.leverage || 1,
+          markPrice,
+          unrealizedPnl,
+          roePct,
+          openTime: p.updatedAt || p._id.getTimestamp(),
+          status: 'open',
+          notes: ''
+        };
+      });
+      return res.json({ positions });
+    }
+
+    const trades = await Trade.find({ userId: id, status: "pending" }).sort({ createdAt: -1 });
+    const positions = trades.map((t) => ({
+      id: t._id,
+      _id: t._id,
+      pair: t.pair,
+      side: t.side || 'long',
+      entryPrice: t.entryPrice || t.price || t.amount || 0,
+      quantity: t.quantity || 1,
+      amount: t.amount,
+      openTime: t.createdAt,
+      status: t.status,
+      notes: t.notes || ''
+    }));
+
+    return res.json({ positions });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+exports.getUserOpenOrders = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const query = { userId: id, status: { $in: ['open', 'partially_filled'] } };
+
+    console.log('ADMIN_SIM_USER', id);
+    console.log('ADMIN_SIM_QUERY', { collection: 'Order', query });
+
+    const orders = await Order.find(query).sort({ createdAt: -1 });
+
+    console.log('ADMIN_SIM_QUERY_RESULT', orders.map((o) => ({
+      _id: o._id,
+      pair: o.pair,
+      side: o.side,
+      status: o.status,
+      createdAt: o.createdAt,
+      amount: o.amount,
+      quantity: o.quantity,
+      price: o.price,
+      stopPrice: o.stopPrice,
+      type: o.type
+    })));
+
+    return res.json({ orders });
+  } catch (error) {
+    console.error('ADMIN_SIM_ORDER_ERROR', error);
+    return res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 exports.getDashboardStats = async (req, res) => {
   try {
     const totalUsers = await User.countDocuments();
@@ -218,7 +327,22 @@ exports.updateUser = async (req, res) => {
     const previousKycStatus = user.kycStatus;
 
     Object.assign(user, updates);
-    await user.save();
+    
+    // Ensure required legacy `userId` exists before saving
+    if (!user.userId) {
+      try {
+        user.userId = (user._id || '').toString();
+      } catch (e) {
+        // fallback: don't block update
+      }
+    }
+
+    // Save with or without validation if userId is still missing
+    if (!user.userId) {
+      await user.save({ validateBeforeSave: false });
+    } else {
+      await user.save();
+    }
 
     const nowKycVerified = Boolean(user.kycVerified);
     const nowKycStatus = user.kycStatus;
@@ -348,11 +472,14 @@ exports.addDeposit = async (req, res) => {
     });
 
     user.balance = (user.balance || 0) + Number(amount);
-    await user.save();
+    if (!user.userId) { try { user.userId = (user._id || '').toString(); } catch (e) {} }
+    if (!user.userId) { await user.save({ validateBeforeSave: false }); } else { await user.save(); }
+    await balanceService.creditBalance(userId, "USDT", Number(amount));
 
     emitSocket("balanceUpdate", {
   userId: user._id,
-  balance: user.balance
+  balance: user.balance,
+  available: user.balance
 });
 
     await createBalanceTransaction({
@@ -432,6 +559,85 @@ exports.updateTradeSettings = async (req, res) => {
   }
 };
 
+exports.adminStartDrift = async (req, res) => {
+  try {
+    const {
+      userId,
+      pair,
+      positionId,
+      positionSide,
+      entryPrice,
+      outcomePercent,
+      direction,
+      speed = "normal",
+      volatility = "low",
+      lossPercent = 0.25,
+    } = req.body;
+
+    if (!userId || !pair || !positionId || entryPrice == null || outcomePercent == null || !direction) {
+      return res.status(400).json({
+        message: "userId, pair, positionId, entryPrice, outcomePercent, and direction are required"
+      });
+    }
+
+    const status = marketSimulator.startDrift({
+      userId,
+      pair,
+      positionId,
+      positionSide,
+      entryPrice: Number(entryPrice),
+      outcomePercent: Number(outcomePercent),
+      direction,
+      speed,
+      volatility,
+      lossPercent,
+    });
+
+    if (!status) {
+      return res.status(400).json({ message: "Unable to start drift for this user/pair" });
+    }
+
+    res.json({ success: true, status });
+  } catch (error) {
+    console.error("adminStartDrift error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+exports.adminStopDrift = async (req, res) => {
+  try {
+    const { userId, pair, positionId } = req.body;
+    if (!userId || !pair || !positionId) {
+      return res.status(400).json({ message: "userId, pair, and positionId are required" });
+    }
+
+    const status = marketSimulator.stopDrift(userId, pair, positionId);
+    if (!status) {
+      return res.status(404).json({ message: "No drift state found for this user/pair" });
+    }
+
+    res.json({ success: true, status });
+  } catch (error) {
+    console.error("adminStopDrift error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+exports.adminDriftStatus = async (req, res) => {
+  try {
+    const { userId, pair, positionId } = req.params;
+    if (!userId || !pair || !positionId) {
+      return res.status(400).json({ message: "userId, pair, and positionId are required" });
+    }
+
+    const status = marketSimulator.getDriftStatus(userId, pair, positionId);
+    res.json({ success: true, status });
+  } catch (error) {
+    console.error("adminDriftStatus error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 exports.addBalance = async (req, res) => {
   try {
     const { userId, amount, description } = req.body;
@@ -445,9 +651,11 @@ exports.addBalance = async (req, res) => {
     if (!user) return res.status(404).json({ message: "User not found" });
 
     user.balance = (user.balance || 0) + Number(amount);
-    await user.save();
+    if (!user.userId) { try { user.userId = (user._id || '').toString(); } catch (e) {} }
+    if (!user.userId) { await user.save({ validateBeforeSave: false }); } else { await user.save(); }
+    await balanceService.creditBalance(userId, 'USDT', Number(amount));
 
-    emitSocket("balanceUpdate", { userId: user._id, balance: user.balance });
+    emitSocket("balanceUpdate", { userId: user._id, balance: user.balance, available: user.balance });
 
     await createBalanceTransaction({
       userId,
@@ -490,7 +698,8 @@ exports.removeBalance = async (req, res) => {
     }
 
     user.balance = (user.balance || 0) - Number(amount);
-    await user.save();
+    if (!user.userId) { try { user.userId = (user._id || '').toString(); } catch (e) {} }
+    if (!user.userId) { await user.save({ validateBeforeSave: false }); } else { await user.save(); }
 
     emitSocket("balanceUpdate", { userId: user._id, balance: user.balance });
 
@@ -531,9 +740,11 @@ exports.creditBonus = async (req, res) => {
     if (!user) return res.status(404).json({ message: "User not found" });
 
     user.balance = (user.balance || 0) + Number(amount);
-    await user.save();
+    if (!user.userId) { try { user.userId = (user._id || '').toString(); } catch (e) {} }
+    if (!user.userId) { await user.save({ validateBeforeSave: false }); } else { await user.save(); }
+    await balanceService.creditBalance(userId, 'USDT', Number(amount));
 
-    emitSocket("balanceUpdate", { userId: user._id, balance: user.balance });
+    emitSocket("balanceUpdate", { userId: user._id, balance: user.balance, available: user.balance });
 
     await createBalanceTransaction({
       userId,
@@ -577,7 +788,8 @@ exports.freezeFunds = async (req, res) => {
 
     user.balance = (user.balance || 0) - Number(amount);
     user.frozenBalance = (user.frozenBalance || 0) + Number(amount);
-    await user.save();
+    if (!user.userId) { try { user.userId = (user._id || '').toString(); } catch (e) {} }
+    if (!user.userId) { await user.save({ validateBeforeSave: false }); } else { await user.save(); }
 
     emitSocket("balanceUpdate", { userId: user._id, balance: user.balance, frozenBalance: user.frozenBalance });
 
@@ -669,7 +881,8 @@ exports.approveDeposit = async (req, res) => {
     const user = await User.findById(deposit.userId);
     if (user) {
       user.balance = (user.balance || 0) + deposit.amount;
-      await user.save();
+      if (!user.userId) { try { user.userId = (user._id || '').toString(); } catch (e) {} }
+      if (!user.userId) { await user.save({ validateBeforeSave: false }); } else { await user.save(); }
 
       emitSocket("balanceUpdate", { userId: user._id, balance: user.balance });
 
@@ -770,7 +983,8 @@ exports.approveWithdrawal = async (req, res) => {
     }
 
     user.balance = (user.balance || 0) - withdrawal.amount;
-    await user.save();
+    if (!user.userId) { try { user.userId = (user._id || '').toString(); } catch (e) {} }
+    if (!user.userId) { await user.save({ validateBeforeSave: false }); } else { await user.save(); }
 
     emitSocket("balanceUpdate", { userId: user._id, balance: user.balance });
 
@@ -829,6 +1043,124 @@ exports.rejectWithdrawal = async (req, res) => {
     });
 
     res.json({ message: "Withdrawal rejected", withdrawal });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// ─── Admin Price Override ─────────────────────────────────────────────────────
+exports.setPriceOverride = async (req, res) => {
+  try {
+    const { userId, pair, price } = req.body;
+
+    if (!userId || !pair || price === undefined) {
+      return res.status(400).json({
+        message: "userId, pair, and price are required"
+      });
+    }
+
+    if (!Number.isFinite(price) || price <= 0) {
+      return res.status(400).json({
+        message: "price must be a positive number"
+      });
+    }
+
+    // Ensure structure exists
+    if (!global.adminPriceOverride[userId]) {
+      global.adminPriceOverride[userId] = {};
+    }
+
+    // Set the override
+    global.adminPriceOverride[userId][pair] = {
+      active: true,
+      price: parseFloat(price)
+    };
+
+    // Emit price update to user's socket room with override price
+    if (global.io) {
+      global.io.to(`user:${userId}`).emit('priceUpdate', {
+        pair,
+        price: parseFloat(price),
+        isOverride: true,
+        time: Date.now()
+      });
+    }
+
+    await createAdminAuditLog({
+      adminId: req.userId,
+      action: "set_price_override",
+      targetType: "price_override",
+      targetId: `${userId}:${pair}`,
+      details: `Set price override for user ${userId} on pair ${pair}`,
+      metadata: { userId, pair, overridePrice: price }
+    });
+
+    res.json({
+      message: "Price override set",
+      override: {
+        userId,
+        pair,
+        active: true,
+        price: parseFloat(price)
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+exports.removePriceOverride = async (req, res) => {
+  try {
+    const { userId, pair } = req.body;
+
+    if (!userId || !pair) {
+      return res.status(400).json({
+        message: "userId and pair are required"
+      });
+    }
+
+    // Clear the override
+    if (global.adminPriceOverride[userId]) {
+      global.adminPriceOverride[userId][pair] = {
+        active: false,
+        price: null
+      };
+    }
+
+    // Get live Binance price
+    const livePrice = global.cachedMarketPrices?.[pair];
+
+    // Emit price update to user's socket room with live Binance price
+    if (global.io) {
+      global.io.to(`user:${userId}`).emit('priceUpdate', {
+        pair,
+        price: livePrice || null,
+        isOverride: false,
+        time: Date.now()
+      });
+    }
+
+    await createAdminAuditLog({
+      adminId: req.userId,
+      action: "remove_price_override",
+      targetType: "price_override",
+      targetId: `${userId}:${pair}`,
+      details: `Removed price override for user ${userId} on pair ${pair}`,
+      metadata: { userId, pair, livePrice: livePrice || null }
+    });
+
+    res.json({
+      message: "Price override removed",
+      override: {
+        userId,
+        pair,
+        active: false,
+        price: null,
+        livePrice: livePrice || null
+      }
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error", error: error.message });

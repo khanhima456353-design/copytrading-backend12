@@ -5,8 +5,32 @@ const nodemailer = require("nodemailer");
 const router = express.Router();
 const User = require("../../models/User");
 const Otp = require("../../models/Otp");
+const Wallet = require("../../models/Wallet");
 const { generateUniqueUserId } = require("../../utils/userIdGenerator");
 const { generateDeviceId } = require("../../utils/otpSecurity");
+
+// ── Auto-initialize wallet for new user ──────────────────────────────────────
+const initUserWallet = async (userId) => {
+  try {
+    await Wallet.findOneAndUpdate(
+      { userId, type: "spot" },
+      {
+        $setOnInsert: {
+          userId,
+          type: "spot",
+          availableBalance: 0,
+          lockedBalance: 0,
+          borrowedBalance: 0,
+          unrealizedPnl: 0,
+          equity: 0
+        }
+      },
+      { upsert: true, returnDocument: "after" }
+    );
+  } catch (err) {
+    console.error("initUserWallet error:", err.message);
+  }
+};
 
 // ================= OTP GENERATOR =================
 function generateOTP() {
@@ -35,52 +59,30 @@ const transporter = nodemailer.createTransport({
 
 // ================= SEND OTP =================
 router.post("/send-otp", async (req, res) => {
-  console.log("🔥 OTP REQUEST RECEIVED:", req.body);
-  console.log("🔥 REQUEST METHOD:", req.method);
-  console.log("🔥 REQUEST URL:", req.url);
   const { email } = req.body;
-
   const ip = getIp(req);
   const deviceId = generateDeviceId(req);
 
-  console.log("📧 Email:", email);
-  console.log("🌐 IP:", ip);
-  console.log("📱 Device ID:", deviceId);
-
   if (!email) {
-    console.log("❌ No email provided");
     return res.status(400).json({ message: "Email required" });
   }
 
   try {
-    console.log("🔍 Checking if user exists...");
-    // ✅ CHECK IF USER ALREADY HAS COMPLETE ACCOUNT
     let user = await User.findOne({ email });
-    console.log("👤 User found:", !!user);
 
     if (user && user.password) {
-      console.log("❌ User already has password");
       return res.status(400).json({ message: "User already exists. Please login instead." });
     }
 
     if (!user) {
-      console.log("🆕 Creating new user...");
       const userId = await generateUniqueUserId();
-      console.log("🆔 Generated userId:", userId);
       user = await User.create({ email, userId });
-      console.log("✅ User created:", user._id);
+      await initUserWallet(user._id);
     }
 
-    console.log("🔢 Generating OTP...");
     const otp = generateOTP();
-    console.log("🔢 OTP generated:", otp);
-
-    console.log("🔐 Hashing OTP...");
     const hashedOtp = await bcrypt.hash(otp, 10);
-    console.log("🔐 OTP hashed successfully");
-
     const expiresAt = Date.now() + 5 * 60 * 1000;
-    console.log("💾 Saving OTP to database...");
 
     await Otp.findOneAndUpdate(
       { email },
@@ -94,43 +96,32 @@ router.post("/send-otp", async (req, res) => {
         attempts: 0,
         $inc: { resendCount: 1 },
       },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: "after" }
     );
-    console.log("💾 OTP saved to database");
 
-    // ================= SEND OTP EMAIL =================
-    console.log("📤 Sending email...");
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: email,
       subject: "Your SwanCore Activation Code",
       html: `
         <div style="font-family: Arial, sans-serif; line-height:1.6; color:#222;">
-          
           <p><strong>Welcome to SwanCore. Please confirm your registration using the activation code below.</strong></p>
-
           <p><strong>Account activation code:</strong></p>
-
           <h2 style="color:#f0b90b;">${otp}</h2>
-
-          <p><strong>Security Tips :</strong></p>
+          <p><strong>Security Tips:</strong></p>
           <ul>
-            <li>Always keep your password safe and private—it’s your key to a secure experience.</li>
+            <li>Always keep your password safe and private.</li>
             <li>Your security is our priority.</li>
             <li>Explore our security tips to keep your account protected.</li>
           </ul>
-
-          <p>Don’t recognize this activity? Please reset your password and contact support immediately—we’re here to help.</p>
+          <p>Don't recognize this activity? Please reset your password and contact support immediately.</p>
         </div>
       `,
     });
-    console.log("✅ Email sent successfully");
 
-    console.log("🎉 OTP process completed successfully");
     res.status(200).json({ message: "OTP sent successfully" });
   } catch (error) {
-    console.log("❌ Error in send-otp:", error.message);
-    console.log("Stack:", error.stack);
+    console.error("send-otp error:", error.message);
     res.status(500).json({ message: "Error sending OTP email" });
   }
 });
@@ -138,7 +129,6 @@ router.post("/send-otp", async (req, res) => {
 // ================= VERIFY OTP =================
 router.post("/verify-otp", async (req, res) => {
   const { email, otp } = req.body;
-
   const ip = getIp(req);
   const deviceId = generateDeviceId(req);
 
@@ -153,23 +143,19 @@ router.post("/verify-otp", async (req, res) => {
       return res.status(400).json({ message: "OTP not found" });
     }
 
-    // ⛔ EXPIRED
     if (record.expiresAt < Date.now()) {
       await Otp.deleteOne({ email });
       return res.status(400).json({ message: "OTP expired" });
     }
 
-    // ⛔ DEVICE CHECK
     if (record.deviceId !== deviceId) {
       return res.status(403).json({ message: "Device mismatch detected" });
     }
 
-    // ⚠️ SOFT IP CHECK (log only, don't block)
     if (record.ip !== ip) {
       console.warn("IP changed:", record.ip, ip);
     }
 
-    // ⛔ MAX ATTEMPTS
     if (record.attempts >= 5) {
       return res.status(429).json({ message: "Too many attempts" });
     }
@@ -182,7 +168,6 @@ router.post("/verify-otp", async (req, res) => {
       return res.status(400).json({ message: "Invalid OTP" });
     }
 
-    // ✅ SUCCESS
     await Otp.deleteOne({ email });
 
     return res.json({
@@ -192,11 +177,12 @@ router.post("/verify-otp", async (req, res) => {
     });
 
   } catch (err) {
-    console.log(err);
+    console.error("verify-otp error:", err.message);
     return res.status(500).json({ message: "Verification failed" });
   }
 });
 
+// ================= RESEND OTP =================
 router.post("/resend-otp", async (req, res) => {
   const { email, otpId } = req.body;
 
@@ -217,10 +203,9 @@ router.post("/resend-otp", async (req, res) => {
 
     const otp = generateOTP();
     const hashedOtp = await bcrypt.hash(otp, 10);
-    const expiresAt = Date.now() + 5 * 60 * 1000;
 
     record.otp = hashedOtp;
-    record.expiresAt = expiresAt;
+    record.expiresAt = Date.now() + 5 * 60 * 1000;
     record.attempts = 0;
     record.resendCount = (record.resendCount || 0) + 1;
     record.createdAt = Date.now();
@@ -242,11 +227,12 @@ router.post("/resend-otp", async (req, res) => {
 
     return res.json({ success: true, message: "OTP resent", otpId });
   } catch (err) {
-    console.log(err);
+    console.error("resend-otp error:", err.message);
     return res.status(500).json({ success: false, message: "Error resending OTP" });
   }
 });
 
+// ================= SET PASSWORD =================
 router.post("/set-password", async (req, res) => {
   const { email, password } = req.body;
 
@@ -257,22 +243,20 @@ router.post("/set-password", async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Check if user already has a password (already registered)
     if (user.password) {
       return res.status(400).json({ message: "User already exists. Please login instead." });
     }
 
-    // Generate userId if not already set
     if (!user.userId) {
       user.userId = await generateUniqueUserId();
     }
 
-    const hashed = await bcrypt.hash(password, 10);
-    user.password = hashed;
-
+    user.password = await bcrypt.hash(password, 10);
     await user.save();
 
-    // Generate JWT token
+    // Ensure wallet exists for this user
+    await initUserWallet(user._id);
+
     const jwt = require("jsonwebtoken");
     const token = jwt.sign(
       { userId: user.id, email: user.email },
@@ -284,7 +268,7 @@ router.post("/set-password", async (req, res) => {
       success: true,
       message: "Password set successfully",
       sessionToken: token,
-      expiresIn: 7 * 24 * 60 * 60, // 7 days in seconds
+      expiresIn: 7 * 24 * 60 * 60,
       user: {
         id: user.id,
         userId: user.userId,
@@ -293,7 +277,7 @@ router.post("/set-password", async (req, res) => {
     });
 
   } catch (err) {
-    console.log(err);
+    console.error("set-password error:", err.message);
     res.status(500).json({ message: "Error setting password" });
   }
 });
@@ -307,33 +291,25 @@ router.post("/register", async (req, res) => {
   }
 
   try {
-    // Check if user already exists and has a password
     const existingUser = await User.findOne({ email });
     if (existingUser && existingUser.password) {
       return res.status(400).json({ message: "User already exists. Please login instead." });
     }
 
-    // Generate unique userId
     const userId = await generateUniqueUserId();
-
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user or update existing one
     let user;
     if (existingUser) {
-      // Update existing user with password and userId
       existingUser.password = hashedPassword;
       existingUser.userId = userId;
       user = await existingUser.save();
     } else {
-      // Create new user
-      user = await User.create({
-        userId,
-        email,
-        password: hashedPassword
-      });
+      user = await User.create({ userId, email, password: hashedPassword });
     }
+
+    // Auto-initialize wallet for new user
+    await initUserWallet(user._id);
 
     res.status(201).json({
       message: "User registered successfully",
@@ -346,7 +322,7 @@ router.post("/register", async (req, res) => {
     });
 
   } catch (err) {
-    console.log(err);
+    console.error("register error:", err.message);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -361,8 +337,7 @@ router.post("/login", async (req, res) => {
   }
 
   try {
-    // Check if identifier is email or userId
-    const isEmail = rawIdentifier.includes('@');
+    const isEmail = rawIdentifier.includes("@");
     const identifier = isEmail ? rawIdentifier.toLowerCase() : rawIdentifier.toUpperCase();
     const query = isEmail ? { email: identifier } : { userId: identifier };
 
@@ -382,7 +357,9 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ message: "Invalid password" });
     }
 
-    // Generate JWT token
+    // Ensure wallet exists (for users registered before this update)
+    await initUserWallet(user._id);
+
     const jwt = require("jsonwebtoken");
     const token = jwt.sign(
       { userId: user.id, email: user.email, role: user.role },
@@ -407,11 +384,12 @@ router.post("/login", async (req, res) => {
     });
 
   } catch (err) {
-    console.log(err);
+    console.error("login error:", err.message);
     res.status(500).json({ message: "Server error" });
   }
 });
 
+// ================= SUBMIT KYC =================
 router.post("/submit-kyc", authMiddleware, async (req, res) => {
   try {
     const { personal, documentType, documentFront, documentBack, selfie } = req.body;
@@ -472,7 +450,7 @@ router.post("/submit-kyc", authMiddleware, async (req, res) => {
 
     return res.json({ success: true, message: "KYC submitted successfully", userId: user._id });
   } catch (err) {
-    console.error("Submit KYC error:", err);
+    console.error("submit-kyc error:", err.message);
     return res.status(500).json({ message: "Error submitting KYC" });
   }
 });

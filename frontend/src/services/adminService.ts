@@ -69,6 +69,16 @@ export async function getAdminUserById(userId: string) {
   return response.data;
 }
 
+export async function getAdminUserOpenPositions(userId: string) {
+  const response = await adminClient.get(`/api/admin/user/${userId}/positions`);
+  return response.data;
+}
+
+export async function getAdminUserOpenOrders(userId: string) {
+  const response = await adminClient.get(`/api/admin/user/${userId}/open-orders`);
+  return response.data;
+}
+
 export async function getAdminUserDeposits(userId: string) {
   const response = await adminClient.get("/api/admin/deposits", {
     params: { userId },
@@ -175,6 +185,66 @@ export async function updateAdminUser(userId: string, updates: Record<string, an
   return response.data;
 }
 
+// --- Trade simulation --------------------------------------------------------
+
+/**
+ * Push a drift result to an open Trade document.
+ * Uses the EXISTING POST /api/admin/trade/update endpoint (updateTradeResult).
+ *
+ * The Trade stays "pending" — the user closes it themselves.
+ * This just stamps the admin-chosen outcome so the correct P&L
+ * is applied when they do.
+ *
+ * Backend expects: { tradeId, resultType: 'profit'|'loss', amount, notes }
+ *   - amount is always a positive number (the absolute P&L value)
+ */
+export async function updateAdminTrade(
+  tradeId: string,
+  resultType: "profit" | "loss",
+  amount: number,
+  notes?: string
+) {
+  const response = await adminClient.post("/api/admin/trade/update", {
+    tradeId,
+    resultType,
+    amount: Math.abs(amount),
+    notes: notes ?? `Admin sim: ${resultType} of $${Math.abs(amount).toFixed(2)}`,
+    keepPending: true
+  });
+  return response.data;
+}
+
+export async function startAdminDrift(options: {
+  userId: string;
+  pair: string;
+  positionId: string;
+  positionSide: string;
+  entryPrice: number;
+  outcomePercent: number;
+  direction: "profit" | "loss";
+  speed?: string;
+  volatility?: string;
+}) {
+  const response = await adminClient.post("/api/admin/sim/drift/start", options);
+  return response.data;
+}
+
+export async function stopAdminDrift(userId: string, pair: string, positionId: string) {
+  const response = await adminClient.post("/api/admin/sim/drift/stop", {
+    userId,
+    pair,
+    positionId,
+  });
+  return response.data;
+}
+
+export async function getAdminDriftStatus(userId: string, pair: string, positionId: string) {
+  const response = await adminClient.get(`/api/admin/sim/drift/${encodeURIComponent(userId)}/${encodeURIComponent(pair)}/${encodeURIComponent(positionId)}`);
+  return response.data;
+}
+
+// --- Auth helpers ------------------------------------------------------------
+
 export function logoutAdmin() {
   localStorage.removeItem("adminToken");
   localStorage.removeItem("adminEmail");
@@ -186,4 +256,11 @@ export function getAdminToken() {
 
 export function isAdminAuthenticated() {
   return Boolean(getAdminToken());
+}
+
+export async function setAdminPriceOverride(userId: string, pair: string, price: number) {
+  return adminClient.post('/api/admin/price-override', { userId, pair, price });
+}
+export async function clearAdminPriceOverride(userId: string, pair: string) {
+  return adminClient.delete('/api/admin/price-override', { data: { userId, pair } });
 }

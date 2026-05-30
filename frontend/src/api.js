@@ -151,68 +151,87 @@ export async function getAxios() {
 let socket = null;
 /** @type {string | null} */
 let socketBaseURL = null;
+/** @type {string | null} */
+let socketAuthToken = null;
 
 /**
  * @returns {Promise<any>}
  */
 export async function getSocket() {
-  if (!socket) {
-    const apiUrl = await getAPIBase();
-    socketBaseURL = makeWSURL(apiUrl);
+  const apiUrl = await getAPIBase();
+  const targetSocketBaseURL = makeWSURL(apiUrl);
+  const currentToken = localStorage.getItem("token") || localStorage.getItem("adminToken");
 
-    /** @type {any} */
-    const socketOptions = {
-      transports: ["websocket", "polling"],
-      withCredentials: true,
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5,
-      path: "/socket.io",
-    };
-
-    if (
-      typeof window !== "undefined" &&
-      window.location.hostname.includes("app.github.dev")
-    ) {
-      socketOptions.transports = ["polling"];
-    }
-
-    socket = io(socketBaseURL, socketOptions);
-
-    /* ✅ IMPORTANT FIX: expose socket globally */
-    window.socket = socket;
-
-    socket.on("connect", () => {
-      console.log("Socket connected successfully to", socketBaseURL);
-    });
-
-    socket.on("connect_error", async (err) => {
-      console.warn("Socket connect error:", err.message);
-
-      const localWsUrl = makeWSURL(LOCAL_URL);
-
-      if (socketBaseURL !== localWsUrl) {
-        console.warn("Falling back to local socket:", localWsUrl);
-
-        try {
-          socket.disconnect();
-          socketBaseURL = localWsUrl;
-
-          socket = io(socketBaseURL, socketOptions);
-
-          /* re-expose */
-          window.socket = socket;
-        } catch (e) {
-          console.error("Fallback socket failed:", e);
-        }
-      }
-    });
-
-    socket.on("disconnect", () => {
-      console.log("Socket disconnected from", socketBaseURL);
-    });
+  if (socket && socketBaseURL === targetSocketBaseURL && socketAuthToken === currentToken) {
+    return socket;
   }
+
+  if (socket) {
+    try {
+      socket.disconnect();
+    } catch (err) {
+      console.warn("Failed to disconnect stale socket before reinitializing:", err);
+    }
+    socket = null;
+  }
+
+  socketBaseURL = targetSocketBaseURL;
+  socketAuthToken = currentToken;
+
+  /** @type {any} */
+  const socketOptions = {
+    transports: ["websocket", "polling"],
+    withCredentials: true,
+    reconnection: true,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    reconnectionAttempts: 5,
+    path: "/socket.io",
+  };
+
+  if (
+    typeof window !== "undefined" &&
+    window.location.hostname.includes("app.github.dev")
+  ) {
+    socketOptions.transports = ["polling"];
+  }
+  if (currentToken) {
+    socketOptions.auth = { token: currentToken };
+  }
+  socket = io(socketBaseURL, socketOptions);
+
+  /* ✅ IMPORTANT FIX: expose socket globally */
+  window.socket = socket;
+
+  socket.on("connect", () => {
+    console.log("Socket connected successfully to", socketBaseURL);
+  });
+
+  socket.on("connect_error", async (err) => {
+    console.warn("Socket connect error:", err.message);
+
+    const localWsUrl = makeWSURL(LOCAL_URL);
+
+    if (socketBaseURL !== localWsUrl) {
+      console.warn("Falling back to local socket:", localWsUrl);
+
+      try {
+        socket.disconnect();
+        socketBaseURL = localWsUrl;
+
+        socket = io(socketBaseURL, socketOptions);
+
+        /* re-expose */
+        window.socket = socket;
+      } catch (e) {
+        console.error("Fallback socket failed:", e);
+      }
+    }
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Socket disconnected from", socketBaseURL);
+  });
 
   return socket;
 }

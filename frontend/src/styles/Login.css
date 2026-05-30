@@ -47,6 +47,17 @@
   --coin-gold: #F0B90B;
 }
 
+:root[data-theme="light"] .login-right {
+  background: var(--bg-current);
+  color: var(--text-current);
+}
+
+
+.login-page {
+  padding-top: 64px;
+}
+
+
 /* ---------- RESET ---------- */
 *,
 *::before,
@@ -74,7 +85,7 @@
   flex: 1 1 55%;
   min-height: 100vh;
   overflow: hidden;
-  background: radial-gradient(ellipse at 60% 50%, #1a1f27 0%, #0B0E11 70%);
+  background: var(--bg-current);
 }
 
 :root[data-theme="light"] .login-left {
@@ -144,6 +155,10 @@
   border: 1px solid rgba(240,185,11,0.1);
 }
 
+.coin-btc .coin-symbol {
+  font-size: 150px !important;
+}
+
 /* Ethereum */
 .coin-eth {
   width: 140px;
@@ -156,6 +171,19 @@
   z-index: 2;
   border: 1px solid rgba(123,159,255,0.12);
   color: var(--accent);
+}
+
+.coin-eth .coin-symbol {
+  font-size: 90px !important;
+}
+
+.coin-s1 .coin-symbol {
+  font-size: 36px !important;
+  color: #0085C0;
+}
+.coin-s2 .coin-symbol {
+  font-size: 36px !important;
+  color: #26A17B;
 }
 
 /* Small decorative coins */
@@ -187,6 +215,7 @@
   text-shadow: 0 2px 12px rgba(0,0,0,0.6);
   user-select: none;
   line-height: 1;
+  font-size: 770px;
 }
 
 /* Float animation */
@@ -224,7 +253,7 @@
   justify-content: center;
   padding: 48px 40px;
   min-height: 100vh;
-  background: var(--bg-current);
+  background: var(--surface);
   position: relative;
 }
 
@@ -312,15 +341,16 @@
 }
 
 .form-group input {
-  background: var(--card-current);
-  border: 1px solid var(--border-current);
-  border-radius: 10px;
-  padding: 13px 16px;
-  font-size: 14px;
-  color: var(--text-current);
-  outline: none;
-  transition: var(--transition);
-  width: 100%;
+  width: "100%";
+    background: "var(--surface)";
+    border: "1px solid var(--border)";
+    borderRadius: 12;
+    padding: "14px 16px";
+    fontSize: 14;
+    color: "var(--txt-primary)";
+    outline: "none";
+    transition: "border-color .2s";
+    boxSizing: "border-box" as const;
 }
 
 .form-group input::placeholder {
@@ -382,7 +412,7 @@
 .remember-checkbox {
   appearance: none;
   -webkit-appearance: none;
-  width: 16px;
+  width: 20px;
   height: 16px;
   border: 1.5px solid var(--border-current);
   border-radius: 4px;
@@ -686,3 +716,48 @@
     max-width: 100%;
   }
 }
+@media (min-width: 768px) {
+  body:has(.login-page) .container {
+    max-width: 100%;
+    padding-left: 24px;
+  }
+}
+
+@media (min-width: 768px) {
+  body:has(.login-page) .navbar {
+    height: 60px;
+  }
+}
+
+@media (min-width: 768px) {
+  body:has(.login-page) .navbar .container {
+    max-width: 100%;
+    padding: 0 24px;
+  }
+}
+
+body:has(.login-page) .navbar {
+  display: flex;
+  align-items: center;
+}
+
+body:has(.login-page) .app-layout {
+  display: flex;
+  flex-direction: column;
+}
+body:has(.login-page) .login-page {
+  margin-top: -80px;
+  padding-top: 80px;
+}
+body:has(.login-page) .login-page {
+  min-height: calc(100vh - 80px);
+}
+body:has(.login-page) .navbar { height: 56px; display: flex; align-items: center; }
+
+body:has(.login-page) .navbar { height: 68px; }
+
+body:has(.login-page) .navbar { height: 72px; }
+
+body:has(.login-page) .navbar { height: 75px; }
+
+body:has(.login-page) .navbar { height: 78px; }

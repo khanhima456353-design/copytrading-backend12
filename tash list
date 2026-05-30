@@ -1,0 +1,38 @@
+warning: in the working copy of 'dist/src/services/orderService.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/components/PositionsPanel.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/pages/Trading.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/services/adminService.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'models/Order.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'models/Position.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'package-lock.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'package.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'server.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/services/balanceService.js', LF will be replaced by CRLF the next time Git touches it
+ dist/src/services/orderService.js                  |   20 [32m+[m[31m-[m
+ dist/src/services/riskEngine.js                    |   16 [32m+[m[31m-[m
+ dist/src/services/walletService.js                 |   10 [32m+[m[31m-[m
+ frontend/src/api.js                                |  107 [32m+[m[31m-[m
+ frontend/src/components/PositionsPanel.tsx         |    7 [32m+[m[31m-[m
+ frontend/src/components/TradingChart.jsx           |    2 [32m+[m[31m-[m
+ frontend/src/pages/AdminDashboard.tsx              |   23 [32m+[m[31m-[m
+ frontend/src/pages/Trading.tsx                     | 2357 [32m+++++++[m[31m-------------[m
+ frontend/src/services/adminService.ts              |   77 [32m+[m
+ frontend/src/services/marketState.ts               |  599 [32m+++[m[31m--[m
+ frontend/src/styles/Admin.css                      |    6 [32m+[m[31m-[m
+ models/Order.js                                    |    8 [32m+[m
+ models/Position.js                                 |   22 [32m+[m[31m-[m
+ package-lock.json                                  |  220 [32m+[m[31m-[m
+ package.json                                       |   11 [32m+[m[31m-[m
+ .../migrations/20260410153409_init/migration.sql   |   29 [31m-[m
+ .../20260411042624_add_deposits/migration.sql      |   12 [31m-[m
+ .../20260411070342_add_follow_system/migration.sql |   15 [31m-[m
+ prisma/migrations/migration_lock.toml              |    3 [31m-[m
+ prisma/schema.prisma                               |   74 [31m-[m
+ server.js                                          | 1479 [32m++++++[m[31m------[m
+ src/controllers/adminController.js                 |  289 [32m+++[m
+ src/controllers/tradeController.js                 |   32 [32m+[m
+ src/routes/adminRoutes.js                          |   27 [32m+[m[31m-[m
+ src/services/balanceService.js                     |   15 [32m+[m[31m-[m
+ src/services/marketData.ts                         |   40 [32m+[m[31m-[m
+ utils/auth.js                                      |    2 [32m+[m[31m-[m
+ 27 files changed, 2586 insertions(+), 2916 deletions(-)

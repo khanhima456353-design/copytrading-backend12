@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const tradingPermissionSchema = new mongoose.Schema(
   {
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     enabled: { type: Boolean, default: true },
     allowedPairs: { type: [String], default: [] },
     blockedPairs: { type: [String], default: [] },

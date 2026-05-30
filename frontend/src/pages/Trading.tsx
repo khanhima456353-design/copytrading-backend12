@@ -3,6 +3,7 @@ import logo from "../assets/logo.jpg";
 import "./Trading.css";
 import { getAxios } from "../api";
 import { MarketState, subscribeConnectionStatus, subscribeMarketState, isValidPrice } from "../services/marketState";
+import { initializeCandles, resetCandles, updateLatestCandle, getCandles } from "../services/candleEngine";
 import PositionsPanel from "../components/PositionsPanel";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -11,13 +12,22 @@ type Trade = { time: number; price: number; amount: number; side: "buy" | "sell"
 type Candle = { time: number; open: number; high: number; close: number; low: number; volume: number };
 type Order = { price: number; amount: number; total?: number };
 type AssetHolding = { asset: string; amount: number; value: number };
-type AccountSummary = { available: number; locked: number; holdings: AssetHolding[] };
+type AccountSummary = {
+  available: number;
+  locked: number;
+  unrealizedPnl?: number;
+  equity?: number;
+  totalEquity?: number;
+  usedMargin?: number;
+  totalPortfolio?: number;
+  holdings: AssetHolding[];
+};
 type UserOrder = {
   id: string; pair: string; type: "market" | "limit" | "stop-loss" | "take-profit" | "oco";
   side: "buy" | "sell"; price: number; amount: number; status: "open" | "filled" | "cancelled";
   stopLoss?: number; takeProfit?: number; createdAt: number;
 };
-type TradeHistoryItem = { time: number; price: number; quantity: number; side: "buy" | "sell"; pair: string; type: "market" | "limit" };
+type TradeHistoryItem = { time: number; price: number; quantity: number; side: "buy" | "sell"; pair: string; type: "market" | "limit"; profit?: number; };
 type DrawingTool = "cursor" | "crosshair" | "trendline" | "hline" | "vline" | "rect" | "fib" | "text" | "brush" | "eraser" | "measure" | "pitchfork" | "magnet";
 type DrawingObject = {
   id: string; tool: DrawingTool; points: { x: number; y: number; price?: number; time?: number }[];
@@ -26,8 +36,30 @@ type DrawingObject = {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const timeframeOptions = ["1s", "1m", "5m", "15m", "1h", "4h", "1d", "1w"];
-const TF_SECONDS: Record<string, number> = { "1s": 1, "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "4h": 14400, "1d": 86400, "1w": 604800 };
+const timeframeOptions = ["1s", "1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "1w"];
+const TF_SECONDS: Record<string, number> = {
+  "1s": 1,
+  "1m": 60,
+  "3m": 180,
+  "5m": 300,
+  "15m": 900,
+  "30m": 1800,
+  "1h": 3600,
+  "2h": 7200,
+  "4h": 14400,
+  "6h": 21600,
+  "8h": 28800,
+  "12h": 43200,
+  "1d": 86400,
+  "1w": 604800,
+};
+
+const BINANCE_TIMEFRAMES = ["1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "1w"];
+
+function normalizeTimeframe(value: string | undefined) {
+  if (!value || typeof value !== "string") return "1d";
+  return value.toLowerCase().trim();
+}
 
 // ─── Trading Constants ────────────────────────────────────────────────────────
 
@@ -89,7 +121,9 @@ function formatFullAmount(v: number) {
 function formatChartTime(ts: number, tf: string) {
   const d = new Date(ts * 1000);
   if (tf === "1d" || tf === "1w") return d.toLocaleDateString([], { month: "short", day: "numeric" });
-  if (tf === "4h" || tf === "1h") return d.toLocaleDateString([], { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  if (["1h", "2h", "4h", "6h", "8h", "12h"].includes(tf)) {
+    return d.toLocaleDateString([], { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
@@ -132,7 +166,7 @@ const createFallbackCandles = (count = 300, startPrice = 80721): Candle[] => {
 };
 
 const createFallbackAccountSummary = (): AccountSummary => ({
-  available: 0, locked: 0,
+  available: 0, locked: 0, equity: 0,
   holdings: [{ asset: "BTC", amount: 0, value: 0 }, { asset: "ETH", amount: 0, value: 0 }, { asset: "USDT", amount: 0, value: 0 }],
 });
 const createFallbackUserOrders = (): UserOrder[] => [
@@ -1176,7 +1210,7 @@ export default function Trading() {
 
   const [symbols, setSymbols] = useState<string[]>([]);
   const [symbol, setSymbol] = useState(saved.symbol || "BTC/USDT");
-  const [timeframe, setTimeframe] = useState(saved.timeframe || "1d");
+  const [timeframe, setTimeframe] = useState(normalizeTimeframe(saved.timeframe || "1d"));
   const [orderbook, setOrderbook] = useState<{ buy: Order[]; sell: Order[] }>({ buy: [], sell: [] });
   const [trades, setTrades] = useState<Trade[]>([]);
   const [candles, setCandles] = useState<Candle[]>([]);
@@ -1247,9 +1281,37 @@ export default function Trading() {
   const [liveStatus, setLiveStatus] = useState("offline");
   const [accountSummary, setAccountSummary] = useState<AccountSummary>(createFallbackAccountSummary());
   const [userOrders, setUserOrders] = useState<UserOrder[]>(createFallbackUserOrders());
+  const [lockedUSDT, setLockedUSDT] = useState(0);
   const [tradeHistory, setTradeHistory] = useState<TradeHistoryItem[]>(createFallbackTradeHistory());
+  const [serverPositions, setServerPositions] = useState<any[]>([]);
+  const closePosition = async (position: { pair: string; id?: string; _id?: string; markPrice?: number; entryPrice?: number; }) => {
+    try {
+      const token = localStorage.getItem('token');
+      const positionId = position.id || position._id;
+      if (!positionId) {
+        console.error('Close position failed: missing position id', position);
+        return;
+      }
+      const currentPrice = isValidPrice(lastPrice)
+        ? lastPrice
+        : position.markPrice || position.entryPrice;
+      const response = await fetch('/api/trade/close-position', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: "Bearer " + token },
+        body: JSON.stringify({ pair: position.pair, positionId }),
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Close position failed:', response.status, errorText);
+        return;
+      }
+      await refreshAccountData();
+    } catch (err) {
+      console.error('Close position error:', err);
+    }
+  };
   const [rightTab, setRightTab] = useState<"market" | "mytrades">("market");
-  const [bottomTab, setBottomTab] = useState<"openorders" | "orderhistory" | "tradehistory" | "holdings" | "bots">("openorders");
+  const [bottomTab, setBottomTab] = useState<"openorders" | "positions" | "orderhistory" | "tradehistory" | "holdings" | "bots">("openorders");
   const [pairTab, setPairTab] = useState<"usdt" | "fav">("usdt");
   const [activeTool, setActiveTool] = useState<DrawingTool>("cursor");
   const [drawings, setDrawings] = useState<DrawingObject[]>([]);
@@ -1293,7 +1355,6 @@ export default function Trading() {
 
   useEffect(() => {
     let mounted = true;
-    console.log("[Trading] subscribeMarketState init", { symbol });
 
     const unsubscribeConnection = subscribeConnectionStatus((status) => {
       if (!mounted) return;
@@ -1332,11 +1393,6 @@ export default function Trading() {
   const refreshAccountData = useCallback(async () => {
     try {
       const api = await getAxios();
-      
-      // Recalculate balances from trade history to ensure they're fresh
-      await api.post('/api/account/recalculate-balances').catch(() => {
-        // If recalculate fails, just continue with existing balances
-      });
 
       const [summaryRes, ordersRes, positionsRes, balancesRes, historyRes] = await Promise.all([
         api.get('/api/account/summary'),
@@ -1347,19 +1403,36 @@ export default function Trading() {
       ]);
       
       if (summaryRes?.data) setAccountSummary((prev) => ({ ...prev, ...summaryRes.data } as any));
-      if (ordersRes?.data) setUserOrders((ordersRes.data || []).map((o: any) => ({ id: o.orderId, pair: o.pair || o.symbol, type: o.type, side: o.side, price: o.price, amount: o.amount, status: o.status, createdAt: Math.floor(new Date(o.createdAt).getTime()/1000) })));
+      if (positionsRes?.data) setServerPositions((positionsRes.data || []).filter((p: any) => p && (p.size || p.quantity) && Number(p.size || p.quantity) !== 0));
+      if (ordersRes?.data) {
+        const orders = (ordersRes.data || []).map((o: any) => ({
+          id: o.orderId,
+          pair: o.pair || o.symbol,
+          type: o.type,
+          side: o.side,
+          price: Number(o.price) || 0,
+          amount: Number(o.amount) || 0,
+          status: o.status,
+          createdAt: Math.floor(new Date(o.createdAt).getTime() / 1000),
+        }));
+        setUserOrders(orders);
+        setLockedUSDT(Number(summaryRes?.data?.locked || 0));
+      }
       if (historyRes?.data && Array.isArray(historyRes.data)) {
         setTradeHistory(historyRes.data.map((t: any) => ({
-          time: Math.floor(new Date(t.createdAt || t.time).getTime() / 1000),
-          price: t.price,
-          quantity: t.amount || t.quantity,
-          side: t.side,
-          pair: t.pair || t.symbol || symbol,
-          type: t.type || "market",
+          time:       Math.floor(new Date(t.createdAt || t.time).getTime() / 1000),
+          price:      t.price || 0,          // close price
+          entryPrice: t.entryPrice || 0,     // entry price
+          quantity:   t.amount || t.quantity || 0,
+          side:       t.side,
+          pair:       t.pair || t.symbol || symbol,
+          type:       t.type || 'market',
+          profit:     t.pnl ?? t.profit ?? 0,
+          pnl:        t.pnl ?? t.profit ?? 0,
         })));
       }
       if (balancesRes?.data) {
-        console.log('Fetched fresh balances:', balancesRes.data);
+        // balances updated via accountSummary
       }
     } catch (err) {
       console.error('Error refreshing account data:', err);
@@ -1370,6 +1443,95 @@ export default function Trading() {
   // Initial load: fetch balances, open orders, and trade history from backend
   useEffect(() => {
     refreshAccountData();
+  }, [refreshAccountData]);
+
+  // WebSocket listeners for real-time balance and position updates
+  useEffect(() => {
+    let socket: any = null;
+
+    const connectSocket = async () => {
+      try {
+        const token = localStorage.getItem('token') || localStorage.getItem('sessionToken') || '';
+        if (!token) return;
+
+        const { io } = await import('socket.io-client');
+        const API_BASE = process.env.REACT_APP_API_URL
+          ? process.env.REACT_APP_API_URL.replace(/\/+$/, '')
+          : 'http://localhost:5000';
+
+        socket = io(API_BASE, {
+          auth: { token },
+          transports: ['websocket', 'polling'],
+          path: '/socket.io',
+        });
+
+        // Balance updated by admin or position close
+        socket.on('balanceUpdate', (data: any) => {
+          if (data?.available != null) {
+            setAccountSummary(prev => ({
+              ...prev,
+              available: data.available,
+              locked: data.locked ?? prev.locked,
+            }));
+          }
+          // Full refresh to get all updated values
+          refreshAccountData();
+        });
+
+        // Position closed — refresh everything immediately
+        socket.on('positionClosed', () => {
+          refreshAccountData();
+        });
+
+// Drift stopped — refresh positions and balance
+socket.on('driftStopped', () => {
+  refreshAccountData();
+});
+
+// Update mark price and PnL in real time from simulator
+socket.on('simulatedPriceUpdate', (data: any) => {
+  if (!data?.pair || !data?.price) return;
+  setServerPositions(prev => prev.map((p: any) => {
+    if (p.pair !== data.pair) return p;
+    const side = p.side || 'long';
+    const leverage = p.leverage || 1;
+    const size = Math.abs(p.size || p.quantity || 0);
+    const entry = p.entryPrice || 0;
+    const mark = data.price;
+    const direction = side === 'short' ? -1 : 1;
+    const pnl = (mark - entry) * size * leverage * direction;
+    return { ...p, markPrice: mark, unrealizedPnl: pnl };
+  }));
+});
+
+socket.on('market_update', (data: any) => {
+  if (data?.unrealizedPnl != null) {
+    setAccountSummary(prev => ({
+      ...prev,
+      unrealizedPnl: data.unrealizedPnl,
+      available: data.available ?? data.balance ?? prev.available,
+      locked: data.locked ?? prev.locked,
+      equity: data.equity ?? data.totalEquity ?? (
+        Number(data.available ?? data.balance ?? prev.available ?? 0) +
+        Number(data.locked ?? prev.locked ?? 0) +
+        Number(data.unrealizedPnl ?? 0)
+      ),
+      totalEquity: data.totalEquity ?? data.equity ?? prev.totalEquity,
+      totalPortfolio: data.totalPortfolio ?? data.equity ?? prev.totalPortfolio,
+    }));
+  }
+});
+
+      } catch (err) {
+        console.error('Socket connection error:', err);
+      }
+    };
+
+    connectSocket();
+
+    return () => {
+      if (socket) socket.disconnect();
+    };
   }, [refreshAccountData]);
 
   useEffect(() => {
@@ -1403,7 +1565,14 @@ export default function Trading() {
       setSpread(newSpread);
       setSpreadPct(newSpreadPct);
     } catch (e) {}
-  }, [marketState]);
+    // Update the latest candle on every live quote.
+    if (isValidPrice(marketState.lastPrice) && candles.length) {
+      const updated = updateLatestCandle(marketState.lastPrice, Date.now());
+      if (updated) {
+        setCandles(getCandles());
+      }
+    }
+  }, [marketState, candles.length]);
 
   const indicators = useMemo(() => ({
     sma:  showSMA       ? calcSMA(candles, 7)     : [],
@@ -1414,32 +1583,90 @@ export default function Trading() {
   const rsiData  = useMemo(() => showRSI  ? calcRSI(candles, 14) : [], [candles, showRSI]);
   const macdData = useMemo(() => showMACD ? calcMACD(candles, 12, 26, 9) : null, [candles, showMACD]);
 
-  const buyOrders  = orderbook.buy.slice().sort((a, b) => b.price - a.price).slice(0, depthLimit).map(o => ({ ...o, total: +(o.price * o.amount).toFixed(2) }));
+    const buyOrders = orderbook.buy.slice().sort((a, b) => b.price - a.price).slice(0, depthLimit).map(o => ({ ...o, total: +(o.price * o.amount).toFixed(2) }));
   const sellOrders = orderbook.sell.slice().sort((a, b) => a.price - b.price).slice(0, depthLimit).map(o => ({ ...o, total: +(o.price * o.amount).toFixed(2) }));
+  
   let buyCum = 0, sellCum = 0;
   const buyDisplay  = buyOrders.map(o => { buyCum += o.total || 0;  return { ...o, cumulative: buyCum }; });
   const sellDisplay = sellOrders.map(o => { sellCum += o.total || 0; return { ...o, cumulative: sellCum }; });
+  
   const maxBid = Math.max(...buyDisplay.map(b => b.total || 0), 1);
   const maxAsk = Math.max(...sellDisplay.map(a => a.total || 0), 1);
+  
   const totalBidVol  = buyCum;
   const totalAskVol  = sellCum;
+  
   const bidPct = totalBidVol + totalAskVol > 0 ? (totalBidVol / (totalBidVol + totalAskVol) * 100).toFixed(1) : "50.0";
   const askPct = totalBidVol + totalAskVol > 0 ? (totalAskVol / (totalBidVol + totalAskVol) * 100).toFixed(1) : "50.0";
+  
   const activeOrders = userOrders.filter(o => o.status === "open");
+  
   const pendingLocked = useMemo(() => userOrders
     .filter(o => o.status === "open" && o.side === "buy")
     .reduce((sum, order) => sum + order.price * order.amount, 0), [userOrders]);
+    
   const pendingSellLockedBTC = useMemo(() => userOrders
     .filter(o => o.status === "open" && o.side === "sell")
     .reduce((sum, order) => sum + order.amount, 0), [userOrders]);
-  const reservedUSDT = pendingLocked;
-  const freeToTrade = Math.max(0, accountSummary.available - reservedUSDT);
-  const availableBalance = freeToTrade;
+
+  // ─── UNIFIED BALANCES & RECONCILIATION ─────────────────────────────────────
+  const availableBalanceRaw = Number.isFinite(accountSummary.available) ? Number(accountSummary.available) : 0;
+  const availableBalance    = availableBalanceRaw;
+  const reservedUSDT        = Number.isFinite(accountSummary.locked) ? Number(accountSummary.locked) : lockedUSDT;
+
+  const livePositionsUnrealizedPnl = useMemo(() => {
+    if (!serverPositions.length) return null;
+    return serverPositions.reduce((sum, p: any) => {
+      const currentPairMark = marketState?.pair === p.pair
+        ? (Number(marketState?.markPrice) || Number(marketState?.lastPrice))
+        : NaN;
+      const storedMark = Number(p.markPrice);
+      const mark = Number.isFinite(currentPairMark) && currentPairMark > 0
+        ? currentPairMark
+        : Number.isFinite(storedMark) && storedMark > 0
+          ? storedMark
+          : NaN;
+      const entry = Number(p.entryPrice);
+      const size = Math.abs(Number(p.size || p.quantity || 0));
+      const leverage = Number(p.leverage || 1);
+      const direction = (p.side || "long") === "short" ? -1 : 1;
+
+      if (Number.isFinite(mark) && mark > 0 && Number.isFinite(entry) && entry > 0 && size > 0) {
+        return sum + (mark - entry) * size * leverage * direction;
+      }
+
+      const fallbackPnl = Number(p.unrealizedPnl ?? p.unrealizedPnL ?? 0);
+      return sum + (Number.isFinite(fallbackPnl) ? fallbackPnl : 0);
+    }, 0);
+  }, [serverPositions, marketState?.pair, marketState?.markPrice, marketState?.lastPrice]);
+
+  const accountUnrealizedPnl = livePositionsUnrealizedPnl !== null
+    ? livePositionsUnrealizedPnl
+    : typeof accountSummary.unrealizedPnl === "number" ? accountSummary.unrealizedPnl : 0;
+
+  // 3. Equity Balance ($10,000.00 synchronized baseline)
+  const totalEquity = livePositionsUnrealizedPnl !== null
+    ? availableBalanceRaw + reservedUSDT + accountUnrealizedPnl
+    : Number.isFinite(accountSummary.equity)
+      ? Number(accountSummary.equity)
+      : availableBalanceRaw + reservedUSDT + accountUnrealizedPnl;
+
+  // 1. Total Portfolio Value ($10,000.00 baseline)
+  const portfolioTotal = Number.isFinite(accountSummary.totalPortfolio)
+    ? Number(accountSummary.totalPortfolio)
+    : totalEquity;
+
+  // 2. Free To Trade / Buying Power ($7,500.00)
+  const freeToTrade = portfolioTotal - reservedUSDT;
+
+  // Legacy fallback safety mappings
+  const accountEquity = totalEquity;
   
-  // Derived balance values (computed before use)
-  const btcHolding = accountSummary.holdings.find(h => h.asset === "BTC")?.amount || 0;
+  // 4. Crypto Position Holdings Mapping
+  const btcHolding   = accountSummary.holdings.find(h => h.asset === "BTC")?.amount || 0;
   const availableBTC = Math.max(0, btcHolding - pendingSellLockedBTC);
-  const portfolioTotal = accountSummary.holdings.reduce((s, h) => s + h.value, availableBalance + pendingLocked);
+
+
 
   const parseNumber = (value: unknown) => {
     const parsed = Number(value);
@@ -1460,21 +1687,7 @@ export default function Trading() {
   const buyPrice = orderType === "market" ? marketPrice : (Number.isFinite(limitPrice) && limitPrice > 0 ? limitPrice : NaN);
   const sellPrice = orderType === "market" ? marketPrice : (Number.isFinite(limitPrice) && limitPrice > 0 ? limitPrice : NaN);
 
-  useEffect(() => {
-    console.log("[Trading] pricing debug", {
-      symbol,
-      orderType,
-      priceInput,
-      savedManualPriceInput,
-      marketStateLastPrice: marketState?.lastPrice,
-      marketPrice,
-      orderPriceDisplay,
-      buyPrice,
-      sellPrice,
-      buyTotalInput,
-      sellTotalInput,
-    });
-  }, [symbol, orderType, priceInput, savedManualPriceInput, marketState?.lastPrice, marketPrice, orderPriceDisplay, buyTotalInput, sellTotalInput]);
+  // pricing values computed above
 
   const buyAmount = parseNumber(buyAmountInput || 0);
   const sellAmount = parseNumber(sellAmountInput || 0);
@@ -1823,18 +2036,68 @@ export default function Trading() {
   );
 
   const fetchSymbols = async () => {
-    try {
-      const api = await getAxios();
-      const res = await api.get("/api/market/symbols");
-      const available = generateSyntheticPairs(res.data.symbols || ["BTC/USDT"]).filter(pair => pair.endsWith("/USDT"));
-      setSymbols(available); setFilteredSymbols(available);
-      setMarketMovers(available.map((pair: string) => ({ pair, change: +((Math.random() - 0.5) * 12).toFixed(2), volume: +(Math.random() * 150 + 10).toFixed(2), high: 81000 + Math.random() * 1000, low: 79000 + Math.random() * 1000 })));
-    } catch {
-      const available = generateSyntheticPairs(["BTC/USDT"]).filter(pair => pair.endsWith("/USDT"));
-      setSymbols(available); setFilteredSymbols(available);
-      setMarketMovers(available.slice(0, 30).map(pair => ({ pair, change: +((Math.random() - 0.5) * 12).toFixed(2), volume: +(Math.random() * 150 + 10).toFixed(2), high: 81000 + Math.random() * 1000, low: 79000 + Math.random() * 1000 })));
-    }
+  // A comprehensive list of your system altcoins to ensure your layout 
+  // never collapses into a pure Bitcoin clone if a network drift hits.
+  const EMERGENCY_FALLBACK_PAIRS = [
+    "BTC/USDT", "ETH/USDT", "BNB/USDT", "ADA/USDT", "SOL/USDT", "XRP/USDT",
+    "DOT/USDT", "AVAX/USDT", "LINK/USDT", "1INCH/USDT", "AAVE/USDT", "ALGO/USDT",
+    "ANKR/USDT", "ARDR/USDT", "ARPA/USDT", "ASR/USDT", "ATM/USDT", "ATOM/USDT"
+  ];
+
+  // Helper function to safely extract realistic High/Low points based on asset type
+  const getDynamicHighLow = (pair: string) => {
+    const isBtc = pair.startsWith("BTC/");
+    const baseHigh = isBtc ? 76000 : 100; // Realistic placeholder seed range
+    const baseLow  = isBtc ? 74000 : 90;
+    return {
+      high: +(baseHigh + Math.random() * (isBtc ? 1000 : 10)).toFixed(2),
+      low:  +(baseLow - Math.random() * (isBtc ? 1000 : 10)).toFixed(2)
+    };
   };
+
+  try {
+    const api = await getAxios();
+    const res = await api.get("/api/market/symbols");
+    
+    // Fall back to our extensive array if the backend array returns empty or corrupted
+    const sourceSymbols = (res.data?.symbols && res.data.symbols.length > 0) 
+      ? res.data.symbols 
+      : EMERGENCY_FALLBACK_PAIRS;
+
+    const available = generateSyntheticPairs(sourceSymbols).filter(pair => pair.endsWith("/USDT"));
+    setSymbols(available); 
+    setFilteredSymbols(available);
+    
+    setMarketMovers(available.map((pair: string) => {
+      const bounds = getDynamicHighLow(pair);
+      return {
+        pair,
+        change: +((Math.random() - 0.5) * 12).toFixed(2),
+        volume: +(Math.random() * 150 + 10).toFixed(2),
+        high: bounds.high,
+        low: bounds.low
+      };
+    }));
+
+  } catch (error) {
+    console.warn("⚠️ Market API drift detected. Injecting robust UI recovery symbols:", error);
+    
+    const available = generateSyntheticPairs(EMERGENCY_FALLBACK_PAIRS).filter(pair => pair.endsWith("/USDT"));
+    setSymbols(available); 
+    setFilteredSymbols(available);
+    
+    setMarketMovers(available.slice(0, 30).map((pair: string) => {
+      const bounds = getDynamicHighLow(pair);
+      return {
+        pair,
+        change: +((Math.random() - 0.5) * 12).toFixed(2),
+        volume: +(Math.random() * 150 + 10).toFixed(2),
+        high: bounds.high,
+        low: bounds.low
+      };
+    }));
+  }
+};
 
   const updateOrderPrice = (value: string) => {
     if (orderType === "market") return;
@@ -1921,8 +2184,12 @@ export default function Trading() {
   };
 
   const krakenPair = symbol.replace("/", "").replace(/USDT$/, "USD"); // e.g., "BTC/USDT" → "BTCUSD"
-  const estimatedMaxBuyBTC = availableBalance > 0 && Number.isFinite(buyPrice) && buyPrice > 0
-    ? (availableBalance / buyPrice).toFixed(8)
+  const effectiveBuyPrice = Number.isFinite(buyPrice) && buyPrice > 0 ? buyPrice : lastPrice;
+  const effectiveBuyPriceForMax = (Number.isFinite(effectiveBuyPrice) && effectiveBuyPrice > 0)
+    ? effectiveBuyPrice
+    : (Number.isFinite(marketState?.lastPrice ?? 0) && (marketState?.lastPrice ?? 0) > 0 ? (marketState?.lastPrice ?? 0) : 0);
+  const estimatedMaxBuyBTC = availableBalance > 0 && effectiveBuyPriceForMax > 0
+    ? (availableBalance / effectiveBuyPriceForMax).toFixed(8)
     : "0.00000000";
   const estimatedMaxSellUSDT = availableBTC > 0 && Number.isFinite(sellPrice) && sellPrice > 0
     ? (availableBTC * sellPrice).toFixed(2)
@@ -1931,24 +2198,33 @@ export default function Trading() {
     const usableMargin = availableBalance;
     const effPrice = orderType === "market" ? marketPrice : getEffectivePrice(priceInput, lastPrice);
     const pairNotional = effPrice ? ((Number(buyAmountInput) || 0) * effPrice).toFixed(2) : "0.00";
+    const formattedTotalEquity = `$${totalEquity.toFixed(2)}`;
     if (activeTab === "cross") return [
-      { label: "Cross Balance", value: `$${availableBalance.toFixed(2)}` },
-      { label: "Cross Used Margin", value: `$${pendingLocked.toFixed(2)}` },
-      { label: "Available Margin", value: `$${usableMargin.toFixed(2)}` },
+      { label: "Available USDT", value: `$${availableBalance.toFixed(2)}` },
+      { label: "Locked USDT", value: `$${lockedUSDT.toFixed(2)}` },
+      { label: "Total Equity", value: formattedTotalEquity },
+      { label: "Total Portfolio", value: `$${portfolioTotal.toFixed(2)}` },
     ];
     if (activeTab === "isolated") return [
       { label: "Available USDT", value: `$${availableBalance.toFixed(2)}` },
       { label: "Estimated Max BTC", value: `${estimatedMaxBuyBTC} BTC` },
+      { label: "Total Equity", value: formattedTotalEquity },
       { label: "Pair Exposure", value: `$${pairNotional}` },
     ];
     return [
       { label: "Available USDT", value: `$${availableBalance.toFixed(2)}` },
-      { label: "Locked USDT", value: `$${pendingLocked.toFixed(2)}` },
+      { label: "Locked USDT", value: `$${lockedUSDT.toFixed(2)}` },
+      { label: "Total Equity", value: formattedTotalEquity },
       { label: "Total Portfolio", value: `$${portfolioTotal.toFixed(2)}` },
     ];
-  }, [activeTab, availableBalance, pendingLocked, buyAmountInput, buyPrice, lastPrice, portfolioTotal]);
+  }, [activeTab, availableBalance, pendingLocked, buyAmountInput, buyPrice, lastPrice, portfolioTotal, totalEquity, lockedUSDT]);
 
-  const fetchMarketData = async (sym: string, tf: string) => {
+  const initChartCandles = useCallback((nextCandles: Candle[]) => {
+    initializeCandles(nextCandles);
+    setCandles(nextCandles);
+  }, []);
+
+  const fetchMarketData = useCallback(async (sym: string, tf: string) => {
     // Fetch chart/candle data for the symbol and timeframe
     // Uses fallback synthetic data if backend endpoint unavailable
     try {
@@ -1956,17 +2232,22 @@ export default function Trading() {
       const encodedPair = encodeURIComponent(sym);
       const res = await api.get(`/api/market/candles/${encodedPair}?timeframe=${tf}`);
       if (res.data?.candles) {
-        setCandles(res.data.candles);
+        initChartCandles(res.data.candles);
       } else if (Array.isArray(res.data)) {
-        setCandles(res.data);
+        initChartCandles(res.data);
       }
     } catch (err) {
       // Backend endpoint unavailable - use fallback synthetic candles
-      setCandles(createFallbackCandles());
+      initChartCandles(createFallbackCandles());
     }
-  };
+  }, [initChartCandles]);
 
-  useEffect(() => { if (!symbol) return; fetchMarketData(symbol, timeframe); }, [symbol, timeframe]);
+  useEffect(() => {
+    resetCandles();
+    setCandles([]);
+    if (!symbol) return;
+    fetchMarketData(symbol, timeframe);
+  }, [symbol, timeframe, fetchMarketData]);
   useEffect(() => {
     const q = searchQuery.toLowerCase();
     const filtered = symbols.filter(s => s.toLowerCase().includes(q)).sort((a, b) => {
@@ -1978,22 +2259,6 @@ export default function Trading() {
   }, [searchQuery, symbols, sortBy, marketMovers]);
 
   useEffect(() => { fetchSymbols(); }, []);
-
-  const fetchProfileBalance = async () => {
-    try {
-      const api = await getAxios();
-      const res = await api.get("/api/profile");
-      if (res.data?.success) {
-        setAccountSummary(prev => ({ ...prev, available: res.data.user.balance || 0 }));
-      }
-    } catch (error) {
-      console.error("Error fetching trading page profile balance:", error);
-    }
-  };
-
-  useEffect(() => {
-    fetchProfileBalance();
-  }, []);
 
   const applyDisplayPriceUpdate = useCallback((rawPrice: number) => {
     const state = priceMovementRef.current;
@@ -2133,9 +2398,15 @@ export default function Trading() {
   // Pair tab filter
   const pairFilter = pairTab === "fav" ? [] : "USDT";
   const displayedPairs = filteredSymbols.filter(p => pairTab === "fav" || p.endsWith("/" + pairFilter)).slice(0, 50);
+  const dashboardAccountMetrics = [
+    { label: "Available", value: `$${availableBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
+    { label: "Equity", value: `$${totalEquity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
+    { label: "Locked", value: `$${reservedUSDT.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
+    { label: "Open PnL", value: `${accountUnrealizedPnl >= 0 ? "+" : ""}$${accountUnrealizedPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, trend: accountUnrealizedPnl >= 0 ? "positive" : "negative" },
+  ];
 
   return (
-    <div ref={tradingPageRef} className="trading-page" style={{ display: "flex", flexDirection: "column", height: "auto", background: COLORS.bg, color: COLORS.textBright, fontFamily: "'IBM Plex Sans', 'Helvetica Neue', sans-serif", fontSize: 13, overflowY: "auto", overflowX: "hidden", minHeight: "100dvh", scrollBehavior: "smooth", WebkitOverflowScrolling: "touch", touchAction: "pan-y", overscrollBehaviorY: "auto" }}>
+    <div ref={tradingPageRef} className="trading-page trading-dashboard" style={{ display: "flex", flexDirection: "column", height: "auto", background: COLORS.bg, color: COLORS.textBright, fontFamily: "'IBM Plex Sans', 'Helvetica Neue', sans-serif", fontSize: 13, overflowY: "auto", overflowX: "hidden", minHeight: "100dvh", scrollBehavior: "smooth", WebkitOverflowScrolling: "touch", touchAction: "pan-y", overscrollBehaviorY: "auto" }}>
       <div className="trading-rotate-prompt" role="status" aria-live="polite">
         <div className="trading-rotate-prompt__panel">
           <div className="trading-rotate-prompt__icon">↻</div>
@@ -2147,7 +2418,7 @@ export default function Trading() {
       </div>
 
       {/* ── TOP HEADER BAR (Binance style) ── */}
-      <div className="trading-header" style={{ display: "flex", alignItems: "center", height: 52, borderBottom: `1px solid ${COLORS.border}`, padding: "0 16px", gap: 24, background: COLORS.bgPanel, flexShrink: 0, overflow: "hidden", marginLeft: isDesktopLayout && isChartView ? 44 : 0, width: isDesktopLayout && isChartView ? 'calc(100% - 44px - 280px)' : '100%' }}>
+      <div className="trading-header trading-dashboard__header" style={{ display: "flex", alignItems: "center", height: 52, borderBottom: `1px solid ${COLORS.border}`, padding: "0 16px", gap: 24, background: COLORS.bgPanel, flexShrink: 0, overflow: "hidden", marginLeft: isDesktopLayout && isChartView ? 44 : 0, width: isDesktopLayout && isChartView ? 'calc(100% - 44px - 280px)' : '100%' }}>
         {/* Symbol + price */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
           <div style={{ width: 28, height: 28, background: COLORS.amber, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: "#000" }}>₿</div>
@@ -2184,6 +2455,14 @@ export default function Trading() {
             </div>
           </div>
         </div>
+        <div className="trading-dashboard__account-strip" aria-label="Account summary">
+          {dashboardAccountMetrics.map(metric => (
+            <div key={metric.label} className="trading-dashboard__account-metric">
+              <span>{metric.label}</span>
+              <strong className={metric.trend ? `trading-dashboard__metric--${metric.trend}` : undefined}>{metric.value}</strong>
+            </div>
+          ))}
+        </div>
         {/* Live status */}
         <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ width: 8, height: 8, borderRadius: "50%", background: liveStatus === "live" ? COLORS.green : COLORS.red, display: "inline-block", boxShadow: liveStatus === "live" ? `0 0 6px ${COLORS.green}` : "none" }} />
@@ -2192,11 +2471,11 @@ export default function Trading() {
       </div>
 
       {/* ── MAIN BODY ── */}
-      <div className="trading-body" style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0 }}>
+      <div className="trading-body trading-dashboard__body" style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0 }}>
 
         {/* ── LEFT: Drawing Toolbar ── */}
         {isChartView && (
-          <div className="trading-toolbar" style={{ width: 44, background: COLORS.bgPanel, borderRight: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 8, gap: 2, flexShrink: 0 }}>
+          <div className="trading-toolbar trading-dashboard__tools" style={{ width: 44, background: COLORS.bgPanel, borderRight: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 8, gap: 2, flexShrink: 0 }}>
             {DRAWING_TOOLS.map(tool => (
               <button key={tool.id} title={tool.label} onClick={() => setActiveTool(tool.id)} style={{ width: 32, height: 32, background: activeTool === tool.id ? COLORS.bgHover : "transparent", border: activeTool === tool.id ? `1px solid ${COLORS.border}` : "1px solid transparent", borderRadius: 4, color: activeTool === tool.id ? COLORS.amber : COLORS.text, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
                 onMouseEnter={e => { if (activeTool !== tool.id) (e.currentTarget as HTMLElement).style.background = COLORS.bgHover; }}
@@ -2221,7 +2500,7 @@ export default function Trading() {
         )}
 
         {/* ── CENTER: Chart + Order Form ── */}
-        <div className="trading-main" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden" }}>
+        <div className="trading-main trading-dashboard__main" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden" }}>
           {/* Main view tabs */}
           <div style={{ display: "flex", alignItems: "center", height: 38, borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, padding: "0 12px", gap: 0, flexShrink: 0 }}>
             {([
@@ -2246,8 +2525,8 @@ export default function Trading() {
             <div style={{ display: "flex", alignItems: "center", height: 34, borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, padding: "0 10px", gap: 2, flexShrink: 0, flexWrap: "nowrap", overflow: "visible" }}>
               {/* Pinned Timeframes */}
               <div style={{ display: "flex", gap: 1 }}>
-                {["1s", "15m", "1H", "4H", "1D", "1W"].map(tf => (
-                  <button key={tf} onClick={() => setTimeframe(tf)} style={{ padding: "3px 6px", background: timeframe === tf ? COLORS.bgHover : "transparent", border: timeframe === tf ? `1px solid ${COLORS.border}` : "1px solid transparent", borderRadius: 3, color: timeframe === tf ? COLORS.amber : COLORS.text, cursor: "pointer", fontSize: 11, fontWeight: timeframe === tf ? 700 : 400, minWidth: "32px", textAlign: "center" }}>{tf}</button>
+                {["1m", "15m", "1h", "4h", "1d", "1w"].map(tf => (
+                  <button key={tf} onClick={() => setTimeframe(normalizeTimeframe(tf))} style={{ padding: "3px 6px", background: timeframe === tf ? COLORS.bgHover : "transparent", border: timeframe === tf ? `1px solid ${COLORS.border}` : "1px solid transparent", borderRadius: 3, color: timeframe === tf ? COLORS.amber : COLORS.text, cursor: "pointer", fontSize: 11, fontWeight: timeframe === tf ? 700 : 400, minWidth: "32px", textAlign: "center" }}>{tf}</button>
                 ))}
               </div>
               {/* Time dropdown */}
@@ -2259,8 +2538,8 @@ export default function Trading() {
                 {showTimeDropdown && (
                   <div style={{ position: "absolute", top: "100%", left: 0, background: COLORS.bgPanel, border: `1px solid ${COLORS.border}`, borderRadius: 4, zIndex: 1002, minWidth: "120px", maxHeight: "200px", overflow: "auto" }}>
                     <div style={{ padding: "4px 8px", fontSize: 10, color: COLORS.textMuted, fontWeight: 700, borderBottom: `1px solid ${COLORS.borderLight}` }}>Available</div>
-                    {["1m", "3m", "5m", "30m", "2H", "6H", "8H", "12H", "1M"].map(tf => (
-                      <button key={tf} onClick={() => { setTimeframe(tf); setShowTimeDropdown(false); }} style={{ width: "100%", padding: "6px 8px", background: timeframe === tf ? COLORS.bgHover : "transparent", border: "none", color: timeframe === tf ? COLORS.amber : COLORS.text, cursor: "pointer", fontSize: 11, textAlign: "left", display: "block" }}>{tf}</button>
+                    {["3m", "5m", "30m", "2h", "6h", "8h", "12h"].map(tf => (
+                      <button key={tf} onClick={() => { setTimeframe(normalizeTimeframe(tf)); setShowTimeDropdown(false); }} style={{ width: "100%", padding: "6px 8px", background: timeframe === tf ? COLORS.bgHover : "transparent", border: "none", color: timeframe === tf ? COLORS.amber : COLORS.text, cursor: "pointer", fontSize: 11, textAlign: "left", display: "block" }}>{tf}</button>
                     ))}
                   </div>
                 )}
@@ -2293,7 +2572,7 @@ export default function Trading() {
           )}
 
           {/* Chart / content area */}
-          <div className="trading-chart-panel" style={{ flex: 1, position: "relative", overflow: "hidden", minHeight: 300, background: COLORS.bg }}>
+          <div className="trading-chart-panel trading-dashboard__chart-panel" style={{ flex: 1, position: "relative", overflow: "hidden", minHeight: 300, background: COLORS.bg }}>
             {activeViewTab === "chart" && (
               <div className="trading-chart-layout" style={{ display: "flex", height: "100%" }}>
                 <div className="trading-chart-stage" style={{ flex: 1, position: "relative", minWidth: 0 }}>
@@ -2374,7 +2653,7 @@ export default function Trading() {
 
           {/* ── Bottom panel (Spot/Order form) ── */}
           {isChartView && (
-            <div className="trading-order-form" style={{ height: isDesktopLayout ? "auto" : 210, minHeight: isDesktopLayout ? 430 : undefined, borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, display: "flex", flexShrink: 0, overflow: isDesktopLayout ? "visible" : "hidden" }}>
+            <div className="trading-order-form trading-dashboard__ticket" style={{ height: isDesktopLayout ? "auto" : 210, minHeight: isDesktopLayout ? 430 : undefined, borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, display: "flex", flexShrink: 0, overflow: isDesktopLayout ? "visible" : "hidden" }}>
               {/* Spot/Cross tabs */}
               <div className="trading-order-form__inner" style={{ width: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
                 {/* Tab row */}
@@ -2581,14 +2860,47 @@ export default function Trading() {
           {isCompactLayout && isChartView && orderBookPanel("embedded")}
 
           {/* ── Bottom Tab Bar (Open Orders, History, etc.) ── */}
-          <div ref={bottomScrollRef} className="trading-bottom-panel" style={{ borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, flexShrink: 0 }}>
+          <div ref={bottomScrollRef} className="trading-bottom-panel trading-dashboard__activity" style={{ borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, flexShrink: 0 }}>
             <div style={{ display: "flex", alignItems: "center", height: 36, padding: "0 12px", gap: 0, borderBottom: `1px solid ${COLORS.border}` }}>
-              {[["openorders", `Open Orders(${activeOrders.length})`], ["orderhistory", "Order History"], ["tradehistory", "Trade History"], ["holdings", "Holdings"], ["bots", "Bots"]].map(([key, label]) => (
+              {[["openorders", `Open Orders(${activeOrders.length})`], ["positions", `Positions(${serverPositions.length})`], ["orderhistory", "Order History"], ["tradehistory", "Trade History"], ["holdings", "Holdings"], ["bots", "Bots"]].map(([key, label]) => (
                 <button key={key} onClick={() => setBottomTab(key as any)} style={{ padding: "0 14px", height: "100%", background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: bottomTab === key ? COLORS.textBright : COLORS.text, borderBottom: bottomTab === key ? `2px solid ${COLORS.amber}` : "2px solid transparent", whiteSpace: "nowrap" }}>{label}</button>
               ))}
             </div>
             <div style={{ maxHeight: 120, overflow: "auto" }}>
-              {bottomTab === "openorders" && (
+              {bottomTab === "positions" && (
+  serverPositions.length === 0
+    ? <div style={{ padding: 20, textAlign: "center", color: COLORS.textMuted, fontSize: 12 }}>No open positions</div>
+    : <>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr 1fr 100px", padding: "8px 14px", fontSize: 10, fontFamily: "monospace", color: COLORS.textMuted, borderBottom: `1px solid ${COLORS.border}` }}>
+        <span>Pair</span><span>Side</span><span>Entry</span><span>Mark</span><span>Size</span><span>PnL</span><span style={{ textAlign: "right" }}>Action</span>
+      </div>
+      {serverPositions.map((p, idx) => (
+        <div key={p.id || p._id || String(idx)} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr 1fr 100px", padding: "6px 14px", fontSize: 11, fontFamily: "monospace", borderBottom: `1px solid ${COLORS.border}` }}>
+          <span style={{ color: COLORS.textBright }}>{p.pair}</span>
+          <span style={{ color: p.side === "long" ? COLORS.green : COLORS.red }}>{p.side.toUpperCase()}</span>
+          <span style={{ color: COLORS.text }}>{p.entryPrice?.toFixed(2)}</span>
+          <span style={{ color: COLORS.text }}>{(marketState?.pair === p.pair && marketState?.markPrice ? marketState.markPrice : p.markPrice ?? p.entryPrice)?.toFixed(2)}</span>
+          <span style={{ color: COLORS.text }}>{(p.quantity ?? p.size ?? 0).toFixed(4)}</span>
+          <span style={{ color: COLORS.text }}>
+  {(() => {
+    const mark = (marketState?.pair === p.pair && marketState?.markPrice) ? marketState.markPrice : (p.markPrice ?? p.entryPrice ?? 0);
+    const side = p.side || 'long';
+    const size = Math.abs(p.size || p.quantity || 0);
+    const entry = p.entryPrice || 0;
+    const leverage = p.leverage || 1;
+    const direction = side === 'short' ? -1 : 1;
+    const livePnl = (mark - entry) * size * leverage * direction;
+    return <span style={{ color: livePnl >= 0 ? COLORS.green : COLORS.red }}>{livePnl >= 0 ? "+" : ""}{livePnl.toFixed(2)}</span>;
+  })()}
+</span>
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <button onClick={() => closePosition(p)} style={{ padding: "2px 10px", fontSize: 10, background: COLORS.red, color: "#fff", border: "none", borderRadius: 3, cursor: "pointer" }}>Close</button>
+          </div>
+        </div>
+      ))}
+    </>
+)}
+{bottomTab === "openorders" && (
                 activeOrders.length === 0
                   ? <div style={{ padding: 20, textAlign: "center", color: COLORS.textMuted, fontSize: 12 }}>No open orders</div>
                   : activeOrders.map(o => (
@@ -2602,15 +2914,45 @@ export default function Trading() {
                     </div>
                   ))
               )}
-              {bottomTab === "tradehistory" && tradeHistory.slice(0, 10).map((t, i) => (
-                <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", padding: "6px 14px", fontSize: 11, fontFamily: "monospace", borderBottom: `1px solid ${COLORS.border}` }}>
-                  <span style={{ color: COLORS.text }}>{new Date(t.time * 1000).toLocaleString()}</span>
-                  <span style={{ color: COLORS.textBright }}>{t.pair}</span>
-                  <span style={{ color: t.side === "buy" ? COLORS.green : COLORS.red }}>{t.side.toUpperCase()}</span>
-                  <span style={{ color: COLORS.textBright }}>{t.price.toFixed(2)}</span>
-                  <span style={{ color: COLORS.textBright }}>{t.quantity.toFixed(6)}</span>
-                </div>
-              ))}
+              {bottomTab === "tradehistory" && (
+                tradeHistory.length === 0
+                  ? <div style={{ padding: 20, textAlign: "center", color: COLORS.textMuted, fontSize: 12 }}>No trade history</div>
+                  : <>
+                    <div style={{ display: "grid", gridTemplateColumns: "1.5fr 0.8fr 0.6fr 1fr 1fr 1fr", padding: "8px 14px", fontSize: 10, fontFamily: "monospace", color: COLORS.textMuted, borderBottom: `1px solid ${COLORS.border}` }}>
+                      <span>Date</span><span>Pair</span><span>Side</span><span>Entry</span><span>Close</span><span style={{ textAlign: "right" }}>PnL</span>
+                    </div>
+                    {tradeHistory.slice(0, 50).map((t: any, i: number) => (
+                      <div key={i} style={{ display: "grid", gridTemplateColumns: "1.5fr 0.8fr 0.6fr 1fr 1fr 1fr", padding: "6px 14px", fontSize: 11, fontFamily: "monospace", borderBottom: `1px solid ${COLORS.border}` }}>
+                        <span style={{ color: COLORS.textMuted }}>{new Date(t.time * 1000).toLocaleString()}</span>
+                        <span style={{ color: COLORS.textBright }}>{t.pair}</span>
+                        <span style={{ color: t.side === "buy" ? COLORS.green : COLORS.red }}>{t.side?.toUpperCase()}</span>
+                        <span style={{ color: COLORS.text }}>{Number(t.entryPrice || 0).toFixed(2)}</span>
+                        <span style={{ color: COLORS.text }}>{Number(t.price || 0).toFixed(2)}</span>
+                        <span style={{ textAlign: "right", color: (t.pnl ?? 0) >= 0 ? COLORS.green : COLORS.red }}>{(t.pnl ?? 0) >= 0 ? "+" : ""}{Number(t.pnl ?? 0).toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </>
+              )}
+              {bottomTab === "orderhistory" && (
+                tradeHistory.length === 0
+                  ? <div style={{ padding: 20, textAlign: "center", color: COLORS.textMuted, fontSize: 12 }}>No order history</div>
+                  : <>
+                    <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 0.7fr 0.7fr 1fr 1fr 1fr", padding: "8px 14px", fontSize: 10, fontFamily: "monospace", color: COLORS.textMuted, borderBottom: `1px solid ${COLORS.border}` }}>
+                      <span>Date</span><span>Pair</span><span>Side</span><span>Type</span><span>Price</span><span>Qty</span><span style={{ textAlign: "right" }}>PnL</span>
+                    </div>
+                    {tradeHistory.slice(0, 50).map((t, i) => (
+                      <div key={i} style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 0.7fr 0.7fr 1fr 1fr 1fr", padding: "6px 14px", fontSize: 11, fontFamily: "monospace", borderBottom: `1px solid ${COLORS.border}` }}>
+                        <span style={{ color: COLORS.textMuted }}>{new Date(t.time * 1000).toLocaleString()}</span>
+                        <span style={{ color: COLORS.textBright }}>{t.pair}</span>
+                        <span style={{ color: t.side === "buy" ? COLORS.green : COLORS.red }}>{t.side.toUpperCase()}</span>
+                        <span style={{ color: COLORS.textMuted }}>{t.type?.toUpperCase() ?? "MARKET"}</span>
+                        <span style={{ color: COLORS.text }}>{t.price.toFixed(2)}</span>
+                        <span style={{ color: COLORS.text }}>{t.quantity.toFixed(6)}</span>
+                        <span style={{ textAlign: "right", color: (t.profit ?? 0) >= 0 ? COLORS.green : COLORS.red }}>{(t.profit ?? 0) >= 0 ? "+" : ""}{(t.profit ?? 0).toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </>
+              )}
               {bottomTab === "holdings" && accountSummary.holdings.map(h => (
                 <div key={h.asset} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", padding: "6px 14px", fontSize: 11, fontFamily: "monospace", borderBottom: `1px solid ${COLORS.border}` }}>
                   <span style={{ color: COLORS.textBright }}>{h.asset}</span>
@@ -2623,7 +2965,7 @@ export default function Trading() {
         </div>
 
         {isDesktopLayout && (
-          <aside className="trading-right" style={{ display: "flex", flexDirection: "column", flexShrink: 0, minHeight: 0, width: 280, background: COLORS.bgPanel, borderLeft: `1px solid ${COLORS.border}` }}>
+          <aside className="trading-right trading-dashboard__side" style={{ display: "flex", flexDirection: "column", flexShrink: 0, minHeight: 0, width: 280, background: COLORS.bgPanel, borderLeft: `1px solid ${COLORS.border}` }}>
             <div style={{ padding: 10 }}>
               <PositionsPanel />
             </div>
@@ -2728,7 +3070,7 @@ export default function Trading() {
             </div>
             <div style={{ overflow: "auto", flex: 1 }}>
               <div style={{ padding: "10px 20px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                {[{ label: "Available", value: `$${availableBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}` }, { label: "Locked", value: `$${pendingLocked.toLocaleString(undefined, { minimumFractionDigits: 2 })}` }, { label: "Realized P&L", value: "$0.00" }, { label: "Rewards earned", value: "$0.00 USD" }].map(m => (
+                {[{ label: "Available", value: `$${availableBalanceRaw.toLocaleString(undefined, { minimumFractionDigits: 2 })}` }, { label: "Locked", value: `$${(Number.isFinite(accountSummary.locked) ? accountSummary.locked : lockedUSDT).toLocaleString(undefined, { minimumFractionDigits: 2 })}` }, { label: "Realized P&L", value: "$0.00" }, { label: "Rewards earned", value: "$0.00 USD" }].map(m => (
                   <div key={m.label} style={{ background: COLORS.bgAlt, borderRadius: 6, padding: "10px 14px" }}>
                     <div style={{ fontSize: 11, color: COLORS.text }}>{m.label}</div>
                     <div style={{ fontSize: 15, fontWeight: 700, marginTop: 4 }}>{m.value}</div>

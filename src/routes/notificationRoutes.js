@@ -11,7 +11,7 @@ const {
 } = require("../controllers/notificationController");
 
 // Import auth middleware
-const { authMiddleware } = require("../middleware/authMiddleware");
+const { authMiddleware, adminMiddleware } = require("../middleware/authMiddleware");
 
 // User routes (require authentication)
 router.get("/", authMiddleware, getUserNotifications);
@@ -21,7 +21,7 @@ router.put("/mark-all-read", authMiddleware, markAllAsRead);
 router.delete("/:notificationId", authMiddleware, deleteNotification);
 
 // Admin routes (for creating notifications)
-router.post("/", createNotification); // Create notification for specific user
-router.post("/broadcast", createBroadcastNotification); // Create notification for all users
+router.post("/", authMiddleware, adminMiddleware, createNotification);
+router.post("/broadcast", authMiddleware, adminMiddleware, createBroadcastNotification);
 
 module.exports = router;
