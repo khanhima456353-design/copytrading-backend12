@@ -1,7 +1,7 @@
 import React from "react";
 import { Routes, Route } from "react-router-dom";
 import ScrollToTop from "./ScrollToTop";
-import { BalanceProvider } from "./context/BalanceContext.tsx";
+import { BalanceProvider } from "./context/BalanceContext";
 
 // Pages
 import Login from "./pages/Login";
