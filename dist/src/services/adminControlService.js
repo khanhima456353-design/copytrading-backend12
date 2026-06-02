@@ -3,8 +3,6 @@ const RiskConfiguration = require("../../models/RiskConfiguration");
 const TradingPermission = require("../../models/TradingPermission");
 const Liquidation = require("../../models/Liquidation");
 const MarginPosition = require("../../models/MarginPosition");
-const WalletService = require("./walletService");
-const RiskEngine = require("./riskEngine");
 const createRiskConfig = async (key, value) => {
     const existing = await RiskConfiguration.findOne({ key });
     if (existing) {
@@ -14,7 +12,7 @@ const createRiskConfig = async (key, value) => {
     return RiskConfiguration.create({ key, value });
 };
 const updateTradingPermission = async (userId, updates) => {
-    const permission = await TradingPermission.findOneAndUpdate({ userId }, updates, { upsert: true, new: true });
+    const permission = await TradingPermission.findOneAndUpdate({ userId }, updates, { upsert: true, returnDocument: 'after' });
     return permission;
 };
 const forceLiquidate = async ({ adminId, positionId, currentPrice, reason }) => {

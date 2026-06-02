@@ -2,8 +2,6 @@ const RiskConfiguration = require("../../models/RiskConfiguration");
 const TradingPermission = require("../../models/TradingPermission");
 const Liquidation = require("../../models/Liquidation");
 const MarginPosition = require("../../models/MarginPosition");
-const WalletService = require("./walletService");
-const RiskEngine = require("./riskEngine");
 
 const createRiskConfig = async (key, value) => {
   const existing = await RiskConfiguration.findOne({ key });
@@ -18,7 +16,7 @@ const updateTradingPermission = async (userId, updates) => {
   const permission = await TradingPermission.findOneAndUpdate(
     { userId },
     updates,
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: 'after' }
   );
   return permission;
 };

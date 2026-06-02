@@ -1,36 +1,18 @@
 const express = require("express");
 const bcrypt = require("bcrypt");
 const nodemailer = require("nodemailer");
+const dns = require("dns").promises;
 
 const router = express.Router();
 const User = require("../../models/User");
 const Otp = require("../../models/Otp");
-const Wallet = require("../../models/Wallet");
 const { generateUniqueUserId } = require("../../utils/userIdGenerator");
 const { generateDeviceId } = require("../../utils/otpSecurity");
 
-// ── Auto-initialize wallet for new user ──────────────────────────────────────
-const initUserWallet = async (userId) => {
-  try {
-    await Wallet.findOneAndUpdate(
-      { userId, type: "spot" },
-      {
-        $setOnInsert: {
-          userId,
-          type: "spot",
-          availableBalance: 0,
-          lockedBalance: 0,
-          borrowedBalance: 0,
-          unrealizedPnl: 0,
-          equity: 0
-        }
-      },
-      { upsert: true, returnDocument: "after" }
-    );
-  } catch (err) {
-    console.error("initUserWallet error:", err.message);
-  }
-};
+const EMAIL_RATE_LIMIT = 3;
+const EMAIL_RATE_WINDOW_MS = 60 * 60 * 1000;
+const GENERIC_OTP_ERROR = "Unable to process request. Please try with valid Email ID.";
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // ================= OTP GENERATOR =================
 function generateOTP() {
@@ -45,6 +27,67 @@ function getIp(req) {
     req.socket.remoteAddress ||
     req.ip
   );
+}
+
+function normalizeEmail(email) {
+  return String(email).trim().toLowerCase();
+}
+
+function isValidEmail(email) {
+  return EMAIL_REGEX.test(email);
+}
+
+async function hasDeliverableEmail(email) {
+  const [, domain] = email.split("@");
+  if (!domain) return false;
+  const DNS_TIMEOUT_MS = 2000;
+
+  const withTimeout = (promise, ms) =>
+    Promise.race([
+      promise,
+      new Promise((_, rej) => setTimeout(() => rej(new Error("DNS timeout")), ms)),
+    ]);
+
+  try {
+    // Prefer MX records
+    const mxRecords = await withTimeout(dns.resolveMx(domain), DNS_TIMEOUT_MS);
+    if (Array.isArray(mxRecords) && mxRecords.length > 0) {
+      return true;
+    }
+    // no MX entries -> try A/AAAA lookup
+    try {
+      const addrs = await withTimeout(dns.resolve(domain), DNS_TIMEOUT_MS);
+      return Array.isArray(addrs) && addrs.length > 0;
+    } catch (addrErr) {
+      // No A records
+      return false;
+    }
+  } catch (mxErr) {
+    // If MX failed due to NXDOMAIN/NO DATA etc, try A record. For other errors
+    // (timeouts, network issues), be permissive and allow valid emails to pass
+    // through rather than blocking registration.
+    const permissiveCodes = ["ETIMEOUT", "EAI_AGAIN", "ECONNREFUSED", "ENETUNREACH"];
+    const fallbackCodes = ["ENODATA", "ENOTFOUND", "ENOENT", "ENOTIMP", "ESERVFAIL"];
+
+    if (fallbackCodes.includes(mxErr.code)) {
+      try {
+        const addrs = await withTimeout(dns.resolve(domain), DNS_TIMEOUT_MS);
+        return Array.isArray(addrs) && addrs.length > 0;
+      } catch {
+        return false;
+      }
+    }
+
+    if (permissiveCodes.includes(mxErr.code) || mxErr.message === "DNS timeout") {
+      console.warn("MX lookup failed (permissive):", mxErr.message);
+      // Do not block valid-format emails when DNS is flaky; let the flow continue.
+      return true;
+    }
+
+    // Unknown error: log and allow to avoid breaking valid users in restricted envs
+    console.warn("MX lookup unexpected error, allowing email:", mxErr.message);
+    return true;
+  }
 }
 
 // ================= EMAIL TRANSPORT =================
@@ -62,55 +105,99 @@ router.post("/send-otp", async (req, res) => {
   const { email } = req.body;
   const ip = getIp(req);
   const deviceId = generateDeviceId(req);
+  const normalizedEmail = normalizeEmail(email);
 
-  if (!email) {
-    return res.status(400).json({ message: "Email required" });
+  if (!email || !isValidEmail(normalizedEmail)) {
+    return res.status(400).json({ message: GENERIC_OTP_ERROR });
   }
 
   if (process.env.DEBUG_OTP === "true") {
-    const maskedEmail = String(email).replace(/^(.{2})(.*)(?=@)/, "$1***");
+    const maskedEmail = normalizedEmail.replace(/^(.{2})(.*)(?=@)/, "$1***");
     console.debug("send-otp debug:", { email: maskedEmail });
   }
 
   try {
-    let user = await User.findOne({ email });
+    const existingOtp = await Otp.findOne({ email: normalizedEmail });
+
+    if (existingOtp) {
+      const ageMs = Date.now() - new Date(existingOtp.createdAt).getTime();
+      const windowReset = ageMs > EMAIL_RATE_WINDOW_MS;
+      const resendCount = windowReset ? 0 : existingOtp.resendCount || 0;
+      if (resendCount >= EMAIL_RATE_LIMIT) {
+        return res.status(429).json({ message: GENERIC_OTP_ERROR });
+      }
+      if (windowReset) {
+        existingOtp.resendCount = 0;
+        existingOtp.createdAt = new Date();
+        await existingOtp.save();
+      }
+    }
+
+    const isDeliverable = await hasDeliverableEmail(normalizedEmail);
+    if (!isDeliverable) {
+      return res.status(400).json({ message: GENERIC_OTP_ERROR });
+    }
+
+    let user = await User.findOne({ email: normalizedEmail });
 
     if (user && user.password) {
-      return res.status(400).json({ message: "User already exists. Please login instead." });
+      return res.status(400).json({ message: GENERIC_OTP_ERROR });
     }
 
     if (!user) {
       const userId = await generateUniqueUserId();
-      user = await User.create({ email, userId });
-      await initUserWallet(user._id);
+      const newUser = await User.create({ email: normalizedEmail, userId });
+      try {
+        await walletService.createWallet(newUser._id);
+      } catch (walletErr) {
+        await User.findByIdAndDelete(newUser._id);
+        console.error("send-otp wallet error:", walletErr.message);
+        return res.status(500).json({ message: GENERIC_OTP_ERROR });
+      }
+      user = newUser;
     }
 
     const otp = generateOTP();
     const hashedOtp = await bcrypt.hash(otp, 10);
     const expiresAt = Date.now() + 5 * 60 * 1000;
 
-    await Otp.findOneAndUpdate(
-      { email },
-      {
-        $set: {
-          email,
-          otp: hashedOtp,
-          ip,
-          deviceId,
-          expiresAt,
-          attempts: 0,
+    if (!existingOtp || Date.now() - new Date(existingOtp.createdAt).getTime() > EMAIL_RATE_WINDOW_MS) {
+      await Otp.findOneAndUpdate(
+        { email: normalizedEmail },
+        {
+          $set: {
+            email: normalizedEmail,
+            otp: hashedOtp,
+            ip,
+            deviceId,
+            expiresAt,
+            attempts: 0,
+            resendCount: 1,
+            createdAt: new Date(),
+          },
         },
-        $setOnInsert: {
-          createdAt: Date.now(),
+        { upsert: true, returnDocument: "after" }
+      );
+    } else {
+      await Otp.findOneAndUpdate(
+        { email: normalizedEmail },
+        {
+          $set: {
+            otp: hashedOtp,
+            ip,
+            deviceId,
+            expiresAt,
+            attempts: 0,
+          },
+          $inc: { resendCount: 1 },
         },
-        $inc: { resendCount: 1 },
-      },
-      { upsert: true, returnDocument: "after" }
-    );
+        { new: true }
+      );
+    }
 
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
-      to: email,
+      to: normalizedEmail,
       subject: "Your SwanCore Activation Code",
       html: `
         <div style="font-family: Arial, sans-serif; line-height:1.6; color:#222;">
@@ -133,7 +220,7 @@ router.post("/send-otp", async (req, res) => {
   } catch (error) {
     const errorMessage = typeof error === "string" ? error : error?.message || "Unknown error";
     console.error("send-otp error:", errorMessage);
-    res.status(500).json({ message: "Error sending OTP email" });
+    res.status(500).json({ message: GENERIC_OTP_ERROR });
   }
 });
 
@@ -196,20 +283,27 @@ router.post("/verify-otp", async (req, res) => {
 // ================= RESEND OTP =================
 router.post("/resend-otp", async (req, res) => {
   const { email, otpId } = req.body;
+  const normalizedEmail = normalizeEmail(email);
 
-  if (!email || !otpId) {
-    return res.status(400).json({ success: false, message: "Email and OTP ID required" });
+  if (!email || !otpId || !isValidEmail(normalizedEmail)) {
+    return res.status(400).json({ success: false, message: GENERIC_OTP_ERROR });
   }
 
   try {
-    const record = await Otp.findOne({ email });
+    const record = await Otp.findOne({ email: normalizedEmail });
 
     if (!record) {
-      return res.status(404).json({ success: false, message: "OTP request not found" });
+      return res.status(400).json({ success: false, message: GENERIC_OTP_ERROR });
     }
 
-    if ((record.resendCount || 0) >= 3) {
-      return res.status(429).json({ success: false, message: "Resend limit reached" });
+    const ageMs = Date.now() - new Date(record.createdAt).getTime();
+    if (ageMs > EMAIL_RATE_WINDOW_MS) {
+      record.resendCount = 0;
+      record.createdAt = new Date();
+    }
+
+    if ((record.resendCount || 0) >= EMAIL_RATE_LIMIT) {
+      return res.status(429).json({ success: false, message: GENERIC_OTP_ERROR });
     }
 
     const otp = generateOTP();
@@ -218,13 +312,12 @@ router.post("/resend-otp", async (req, res) => {
     record.expiresAt = Date.now() + 5 * 60 * 1000;
     record.attempts = 0;
     record.resendCount = (record.resendCount || 0) + 1;
-    record.createdAt = Date.now();
 
     await record.save();
 
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
-      to: email,
+      to: normalizedEmail,
       subject: "Your SwanCore Activation Code",
       html: `
         <div style="font-family: Arial, sans-serif; line-height:1.6; color:#222;">
@@ -238,7 +331,7 @@ router.post("/resend-otp", async (req, res) => {
     return res.json({ success: true, message: "OTP resent", otpId });
   } catch (err) {
     console.error("resend-otp error:", err.message);
-    return res.status(500).json({ success: false, message: "Error resending OTP" });
+    return res.status(500).json({ success: false, message: GENERIC_OTP_ERROR });
   }
 });
 
@@ -268,7 +361,7 @@ router.post("/set-password", async (req, res) => {
     user.password = await bcrypt.hash(password, 10);
     await user.save();
 
-    await initUserWallet(user._id);
+    await walletService.ensureWallet(user._id);
 
     const jwt = require("jsonwebtoken");
     const token = jwt.sign(
@@ -302,6 +395,7 @@ router.post("/register", async (req, res) => {
     return res.status(400).json({ message: "Email and password required" });
   }
 
+  let newUser;
   try {
     const existingUser = await User.findOne({ email });
     if (existingUser && existingUser.password) {
@@ -311,28 +405,31 @@ router.post("/register", async (req, res) => {
     const userId = await generateUniqueUserId();
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    let user;
     if (existingUser) {
       existingUser.password = hashedPassword;
       existingUser.userId = userId;
-      user = await existingUser.save();
+      newUser = await existingUser.save();
     } else {
-      user = await User.create({ userId, email, password: hashedPassword });
+      newUser = await User.create({ userId, email, password: hashedPassword });
     }
 
-    await initUserWallet(user._id);
+    // Auto create wallet for new user
+    await walletService.createWallet(newUser._id);
 
     res.status(201).json({
       message: "User registered successfully",
       user: {
-        id: user.id,
-        userId: user.userId,
-        email: user.email,
-        createdAt: user.createdAt
+        id: newUser.id,
+        userId: newUser.userId,
+        email: newUser.email,
+        createdAt: newUser.createdAt
       }
     });
 
   } catch (err) {
+    if (newUser?._id) {
+      await User.findByIdAndDelete(newUser._id);
+    }
     console.error("register error:", err.message);
     res.status(500).json({ message: "Server error" });
   }
@@ -368,7 +465,6 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ message: "Invalid password" });
     }
 
-    await initUserWallet(user._id);
     const jwt = require("jsonwebtoken");
     const token = jwt.sign(
       { userId: user.id, email: user.email, role: user.role },

@@ -39,7 +39,7 @@ const markAsRead = async (req, res) => {
         if (!userId) {
             return res.status(401).json({ message: "User not authenticated" });
         }
-        const notification = await Notification.findOneAndUpdate({ _id: notificationId, userId }, { isRead: true }, { new: true });
+        const notification = await Notification.findOneAndUpdate({ _id: notificationId, userId }, { isRead: true }, { returnDocument: 'after' });
         if (!notification) {
             return res.status(404).json({ message: "Notification not found" });
         }

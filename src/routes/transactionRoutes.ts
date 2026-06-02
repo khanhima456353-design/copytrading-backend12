@@ -1,12 +1,6 @@
 import { Router } from "express";
 import { authMiddleware } from "../middleware/authMiddleware";
-import {
-  addProfit,
-  deductLoss,
-  getUserTransactions,
-  getAllTransactions,
-  getUserTransactionHistory
-} from "../controllers/transactionController";
+import { getUserTransactions, addProfit, deductLoss, getAllTransactions, getUserTransactionHistory } from "../controllers/transactionController";
 
 const router = Router();
 

@@ -1,5 +1,13 @@
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-const client_1 = require("@prisma/client");
-const prisma = new client_1.PrismaClient();
-exports.default = prisma;
+require("dotenv").config();
+const { PrismaClient } = require("@prisma/client");
+const { PrismaPg } = require("@prisma/adapter-pg");
+const { Pool } = require("pg");
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+    throw new Error("DATABASE_URL must be set for Prisma");
+}
+const pool = new Pool({ connectionString });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
+module.exports = prisma;

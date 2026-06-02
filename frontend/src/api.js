@@ -208,6 +208,22 @@ export async function getSocket() {
     console.log("Socket connected successfully to", socketBaseURL);
   });
 
+  socket.on("reconnect", (attempt) => {
+    console.log("Socket reconnected after", attempt, "attempt(s) to", socketBaseURL);
+  });
+
+  socket.on("reconnect_attempt", (attempt) => {
+    console.log("Socket reconnect attempt", attempt, "to", socketBaseURL);
+  });
+
+  socket.on("reconnect_failed", () => {
+    console.warn("Socket reconnection failed to", socketBaseURL);
+  });
+
+  socket.on("disconnect", (reason) => {
+    console.log("Socket disconnected from", socketBaseURL, "reason:", reason);
+  });
+
   socket.on("connect_error", async (err) => {
     console.warn("Socket connect error:", err.message);
 

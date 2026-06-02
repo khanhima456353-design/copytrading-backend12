@@ -45,7 +45,8 @@ function normalizeToBucket(timestamp, intervalSec) {
  */
 function calculateWick(basePrice, volatility = 'low') {
   const wickPct = volatility === 'high' ? 0.003 : volatility === 'medium' ? 0.0015 : 0.0005;
-  return basePrice * wickPct * Math.random();
+  const wickFactor = volatility === 'high' ? 0.85 : volatility === 'medium' ? 0.7 : 0.5;
+  return basePrice * wickPct * wickFactor;
 }
 
 // ─── Main Candle Update Function ─────────────────────────────────────────────

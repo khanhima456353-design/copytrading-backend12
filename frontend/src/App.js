@@ -1,6 +1,7 @@
 import React from "react";
 import { Routes, Route } from "react-router-dom";
 import ScrollToTop from "./ScrollToTop";
+import { BalanceProvider } from "./context/BalanceContext.tsx";
 
 // Pages
 import Login from "./pages/Login";
@@ -39,7 +40,7 @@ if (!document.documentElement.getAttribute("data-theme")) {
 
 export default function App() {
   return (
-    <>
+    <BalanceProvider>
       <ScrollToTop />
 
       <Routes>
@@ -90,6 +91,6 @@ export default function App() {
         <Route path="/admin/withdrawals" element={<AdminWithdrawals />} />
         <Route path="/admin/balances" element={<AdminBalances />} />
       </Routes>
-    </>
+    </BalanceProvider>
   );
 }

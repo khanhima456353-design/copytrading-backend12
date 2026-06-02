@@ -68,6 +68,11 @@ const AdminBalances: React.FC = () => {
     if (!selectedUser) return;
     setError(null);
 
+    if (!balanceAmount || balanceAmount <= 0) {
+      setError("Please enter a positive amount.");
+      return;
+    }
+
     try {
       if (action === "add") {
         await addAdminBalance(selectedUser._id || selectedUser.id, balanceAmount, description);
@@ -83,9 +88,9 @@ const AdminBalances: React.FC = () => {
       fetchUserTransactions(selectedUser._id || selectedUser.id);
       setBalanceAmount(0);
       setDescription("");
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setError("Unable to perform balance action.");
+      setError(err?.response?.data?.message || "Unable to perform balance action.");
     }
   };
 

@@ -57,6 +57,23 @@ export async function getAdminKycSubmissions() {
   return response.data;
 }
 
+export async function approveAdminKyc(userId: string) {
+  const response = await adminClient.patch(`/api/admin/user/${userId}`, {
+    kycVerified: true,
+    kycStatus: "approved",
+  });
+  return response.data;
+}
+
+export async function rejectAdminKyc(userId: string, rejectionReasons: string[] = []) {
+  const response = await adminClient.patch(`/api/admin/user/${userId}`, {
+    kycVerified: false,
+    kycStatus: "rejected",
+    rejectionReasons,
+  });
+  return response.data;
+}
+
 export async function banAdminUser(userId: string, ban: boolean) {
   const response = await adminClient.patch(`/api/admin/user/${userId}`, {
     isBanned: ban,

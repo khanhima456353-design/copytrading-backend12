@@ -4,42 +4,32 @@
  * Common utilities for trading operations, PnL calculations, and order handling.
  */
 
+import { clampPnL, clampPnLPercent, calculatePositionPnL as calcPositionPnL, shouldClampPnL } from "../utils/pnlClamp";
+
+export { clampPnL, clampPnLPercent, shouldClampPnL };
+
 /**
  * Calculate unrealized PnL for an open position.
- *
- * @param {Object} position - Trade position object
- * @param {number} position.entryPrice - Entry price
- * @param {number} position.quantity - Position quantity
- * @param {number} position.side - 'buy' or 'sell'
- * @param {number} currentPrice - Current market price
- * @returns {Object} { pnl, pnlPercent, isProfit }
  */
 export function calculateUnrealizedPnL(position, currentPrice) {
   if (!position || !Number.isFinite(currentPrice) || currentPrice <= 0) {
-    return { pnl: 0, pnlPercent: 0, isProfit: null };
+    return { pnl: 0, pnlPercent: 0, rawPnl: 0, rawPnlPercent: 0, isProfit: null };
   }
 
-  const { entryPrice, quantity, side } = position;
+  const { entryPrice, quantity, leverage = 1, side } = position;
   if (!Number.isFinite(entryPrice) || !Number.isFinite(quantity) || quantity === 0) {
-    return { pnl: 0, pnlPercent: 0, isProfit: null };
+    return { pnl: 0, pnlPercent: 0, rawPnl: 0, rawPnlPercent: 0, isProfit: null };
   }
 
-  let pnl;
-  if (side === 'buy' || side === 'long') {
-    pnl = (currentPrice - entryPrice) * quantity;
-  } else if (side === 'sell' || side === 'short') {
-    pnl = (entryPrice - currentPrice) * quantity;
-  } else {
-    return { pnl: 0, pnlPercent: 0, isProfit: null };
-  }
-
-  const pnlPercent = ((pnl / (entryPrice * quantity)) * 100);
-  const isProfit = pnl >= 0;
+  const useClamp = shouldClampPnL(position);
+  const result = calcPositionPnL(entryPrice, currentPrice, quantity, side || "long", leverage);
 
   return {
-    pnl: Number(pnl.toFixed(2)),
-    pnlPercent: Number(pnlPercent.toFixed(2)),
-    isProfit
+    rawPnl: result.rawPnl,
+    rawPnlPercent: result.rawPnlPercent,
+    pnl: useClamp ? result.clampedPnl : result.rawPnl,
+    pnlPercent: useClamp ? result.clampedPnlPercent : result.rawPnlPercent,
+    isProfit: (useClamp ? result.clampedPnl : result.rawPnl) >= 0,
   };
 }
 

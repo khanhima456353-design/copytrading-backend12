@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const { MongoMemoryServer } = require("mongodb-memory-server");
 const bcrypt = require("bcrypt");
 const User = require("../models/User");
+const Wallet = require("../models/Wallet");
 const Balance = require("../models/Balance");
 const balanceService = require("../src/services/balanceService");
 
@@ -141,6 +142,20 @@ describe("Trade balance locking integration", function () {
     const balance = await Balance.findOne({ userId: testUser._id, currency: "USDT" }).lean();
     expect(balance.available).to.equal(100);
     expect(balance.locked).to.equal(0);
+  });
+
+  it("should lock funds when wallet is missing by restoring from user.balance", async () => {
+    await Wallet.deleteMany({ userId: testUser._id });
+    await balanceService.lockBalance(testUser._id, "USDT", 50);
+
+    const wallet = await Wallet.findOne({ userId: testUser._id, type: "spot" }).lean();
+    expect(wallet).to.exist;
+    expect(wallet.availableBalance).to.equal(50);
+    expect(wallet.lockedBalance).to.equal(50);
+
+    const balance = await Balance.findOne({ userId: testUser._id, currency: "USDT" }).lean();
+    expect(balance.available).to.equal(50);
+    expect(balance.locked).to.equal(50);
   });
 
   it("should correctly credit USDT and preserve totals when adding profit", async () => {

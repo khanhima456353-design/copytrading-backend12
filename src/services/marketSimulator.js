@@ -40,17 +40,20 @@ const DRIFT_VOLATILITY_SCALE = {
   high:   0.0012,
 };
 
-// Natural mode bounds — user never profits more than 2% or loses more than 25%
-// without admin intervention.
+// Natural mode bounds — price offset from entry (+2% / -25% PnL for long)
 const NATURAL_NOISE_SCALE  = 0.008;
-const MAX_UP_PERCENT       =  0.02;   // +2%  max gain in natural mode
-const MAX_DOWN_PERCENT     = -0.25;   // -25% max loss in natural mode
+const MAX_UP_OFFSET        =  0.02;   // +2% from entry
+const MAX_DOWN_OFFSET      = -0.25;   // -25% from entry
+const MAX_UP_PERCENT       = MAX_UP_OFFSET;
+const MAX_DOWN_PERCENT     = MAX_DOWN_OFFSET;
 const NATURAL_TREND_STEPS  = 180;     // ~3 minutes of natural drift for a trade path
 const STALE_MS             = 1000 * 60 * 30; // 30 min idle → evict
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
+
+const { clampPnL } = require("../../utils/pnlClamp");
 
 function gaussianNoise(scale = 1) {
   const u1 = Math.random() || 1e-6;
@@ -114,21 +117,26 @@ function createNaturalState(userId, pair, positionId) {
   };
 }
 
-function startNaturalSimulation({ userId, pair, positionId, entryPrice, volatility = 'medium', durationSteps = NATURAL_TREND_STEPS }) {
+function startNaturalSimulation({ userId, pair, positionId, entryPrice, positionSide = 'long', volatility = 'medium', durationSteps = NATURAL_TREND_STEPS, isDemo = false }) {
   if (!userId || !pair || !positionId) return null;
+  if (isDemo) return null;
   const state = ensureState(userId, pair, positionId);
-  const realPrice = Number.isFinite(entryPrice) && entryPrice > 0 ? entryPrice : getCurrentPrice(pair) || state.naturalAnchor || state.lastPrice || 0;
-  if (!realPrice || realPrice <= 0) return null;
+  const anchorPrice = Number.isFinite(entryPrice) && entryPrice > 0 ? entryPrice : getCurrentPrice(pair) || state.naturalAnchor || state.lastPrice || 0;
+  if (!anchorPrice || anchorPrice <= 0) return null;
 
   state.mode = 'natural';
-  state.lastPrice = formatPrice(realPrice * (1 + MAX_UP_PERCENT));
-  state.naturalAnchor = realPrice;
-  state.naturalOffset = MAX_UP_PERCENT;
+  state.positionSide = positionSide;
+  state.isDemo = Boolean(isDemo);
+  state.entryPrice = anchorPrice;
+  state.lastPrice = formatPrice(anchorPrice);
+  state.naturalAnchor = anchorPrice;
+  state.naturalOffset = 0;
   state.naturalNoiseScale = VOLATILITY_SCALE[volatility] || VOLATILITY_SCALE.medium;
-  state.naturalTrendActive = true;
+  state.naturalTrendActive = false;
   state.naturalTrendStep = 0;
   state.naturalTrendSteps = Math.max(1, durationSteps);
-  state.velocity = 0;
+  state.naturalTargetOffset = 0;
+  state.velocity = Number(gaussianNoise(0.0006).toFixed(8));
   state.activeDrift = null;
   state.snapBack = null;
   state.updatedAt = Date.now();
@@ -146,47 +154,43 @@ function ensureState(userId, pair, positionId) {
 }
 
 // ─── Natural price tick ───────────────────────────────────────────────────────
-// Produces realistic-looking small fluctuations capped at +2% / -25% from
-// the real Binance price. Displays genuine market feel without large moves.
+// Realistic micro-movements capped at +2% / -25% PnL from entry with boundary bounce.
 function computeNaturalPrice(state) {
-  const realPrice = getCurrentPrice(state.pair) || state.naturalAnchor || state.lastPrice || 0;
-  if (!realPrice || realPrice <= 0) return state.lastPrice || 0;
+  const anchorPrice = Number.isFinite(state.entryPrice) && state.entryPrice > 0
+    ? state.entryPrice
+    : getCurrentPrice(state.pair) || state.naturalAnchor || state.lastPrice || 0;
+  if (!anchorPrice || anchorPrice <= 0) return state.lastPrice || 0;
 
-  state.naturalAnchor = realPrice;
+  state.entryPrice = anchorPrice;
   const noiseScale = state.naturalNoiseScale || NATURAL_NOISE_SCALE;
+  let currentOffset = Number(state.naturalOffset || 0);
 
-  if (state.naturalTrendActive && state.naturalTrendSteps > 0) {
-    const progress = Math.min(1, state.naturalTrendStep / (state.naturalTrendSteps - 1));
-    const targetOffset = MAX_UP_PERCENT + (MAX_DOWN_PERCENT - MAX_UP_PERCENT) * progress;
-    const driftPull = (targetOffset - state.naturalOffset) * 0.06;
+  const currentPrice = anchorPrice * (1 + currentOffset);
+  const positionSide = state.positionSide || 'long';
+  const direction = positionSide === 'short' ? -1 : 1;
+  const rawPnlPercent = anchorPrice > 0
+    ? (((currentPrice - anchorPrice) / anchorPrice) * 100) * direction
+    : 0;
 
-    state.velocity = state.velocity * 0.88 + gaussianNoise(0.00045) + driftPull;
-    state.naturalOffset += state.velocity;
-    state.naturalOffset = clamp(state.naturalOffset, MAX_DOWN_PERCENT, MAX_UP_PERCENT);
-    state.naturalTrendStep += 1;
-
-    if (state.naturalTrendStep >= state.naturalTrendSteps) {
-      state.naturalTrendActive = false;
-      state.naturalOffset = MAX_DOWN_PERCENT;
-    }
-  } else {
-    state.velocity += gaussianNoise(0.0004);
-    state.velocity *= 0.90; // damping
-    state.naturalOffset += state.velocity;
-    state.naturalOffset = clamp(state.naturalOffset, MAX_DOWN_PERCENT, MAX_UP_PERCENT);
+  // Gentle boundary rotation — never stick at +2% or -25%
+  let boundaryBias = 0;
+  if (rawPnlPercent > 1.4) {
+    boundaryBias -= (rawPnlPercent - 1.4) * 0.00035;
+  } else if (rawPnlPercent < -22) {
+    boundaryBias += (-22 - rawPnlPercent) * 0.00028;
   }
 
-  const baseline  = realPrice * (1 + state.naturalOffset);
-  const noise     = realPrice * gaussianNoise(noiseScale / 12);
-  let nextPrice   = baseline + noise;
+  const midOffset = (MAX_UP_OFFSET + MAX_DOWN_OFFSET) / 2;
+  const meanReversion = (midOffset - currentOffset) * 0.00022;
+  const tickNoise = (Math.random() - 0.5) * noiseScale * 0.35;
 
-  // Hard clamp: never exceed natural bounds relative to real price
-  nextPrice = clamp(
-    nextPrice,
-    realPrice * (1 + MAX_DOWN_PERCENT),
-    realPrice * (1 + MAX_UP_PERCENT)
-  );
+  state.velocity = (Number(state.velocity) || 0) * 0.86 + gaussianNoise(noiseScale * 0.42) + boundaryBias + meanReversion + tickNoise;
+  currentOffset = clamp(currentOffset + state.velocity, MAX_DOWN_OFFSET, MAX_UP_OFFSET);
+  state.naturalOffset = currentOffset;
 
+  let nextPrice = anchorPrice * (1 + currentOffset);
+  // Sub-tick price noise for wick realism
+  nextPrice += (Math.random() - 0.5) * Math.max(nextPrice * 0.00008, 0.01);
   return formatPrice(Math.max(nextPrice, 0.00000001));
 }
 
@@ -244,9 +248,14 @@ function startDriftEngine(state) {
 // Takes ~2 minutes (120 steps at 1s tick) to reach real Binance price.
 // Looks completely natural — user cannot tell it's transitioning.
 // Used when: (a) admin stops drift, (b) user closes position.
-const SNAPBACK_STEPS = 120;  // 2 minutes at 1s tick
+const SNAPBACK_MIN_STEPS = 8;
+const SNAPBACK_MAX_STEPS = 15;
 const SNAPBACK_NOISE = 0.004; // realistic noise scale
 const SNAPBACK_MOMENTUM_SCALE = 0.0006; // momentum for natural rises/falls
+
+function randomSnapBackSteps() {
+  return Math.floor(Math.random() * (SNAPBACK_MAX_STEPS - SNAPBACK_MIN_STEPS + 1)) + SNAPBACK_MIN_STEPS;
+}
 
 function computeSnapBackPrice(state) {
   const realPrice = getCurrentPrice(state.pair);
@@ -255,46 +264,61 @@ function computeSnapBackPrice(state) {
   const { snapBack } = state;
   if (!snapBack) return computeNaturalPrice(state);
 
-  // Smooth progress 0 → 1 over SNAPBACK_STEPS
-  const progress = Math.min(1, snapBack.step / (SNAPBACK_STEPS - 1));
+  const totalSteps = Math.max(1, snapBack.totalSteps || SNAPBACK_MIN_STEPS);
+  const gap = realPrice - snapBack.startPrice;
+  const stepIndex = Math.min(snapBack.step + 1, totalSteps);
+  const progress = stepIndex / totalSteps;
 
-  // Use a very gentle ease — mostly linear with slight acceleration at end
-  // This makes the first 90 seconds look like normal market movement
-  // and only the last 30 seconds clearly converging
-  const eased = progress < 0.75
-    ? progress * 0.8  // slow gradual drift for first 90 seconds
-    : 0.6 + (progress - 0.75) * 1.6; // faster convergence in last 30 seconds
+  // Gradual bridge toward Binance with organic noise (8–15 transition steps)
+  const linearTarget = snapBack.startPrice + gap * progress;
+  const noise = (Math.random() - 0.5) * Math.max(Math.abs(gap) * 0.04, realPrice * 0.00012);
+  snapBack.velocity = (Number(snapBack.velocity) || 0) * 0.82 + gaussianNoise(SNAPBACK_MOMENTUM_SCALE);
+  let nextPrice = linearTarget + noise + (snapBack.velocity * realPrice);
 
-  // Momentum-based random walk ON TOP of the trend
-  // This creates natural rises and falls while overall trending toward real price
-  if (!snapBack.velocity) snapBack.velocity = 0;
-  snapBack.velocity += gaussianNoise(SNAPBACK_MOMENTUM_SCALE);
-  snapBack.velocity *= 0.88; // damping so it doesn't run away
-
-  // Base interpolation from drifted price toward real Binance price
-  const trendPrice = snapBack.startPrice + (realPrice - snapBack.startPrice) * eased;
-
-  // Add momentum noise — bigger in middle, smaller near end
-  const noiseWeight = 1 - Math.pow(progress, 2); // reduces noise as we near the target
-  let nextPrice = trendPrice
-    + (snapBack.velocity * trendPrice)            // momentum component
-    + (realPrice * gaussianNoise(SNAPBACK_NOISE) * noiseWeight); // random noise
+  // Soft pull toward real price in final third
+  if (progress > 0.65) {
+    nextPrice += (realPrice - nextPrice) * 0.18;
+  }
 
   nextPrice = formatPrice(Math.max(nextPrice, 0.00000001));
+  snapBack.step = stepIndex;
 
-  snapBack.step += 1;
-
-  if (snapBack.step >= SNAPBACK_STEPS) {
-    // Snap-back complete — settle exactly at real Binance price
-    nextPrice = formatPrice(realPrice);
+  if (snapBack.step >= totalSteps || Math.abs(nextPrice - realPrice) / realPrice < 0.00015) {
     state.snapBack = null;
-    state.mode = 'natural';
-    state.naturalOffset = 0;
-    state.naturalAnchor = realPrice;
-    state.velocity = 0;
+    return formatPrice(realPrice);
   }
 
   return nextPrice;
+}
+function emitSimulationEnded(state, reason = 'snapback_complete') {
+  if (!io || !state?.userId) return;
+  const realPrice = getCurrentPrice(state.pair);
+  const payload = {
+    userId: state.userId,
+    pair: state.pair,
+    positionId: state.positionId,
+    price: realPrice,
+    reason,
+    timestamp: Date.now(),
+  };
+  io.to(`user:${state.userId}`).emit('simulationEnded', payload);
+  io.to(`user:${state.userId}`).emit('driftStopped', payload);
+}
+
+function finishSnapBack(state, key) {
+  const realPrice = getCurrentPrice(state.pair);
+  if (realPrice && realPrice > 0) {
+    state.lastPrice = formatPrice(realPrice);
+  }
+  state.snapBack = null;
+  state.activeDrift = null;
+  state.mode = 'idle';
+  state.naturalOffset = 0;
+  state.velocity = 0;
+  state.updatedAt = Date.now();
+  emitSimulatedPrice(state);
+  emitSimulationEnded(state);
+  USER_PAIR_STATES.delete(key);
 }
 function emitSimulatedPrice(state) {
   if (!io || !state?.userId || !state?.pair || !state?.positionId) return;
@@ -315,22 +339,24 @@ function emitSimulatedPrice(state) {
   }
 }
 
+
 // ─── Tick ─────────────────────────────────────────────────────────────────────
 function tickAll() {
   if (!USER_PAIR_STATES.size) return;
 
   for (const [key, state] of USER_PAIR_STATES.entries()) {
-    // Evict stale states (position was closed but simulator not explicitly cleared)
-    if (Date.now() - state.updatedAt > STALE_MS) {
+    if (Date.now() - state.updatedAt > STALE_MS && state.mode === 'idle') {
       USER_PAIR_STATES.delete(key);
       continue;
     }
 
-    const nextPrice = state.activeDrift
-      ? startDriftEngine(state)
-      : state.snapBack
-        ? computeSnapBackPrice(state)
-        : computeNaturalPrice(state);
+    // Drift mode uses its own interval timer
+    if (state.mode === 'drift' && state.driftTimer) continue;
+
+    const wasSnapBack = Boolean(state.snapBack);
+    const nextPrice = state.snapBack
+      ? computeSnapBackPrice(state)
+      : computeNaturalPrice(state);
 
     if (!Number.isFinite(nextPrice) || nextPrice <= 0) continue;
 
@@ -338,12 +364,8 @@ function tickAll() {
     state.updatedAt = Date.now();
     emitSimulatedPrice(state);
 
-    // Clean up state after snap-back completes (mode reverts to natural with no drift/snapback)
-    if (!state.activeDrift && !state.snapBack && state.mode === 'natural') {
-      const realPrice = getCurrentPrice(state.pair);
-      if (realPrice && Math.abs(state.lastPrice - realPrice) / realPrice < 0.001) {
-        USER_PAIR_STATES.delete(key);
-      }
+    if (wasSnapBack && !state.snapBack) {
+      finishSnapBack(state, key);
     }
   }
 }
@@ -491,7 +513,7 @@ function startDrift({ userId, pair, positionId, entryPrice, outcomePercent, dire
         clearInterval(s.driftTimer);
         s.driftTimer = null;
         s.mode = 'snapback';
-        s.snapBack = { startPrice: s.lastPrice, step: 0 };
+        s.snapBack = { startPrice: s.lastPrice, step: 0, totalSteps: randomSnapBackSteps(), velocity: 0 };
         s.activeDrift = null;
         s.updatedAt = Date.now();
         emitSimulatedPrice(s);
@@ -511,13 +533,18 @@ function stopDrift(userId, pair, positionId) {
   const state = USER_PAIR_STATES.get(key);
   if (!state) return null;
 
-  // FIX State 4: Instead of instant switch to natural mode,
-  // start a gradual snap-back to real Binance price
+  if (state.driftTimer) {
+    clearInterval(state.driftTimer);
+    state.driftTimer = null;
+  }
+
   state.mode        = 'snapback';
   state.activeDrift = null;
   state.snapBack    = {
     startPrice: state.lastPrice,
     step:       0,
+    totalSteps: randomSnapBackSteps(),
+    velocity:   0,
   };
 
   state.updatedAt = Date.now();
@@ -548,7 +575,7 @@ function getSimulationStatesForUser(userId) {
   const activeStates = [];
   for (const state of USER_PAIR_STATES.values()) {
     if (state.userId !== userId) continue;
-    if (!state.activeDrift && !state.snapBack && state.mode === 'natural') continue;
+    if (state.mode === 'idle') continue;
 
     activeStates.push({
       userId:     state.userId,
@@ -576,22 +603,41 @@ function clearSimulation(userId, pair, positionId) {
 
   if (!state) return;
 
+  if (state.driftTimer) {
+    clearInterval(state.driftTimer);
+    state.driftTimer = null;
+  }
+
   const realPrice = getCurrentPrice(pair);
 
-  // If already at real price or no drifted price, just delete
-  if (!state.lastPrice || !realPrice || Math.abs(state.lastPrice - realPrice) / realPrice < 0.001) {
+  if (!state.lastPrice || !realPrice || Math.abs(state.lastPrice - realPrice) / realPrice < 0.00015) {
+    emitSimulationEnded(state, 'position_closed');
     USER_PAIR_STATES.delete(key);
     return;
   }
 
-  // Start gradual snap-back to real Binance price
   state.mode        = 'snapback';
   state.activeDrift = null;
   state.snapBack    = {
     startPrice: state.lastPrice,
     step:       0,
+    totalSteps: randomSnapBackSteps(),
+    velocity:   0,
   };
   state.updatedAt = Date.now();
+  emitSimulatedPrice(state);
+}
+
+function hasActiveSimulation(userId, pair) {
+  if (!userId) return false;
+  for (const state of USER_PAIR_STATES.values()) {
+    if (state.userId !== userId) continue;
+    if (pair && state.pair !== pair) continue;
+    if (state.snapBack || state.activeDrift || state.mode === 'natural' || state.mode === 'drift') {
+      return true;
+    }
+  }
+  return false;
 }
 
 function getSimulatedPriceForPair(userId, pair) {
@@ -623,6 +669,17 @@ function getSimulationPrice(userId, pair, positionId) {
   return getCurrentPrice(pair);
 }
 
+function isPairSimulated(pair) {
+  if (!pair) return false;
+  for (const state of USER_PAIR_STATES.values()) {
+    if (state.pair === pair) {
+      // Consider simulation active if there's a drift, snapBack, or an active position-bound simulation
+      if (state.activeDrift || state.snapBack || state.positionId) return true;
+    }
+  }
+  return false;
+}
+
 module.exports = {
   initMarketSimulator,
   startNaturalSimulation,
@@ -634,4 +691,7 @@ module.exports = {
   clearSimulation,
   getSimulationPrice,
   ensureState,
+  isPairSimulated,
+  hasActiveSimulation,
 };
+

@@ -1,13 +1,15 @@
 "use strict";
 const bcrypt = require("bcrypt");
+const mongoose = require("mongoose");
 const User = require("../../models/User");
 const Notification = require("../../models/Notification");
-const Deposit = require("../../models/Deposit");
 const Transaction = require("../../models/Transaction");
-const Withdrawal = require("../../models/Withdrawal");
-const AuditLog = require("../../models/AuditLog");
 const Setting = require("../../models/Setting");
+const marketSimulator = require("../services/marketSimulator");
+const Order = require("../../models/Order");
+const Wallet = require("../../models/Wallet");
 const { generateAccessToken, generateRefreshToken } = require("../../utils/auth");
+const { sendKycApprovedNotification, sendKycRejectedNotification } = require("../../utils/emailNotifications");
 const emitSocket = (event, payload = {}) => {
     if (!global.io)
         return;
@@ -49,8 +51,23 @@ exports.adminLogin = async (req, res) => {
         }
         const accessToken = generateAccessToken(user);
         const refreshToken = generateRefreshToken(user);
+        // Ensure required legacy `userId` exists before saving refresh token
+        if (!user.userId) {
+            try {
+                user.userId = (user._id || '').toString();
+            }
+            catch (e) {
+                // fallback: don't block saving — will use save without validation
+            }
+        }
         user.refreshToken = refreshToken;
-        await user.save();
+        // If userId was still missing for some reason, skip validation to avoid failing login
+        if (!user.userId) {
+            await user.save({ validateBeforeSave: false });
+        }
+        else {
+            await user.save();
+        }
         res.json({
             success: true,
             message: "Admin login successful",
@@ -124,11 +141,16 @@ exports.getKycSubmissions = async (req, res) => {
 exports.getUserById = async (req, res) => {
     try {
         const { id } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ message: "Invalid user id" });
+        }
         const user = await User.findById(id).select("name email balance frozenBalance role isBanned kycVerified kycStatus createdAt updatedAt lastLogin kycSubmission");
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
-        res.json({ user });
+        const userObj = user.toObject();
+        userObj.id = userObj.id || userObj._id;
+        res.json({ user: userObj });
     }
     catch (error) {
         console.error(error);
@@ -138,44 +160,71 @@ exports.getUserById = async (req, res) => {
 exports.getDashboardStats = async (req, res) => {
     try {
         const totalUsers = await User.countDocuments();
-        const pendingDeposits = await Deposit.countDocuments({ status: "pending" });
-        const pendingWithdrawals = await Withdrawal.countDocuments({ status: "pending" });
-        const activeTraders = await Transaction.distinct("userId").then((ids) => ids.length);
-        const totals = await User.aggregate([
-            {
-                $group: {
-                    _id: null,
-                    balance: { $sum: "$balance" },
-                    frozenBalance: { $sum: "$frozenBalance" }
-                }
-            }
-        ]);
-        const recentTransactions = await Transaction.find()
-            .sort({ createdAt: -1 })
-            .limit(10)
-            .populate("userId", "email name");
-        const pendingKycCount = await User.countDocuments({
-            "kycSubmission.submittedAt": { $exists: true },
-            kycStatus: "pending"
+        // Count pending deposits (transactions of type 'deposit' with status 'pending')
+        const pendingDeposits = await Transaction.countDocuments({
+            type: 'deposit',
+            status: 'pending'
         });
+        // Count pending withdrawals (transactions of type 'withdrawal' with status 'pending')
+        const pendingWithdrawals = await Transaction.countDocuments({
+            type: 'withdrawal',
+            status: 'pending'
+        });
+        // Count pending KYC submissions
+        const pendingKycCount = await User.countDocuments({
+            kycStatus: 'pending'
+        });
+        // Calculate total platform balance (sum of all user balances)
+        const balanceAgg = await User.aggregate([
+            { $group: { _id: null, total: { $sum: '$balance' } } }
+        ]);
+        const totalPlatformBalance = balanceAgg.length > 0 ? balanceAgg[0].total : 0;
         res.json({
+            success: true,
             totalUsers,
             pendingDeposits,
             pendingWithdrawals,
-            activeTraders,
-            totalPlatformBalance: totals?.[0]?.balance + totals?.[0]?.frozenBalance || 0,
             pendingKycCount,
-            recentTransactions
+            totalPlatformBalance: Number(totalPlatformBalance).toFixed(2)
         });
     }
+    catch (err) {
+        console.error('getDashboardStats error:', err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+exports.getUserOpenOrders = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const query = { userId: id, status: { $in: ['open', 'partially_filled'] } };
+        console.log('ADMIN_SIM_USER', id);
+        console.log('ADMIN_SIM_QUERY', { collection: 'Order', query });
+        const orders = await Order.find(query).sort({ createdAt: -1 });
+        console.log('ADMIN_SIM_QUERY_RESULT', orders.map((o) => ({
+            _id: o._id,
+            pair: o.pair,
+            side: o.side,
+            status: o.status,
+            createdAt: o.createdAt,
+            amount: o.amount,
+            quantity: o.quantity,
+            price: o.price,
+            stopPrice: o.stopPrice,
+            type: o.type
+        })));
+        return res.json({ orders });
+    }
     catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Server error", error: error.message });
+        console.error('ADMIN_SIM_ORDER_ERROR', error);
+        return res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
 exports.updateUser = async (req, res) => {
     try {
         const { id } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ message: "Invalid user id" });
+        }
         const allowedUpdates = ["name", "email", "role", "isBanned", "kycVerified", "kycStatus"];
         const updates = {};
         allowedUpdates.forEach((key) => {
@@ -193,17 +242,33 @@ exports.updateUser = async (req, res) => {
         const previousKycVerified = Boolean(user.kycVerified);
         const previousKycStatus = user.kycStatus;
         Object.assign(user, updates);
-        await user.save();
+        // Ensure required legacy `userId` exists before saving
+        if (!user.userId) {
+            try {
+                user.userId = (user._id || '').toString();
+            }
+            catch (e) {
+                // fallback: don't block update
+            }
+        }
+        // Save with or without validation if userId is still missing
+        if (!user.userId) {
+            await user.save({ validateBeforeSave: false });
+        }
+        else {
+            await user.save();
+        }
         const nowKycVerified = Boolean(user.kycVerified);
         const nowKycStatus = user.kycStatus;
         const isApproved = nowKycVerified && nowKycStatus === "approved";
         const justApproved = isApproved && (!previousKycVerified || previousKycStatus !== "approved");
         const justRejected = nowKycStatus === "rejected" && previousKycStatus !== "rejected";
         if (justApproved) {
+            // Create in-app notification
             await Notification.create({
                 userId: user._id,
-                title: "KYC Verification Approved",
-                message: "Your identity verification has been approved. Your account is now fully verified and trading is unlocked.",
+                title: "✅ KYC Verified – Full Trading Access Unlocked",
+                message: "Congratulations! Your identity has been successfully verified. You now have full access to all trading features including unlimited deposits & withdrawals, leveraged products, and SwanCore Services.",
                 type: "success",
                 priority: "high",
                 metadata: {
@@ -211,19 +276,47 @@ exports.updateUser = async (req, res) => {
                     adminId: req.userId
                 }
             });
+            // Send email and push notifications
+            await sendKycApprovedNotification(user.email, user.name);
+            // Emit socket event for push notification
+            if (global.io) {
+                global.io.to(`user_${user._id}`).emit("kycApproved", {
+                    title: "✅ KYC Verified",
+                    message: "Your account is now fully verified with full trading access!",
+                    timestamp: Date.now()
+                });
+            }
         }
         if (justRejected) {
+            // Create in-app notification with rejection details
+            const rejectionReasons = req.body.rejectionReasons || [
+                "Document image was blurry or incomplete",
+                "Address proof is older than 3 months"
+            ];
             await Notification.create({
                 userId: user._id,
-                title: "KYC Verification Rejected",
-                message: "Your KYC submission was not approved. Please review your documents and submit again.",
+                title: "⚠️ KYC Verification Requires Attention",
+                message: `We were unable to verify your identity with the documents provided. Please re-submit with corrected documents. You have 7 days to re-submit before your account is restricted.`,
                 type: "warning",
                 priority: "high",
                 metadata: {
                     kycStatus: user.kycStatus,
-                    adminId: req.userId
+                    adminId: req.userId,
+                    rejectionReasons: rejectionReasons
                 }
             });
+            // Send email notification
+            await sendKycRejectedNotification(user.email, user.name, {
+                reasons: rejectionReasons
+            });
+            // Emit socket event for push notification
+            if (global.io) {
+                global.io.to(`user_${user._id}`).emit("kycRejected", {
+                    title: "⚠️ KYC Verification Requires Attention",
+                    message: "Please re-submit your documents within 7 days.",
+                    timestamp: Date.now()
+                });
+            }
         }
         res.json({ message: "User updated", user });
     }
@@ -235,42 +328,33 @@ exports.updateUser = async (req, res) => {
         res.status(500).json({ message: "Server error", error: error.message });
     }
 };
-exports.deleteUser = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const user = await User.findByIdAndDelete(id);
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
-        }
-        await Promise.all([
-            Deposit.deleteMany({ userId: id }),
-            Transaction.deleteMany({ userId: id }),
-            Withdrawal.deleteMany({ userId: id })
-        ]);
-        res.json({ message: "User deleted" });
-    }
-    catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Server error", error: error.message });
-    }
-};
-const createBalanceTransaction = async ({ userId, amount, type, description, adminId }) => {
+const createBalanceTransaction = async ({ userId, amount, type, description, adminId, balanceBefore, balanceAfter, lockedBefore, lockedAfter }) => {
+    const numericAmount = Number(amount) || 0;
+    const user = await User.findById(userId).lean();
+    if (!user)
+        throw new Error("Transaction target user not found");
+    const currentBalance = user.balance || 0;
+    const currentLocked = user.frozenBalance || 0;
+    const finalizedBalanceAfter = balanceAfter != null ? Number(balanceAfter) : currentBalance;
+    const finalizedLockedAfter = lockedAfter != null ? Number(lockedAfter) : currentLocked;
+    const finalizedBalanceBefore = balanceBefore != null
+        ? Number(balanceBefore)
+        : finalizedBalanceAfter - numericAmount;
+    const finalizedLockedBefore = lockedBefore != null
+        ? Number(lockedBefore)
+        : (type === "freeze" || type === "lock")
+            ? finalizedLockedAfter - numericAmount
+            : finalizedLockedAfter;
     return Transaction.create({
         userId,
         type,
-        amount: Number(amount),
+        amount: numericAmount,
+        balanceBefore: finalizedBalanceBefore,
+        balanceAfter: finalizedBalanceAfter,
+        lockedBefore: finalizedLockedBefore,
+        lockedAfter: finalizedLockedAfter,
         description,
-        createdBy: adminId
-    });
-};
-const createAdminAuditLog = async ({ adminId, action, targetType, targetId, details, metadata }) => {
-    return AuditLog.create({
-        adminId,
-        action,
-        targetType,
-        targetId,
-        details,
-        metadata
+        createdBy: adminId || null,
     });
 };
 const getSettingValue = async (key, defaultValue) => {
@@ -278,70 +362,9 @@ const getSettingValue = async (key, defaultValue) => {
     return setting ? setting.value : defaultValue;
 };
 const upsertSetting = async (key, value) => {
-    return Setting.findOneAndUpdate({ key }, { value }, { upsert: true, new: true, setDefaultsOnInsert: true });
+    return Setting.findOneAndUpdate({ key }, { value }, { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true });
 };
-exports.addDeposit = async (req, res) => {
-    try {
-        const { userId, amount, transactionRef, notes } = req.body;
-        const adminId = req.userId;
-        if (!userId || !amount || amount <= 0) {
-            return res.status(400).json({ message: "userId and positive amount are required" });
-        }
-        const user = await User.findById(userId);
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
-        }
-        const deposit = await Deposit.create({
-            userId,
-            amount: Number(amount),
-            status: "approved",
-            paymentMethod: "admin_credit",
-            transactionRef: transactionRef || `admin-${Date.now()}`,
-            notes: notes || "Admin deposit created",
-            approvedBy: adminId,
-            approvedAt: new Date()
-        });
-        user.balance = (user.balance || 0) + Number(amount);
-        await user.save();
-        emitSocket("balanceUpdate", {
-            userId: user._id,
-            balance: user.balance
-        });
-        await createBalanceTransaction({
-            userId,
-            amount,
-            type: "deposit",
-            description: `Admin deposit approved (${deposit.transactionRef})`,
-            adminId
-        });
-        await createAdminAuditLog({
-            adminId,
-            action: "admin_add_deposit",
-            targetType: "deposit",
-            targetId: deposit._id,
-            details: `Admin credited ${amount} to user ${user.email}`,
-            metadata: { transactionRef: deposit.transactionRef }
-        });
-        res.json({ message: "Deposit created and balance updated", deposit, userBalance: user.balance });
-    }
-    catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Server error", error: error.message });
-    }
-};
-exports.getAuditLogs = async (req, res) => {
-    try {
-        const logs = await AuditLog.find()
-            .populate("adminId", "email name role")
-            .sort({ createdAt: -1 })
-            .limit(200);
-        res.json({ logs });
-    }
-    catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Server error", error: error.message });
-    }
-};
+// Deposit/audit-related admin endpoints removed because corresponding models were deleted.
 exports.getSettings = async (req, res) => {
     try {
         const tradeLossMin = await getSettingValue("tradeLossMinPercent", 10);
@@ -364,17 +387,71 @@ exports.updateTradeSettings = async (req, res) => {
         }
         await upsertSetting("tradeLossMinPercent", Number(tradeLossMin));
         await upsertSetting("tradeLossMaxPercent", Number(tradeLossMax));
-        await createAdminAuditLog({
-            adminId: req.userId,
-            action: "update_trade_settings",
-            targetType: "setting",
-            details: `Updated trade loss range to ${tradeLossMin}-${tradeLossMax}`,
-            metadata: { tradeLossMin, tradeLossMax }
-        });
         res.json({ message: "Trade settings updated", tradeLossMin, tradeLossMax });
     }
     catch (error) {
         console.error(error);
+        res.status(500).json({ message: "Server error", error: error.message });
+    }
+};
+exports.adminStartDrift = async (req, res) => {
+    try {
+        const { userId, pair, positionId, positionSide, entryPrice, outcomePercent, direction, speed = "normal", volatility = "low", lossPercent = 0.25, } = req.body;
+        if (!userId || !pair || !positionId || entryPrice == null || outcomePercent == null || !direction) {
+            return res.status(400).json({
+                message: "userId, pair, positionId, entryPrice, outcomePercent, and direction are required"
+            });
+        }
+        const status = marketSimulator.startDrift({
+            userId,
+            pair,
+            positionId,
+            positionSide,
+            entryPrice: Number(entryPrice),
+            outcomePercent: Number(outcomePercent),
+            direction,
+            speed,
+            volatility,
+            lossPercent,
+        });
+        if (!status) {
+            return res.status(400).json({ message: "Unable to start drift for this user/pair" });
+        }
+        res.json({ success: true, status });
+    }
+    catch (error) {
+        console.error("adminStartDrift error:", error);
+        res.status(500).json({ message: "Server error", error: error.message });
+    }
+};
+exports.adminStopDrift = async (req, res) => {
+    try {
+        const { userId, pair, positionId } = req.body;
+        if (!userId || !pair || !positionId) {
+            return res.status(400).json({ message: "userId, pair, and positionId are required" });
+        }
+        const status = marketSimulator.stopDrift(userId, pair, positionId);
+        if (!status) {
+            return res.status(404).json({ message: "No drift state found for this user/pair" });
+        }
+        res.json({ success: true, status });
+    }
+    catch (error) {
+        console.error("adminStopDrift error:", error);
+        res.status(500).json({ message: "Server error", error: error.message });
+    }
+};
+exports.adminDriftStatus = async (req, res) => {
+    try {
+        const { userId, pair, positionId } = req.params;
+        if (!userId || !pair || !positionId) {
+            return res.status(400).json({ message: "userId, pair, and positionId are required" });
+        }
+        const status = marketSimulator.getDriftStatus(userId, pair, positionId);
+        res.json({ success: true, status });
+    }
+    catch (error) {
+        console.error("adminDriftStatus error:", error);
         res.status(500).json({ message: "Server error", error: error.message });
     }
 };
@@ -389,8 +466,20 @@ exports.addBalance = async (req, res) => {
         if (!user)
             return res.status(404).json({ message: "User not found" });
         user.balance = (user.balance || 0) + Number(amount);
-        await user.save();
-        emitSocket("balanceUpdate", { userId: user._id, balance: user.balance });
+        if (!user.userId) {
+            try {
+                user.userId = (user._id || '').toString();
+            }
+            catch (e) { }
+        }
+        if (!user.userId) {
+            await user.save({ validateBeforeSave: false });
+        }
+        else {
+            await user.save();
+        }
+        const syncedUser = await User.findById(userId).lean();
+        emitSocket("balanceUpdate", { userId: user._id, balance: syncedUser?.balance || user.balance, available: syncedUser?.balance || user.balance });
         await createBalanceTransaction({
             userId,
             amount,
@@ -398,15 +487,7 @@ exports.addBalance = async (req, res) => {
             description: description || "Admin added balance",
             adminId
         });
-        await createAdminAuditLog({
-            adminId,
-            action: "add_balance",
-            targetType: "user",
-            targetId: user._id,
-            details: `Added ${amount} to user ${user.email}`,
-            metadata: { amount, description }
-        });
-        res.json({ message: "Balance added", userBalance: user.balance });
+        res.json({ message: "Balance added", userBalance: syncedUser?.balance || user.balance });
     }
     catch (error) {
         console.error(error);
@@ -427,8 +508,20 @@ exports.removeBalance = async (req, res) => {
             return res.status(400).json({ message: "Insufficient balance" });
         }
         user.balance = (user.balance || 0) - Number(amount);
-        await user.save();
-        emitSocket("balanceUpdate", { userId: user._id, balance: user.balance });
+        if (!user.userId) {
+            try {
+                user.userId = (user._id || '').toString();
+            }
+            catch (e) { }
+        }
+        if (!user.userId) {
+            await user.save({ validateBeforeSave: false });
+        }
+        else {
+            await user.save();
+        }
+        const syncedUser = await User.findById(userId).lean();
+        emitSocket("balanceUpdate", { userId: user._id, balance: syncedUser?.balance || user.balance });
         await createBalanceTransaction({
             userId,
             amount,
@@ -436,15 +529,7 @@ exports.removeBalance = async (req, res) => {
             description: description || "Admin removed balance",
             adminId
         });
-        await createAdminAuditLog({
-            adminId,
-            action: "remove_balance",
-            targetType: "user",
-            targetId: user._id,
-            details: `Removed ${amount} from user ${user.email}`,
-            metadata: { amount, description }
-        });
-        res.json({ message: "Balance removed", userBalance: user.balance });
+        res.json({ message: "Balance removed", userBalance: syncedUser?.balance || user.balance });
     }
     catch (error) {
         console.error(error);
@@ -462,8 +547,20 @@ exports.creditBonus = async (req, res) => {
         if (!user)
             return res.status(404).json({ message: "User not found" });
         user.balance = (user.balance || 0) + Number(amount);
-        await user.save();
-        emitSocket("balanceUpdate", { userId: user._id, balance: user.balance });
+        if (!user.userId) {
+            try {
+                user.userId = (user._id || '').toString();
+            }
+            catch (e) { }
+        }
+        if (!user.userId) {
+            await user.save({ validateBeforeSave: false });
+        }
+        else {
+            await user.save();
+        }
+        const syncedUser = await User.findById(userId).lean();
+        emitSocket("balanceUpdate", { userId: user._id, balance: syncedUser?.balance || user.balance, available: syncedUser?.balance || user.balance });
         await createBalanceTransaction({
             userId,
             amount,
@@ -471,15 +568,7 @@ exports.creditBonus = async (req, res) => {
             description: description || "Admin credited bonus",
             adminId
         });
-        await createAdminAuditLog({
-            adminId,
-            action: "credit_bonus",
-            targetType: "user",
-            targetId: user._id,
-            details: `Credited bonus ${amount} to user ${user.email}`,
-            metadata: { amount, description }
-        });
-        res.json({ message: "Bonus credited", userBalance: user.balance });
+        res.json({ message: "Bonus credited", userBalance: syncedUser?.balance || user.balance });
     }
     catch (error) {
         console.error(error);
@@ -501,8 +590,20 @@ exports.freezeFunds = async (req, res) => {
         }
         user.balance = (user.balance || 0) - Number(amount);
         user.frozenBalance = (user.frozenBalance || 0) + Number(amount);
-        await user.save();
-        emitSocket("balanceUpdate", { userId: user._id, balance: user.balance, frozenBalance: user.frozenBalance });
+        if (!user.userId) {
+            try {
+                user.userId = (user._id || '').toString();
+            }
+            catch (e) { }
+        }
+        if (!user.userId) {
+            await user.save({ validateBeforeSave: false });
+        }
+        else {
+            await user.save();
+        }
+        const syncedUser = await User.findById(userId);
+        emitSocket("balanceUpdate", { userId: user._id, balance: syncedUser?.balance || user.balance, frozenBalance: syncedUser?.frozenBalance || user.frozenBalance });
         await createBalanceTransaction({
             userId,
             amount,
@@ -510,15 +611,7 @@ exports.freezeFunds = async (req, res) => {
             description: description || "Funds frozen by admin",
             adminId
         });
-        await createAdminAuditLog({
-            adminId,
-            action: "freeze_funds",
-            targetType: "user",
-            targetId: user._id,
-            details: `Frozen ${amount} for user ${user.email}`,
-            metadata: { amount, description }
-        });
-        res.json({ message: "Funds frozen", userBalance: user.balance, frozenBalance: user.frozenBalance });
+        res.json({ message: "Funds frozen", userBalance: syncedUser?.balance || user.balance, frozenBalance: syncedUser?.frozenBalance || user.frozenBalance });
     }
     catch (error) {
         console.error(error);
@@ -540,187 +633,90 @@ exports.getBalanceHistory = async (req, res) => {
         res.status(500).json({ message: "Server error", error: error.message });
     }
 };
-exports.getDeposits = async (req, res) => {
+// Deposit and withdrawal admin endpoints removed because corresponding models were deleted.
+// ─── Admin Price Override ─────────────────────────────────────────────────────
+exports.setPriceOverride = async (req, res) => {
     try {
-        const { status, userId } = req.query;
-        const query = {};
-        if (status) {
-            query.status = status;
-        }
-        if (userId) {
-            query.userId = userId;
-        }
-        const deposits = await Deposit.find(query)
-            .populate("userId", "email name")
-            .sort({ createdAt: -1 });
-        res.json({ deposits });
-    }
-    catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Server error", error: error.message });
-    }
-};
-exports.approveDeposit = async (req, res) => {
-    try {
-        const { depositId, transactionRef } = req.body;
-        const adminId = req.userId;
-        if (!depositId) {
-            return res.status(400).json({ message: "depositId is required" });
-        }
-        const deposit = await Deposit.findById(depositId);
-        if (!deposit)
-            return res.status(404).json({ message: "Deposit not found" });
-        if (deposit.status !== "pending") {
-            return res.status(400).json({ message: "Deposit is not pending" });
-        }
-        deposit.status = "approved";
-        deposit.approvedBy = adminId;
-        deposit.approvedAt = new Date();
-        deposit.transactionRef = transactionRef || deposit.transactionRef;
-        await deposit.save();
-        const user = await User.findById(deposit.userId);
-        if (user) {
-            user.balance = (user.balance || 0) + deposit.amount;
-            await user.save();
-            emitSocket("balanceUpdate", { userId: user._id, balance: user.balance });
-            await createBalanceTransaction({
-                userId: deposit.userId,
-                amount: deposit.amount,
-                type: "deposit",
-                description: transactionRef ? `Deposit approved (${transactionRef})` : "Deposit approved by admin",
-                adminId
-            });
-            await createAdminAuditLog({
-                adminId,
-                action: "approve_deposit",
-                targetType: "deposit",
-                targetId: deposit._id,
-                details: `Approved deposit ${deposit._id} for user ${user.email}`,
-                metadata: { transactionRef }
+        const { userId, pair, price } = req.body;
+        if (!userId || !pair || price === undefined) {
+            return res.status(400).json({
+                message: "userId, pair, and price are required"
             });
         }
-        res.json({ message: "Deposit approved", deposit });
+        if (!Number.isFinite(price) || price <= 0) {
+            return res.status(400).json({
+                message: "price must be a positive number"
+            });
+        }
+        // Ensure structure exists
+        if (!global.adminPriceOverride[userId]) {
+            global.adminPriceOverride[userId] = {};
+        }
+        // Set the override
+        global.adminPriceOverride[userId][pair] = {
+            active: true,
+            price: parseFloat(price)
+        };
+        // Emit price update to user's socket room with override price
+        if (global.io) {
+            global.io.to(`user:${userId}`).emit('priceUpdate', {
+                pair,
+                price: parseFloat(price),
+                isOverride: true,
+                time: Date.now()
+            });
+        }
+        res.json({
+            message: "Price override set",
+            override: {
+                userId,
+                pair,
+                active: true,
+                price: parseFloat(price)
+            }
+        });
     }
     catch (error) {
         console.error(error);
         res.status(500).json({ message: "Server error", error: error.message });
     }
 };
-exports.rejectDeposit = async (req, res) => {
+exports.removePriceOverride = async (req, res) => {
     try {
-        const { depositId, reason } = req.body;
-        if (!depositId) {
-            return res.status(400).json({ message: "depositId is required" });
+        const { userId, pair } = req.body;
+        if (!userId || !pair) {
+            return res.status(400).json({
+                message: "userId and pair are required"
+            });
         }
-        const deposit = await Deposit.findById(depositId);
-        if (!deposit)
-            return res.status(404).json({ message: "Deposit not found" });
-        deposit.status = "rejected";
-        deposit.notes = reason || "Rejected by admin";
-        await deposit.save();
-        await createAdminAuditLog({
-            adminId: req.userId,
-            action: "reject_deposit",
-            targetType: "deposit",
-            targetId: deposit._id,
-            details: `Rejected deposit ${deposit._id}`,
-            metadata: { reason }
+        // Clear the override
+        if (global.adminPriceOverride[userId]) {
+            global.adminPriceOverride[userId][pair] = {
+                active: false,
+                price: null
+            };
+        }
+        // Get live Binance price
+        const livePrice = global.cachedMarketPrices?.[pair];
+        // Emit price update to user's socket room with live Binance price
+        if (global.io) {
+            global.io.to(`user:${userId}`).emit('priceUpdate', {
+                pair,
+                price: livePrice || null,
+                isOverride: false,
+                time: Date.now()
+            });
+        }
+        res.json({
+            message: "Price override removed",
+            override: {
+                userId,
+                pair,
+                active: false,
+                price: null,
+                livePrice: livePrice || null
+            }
         });
-        res.json({ message: "Deposit rejected", deposit });
-    }
-    catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Server error", error: error.message });
-    }
-};
-exports.getWithdrawals = async (req, res) => {
-    try {
-        const { status, userId } = req.query;
-        const query = {};
-        if (status)
-            query.status = status;
-        if (userId)
-            query.userId = userId;
-        const withdrawals = await Withdrawal.find(query)
-            .populate("userId", "email name")
-            .sort({ createdAt: -1 });
-        res.json({ withdrawals });
-    }
-    catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Server error", error: error.message });
-    }
-};
-exports.approveWithdrawal = async (req, res) => {
-    try {
-        const { withdrawalId, notes } = req.body;
-        const adminId = req.userId;
-        if (!withdrawalId) {
-            return res.status(400).json({ message: "withdrawalId is required" });
-        }
-        const withdrawal = await Withdrawal.findById(withdrawalId);
-        if (!withdrawal)
-            return res.status(404).json({ message: "Withdrawal not found" });
-        if (withdrawal.status !== "pending") {
-            return res.status(400).json({ message: "Withdrawal is not pending" });
-        }
-        const user = await User.findById(withdrawal.userId);
-        if (!user)
-            return res.status(404).json({ message: "User not found" });
-        if ((user.balance || 0) < withdrawal.amount) {
-            return res.status(400).json({ message: "Insufficient user balance" });
-        }
-        user.balance = (user.balance || 0) - withdrawal.amount;
-        await user.save();
-        emitSocket("balanceUpdate", { userId: user._id, balance: user.balance });
-        withdrawal.status = "approved";
-        withdrawal.approvedBy = adminId;
-        withdrawal.approvedAt = new Date();
-        withdrawal.notes = notes || withdrawal.notes;
-        await withdrawal.save();
-        await createBalanceTransaction({
-            userId: withdrawal.userId,
-            amount: withdrawal.amount,
-            type: "withdrawal",
-            description: notes || "Withdrawal approved by admin",
-            adminId
-        });
-        await createAdminAuditLog({
-            adminId,
-            action: "approve_withdrawal",
-            targetType: "withdrawal",
-            targetId: withdrawal._id,
-            details: `Approved withdrawal ${withdrawal._id} for user ${user.email}`,
-            metadata: { notes }
-        });
-        res.json({ message: "Withdrawal approved", withdrawal, userBalance: user.balance });
-    }
-    catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Server error", error: error.message });
-    }
-};
-exports.rejectWithdrawal = async (req, res) => {
-    try {
-        const { withdrawalId, reason } = req.body;
-        if (!withdrawalId) {
-            return res.status(400).json({ message: "withdrawalId is required" });
-        }
-        const withdrawal = await Withdrawal.findById(withdrawalId);
-        if (!withdrawal)
-            return res.status(404).json({ message: "Withdrawal not found" });
-        withdrawal.status = "rejected";
-        withdrawal.notes = reason || "Rejected by admin";
-        await withdrawal.save();
-        await createAdminAuditLog({
-            adminId: req.userId,
-            action: "reject_withdrawal",
-            targetType: "withdrawal",
-            targetId: withdrawal._id,
-            details: `Rejected withdrawal ${withdrawal._id}`,
-            metadata: { reason }
-        });
-        res.json({ message: "Withdrawal rejected", withdrawal });
     }
     catch (error) {
         console.error(error);

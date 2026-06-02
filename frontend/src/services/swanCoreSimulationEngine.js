@@ -26,6 +26,13 @@ const TIMEFRAME_INTERVALS = {
 const DEFAULT_INTERVAL_SEC = 60;
 const MAX_HISTORY_CANDLES = 200;
 const LIQUIDATION_LOSS_RATIO = 0.8;
+const MIN_PNL_PERCENT = -25;
+const MAX_PNL_PERCENT = 2;
+
+function clampPnlPercent(percent) {
+  if (!Number.isFinite(percent)) return 0;
+  return Number(Math.min(Math.max(percent, MIN_PNL_PERCENT), MAX_PNL_PERCENT).toFixed(4));
+}
 
 function normalizeToBucket(timestampSec, intervalSec) {
   return Math.floor(timestampSec / intervalSec) * intervalSec;
@@ -51,19 +58,25 @@ function buildOrderBook(price, skew = 0) {
 }
 
 function calculatePositionPnl(position, price) {
-  const raw = position.side === 'long'
-    ? (price - position.entryPrice) * position.quantity
-    : (position.entryPrice - price) * position.quantity;
+  const leverage = Number(position.leverage || 1) || 1;
+  const quantity = Number(position.quantity || 0);
+  const side = String(position.side || 'long').toLowerCase();
+  const direction = side === 'short' ? -1 : 1;
 
-  const pnlPercent = position.entryPrice > 0
-    ? Number(((raw / (position.entryPrice * position.quantity)) * 100).toFixed(2))
+  const raw = direction * (price - position.entryPrice) * quantity * leverage;
+  const rawPercent = position.entryPrice > 0
+    ? (((price - position.entryPrice) / position.entryPrice) * 100) * direction
     : 0;
+  const clampedPercent = clampPnlPercent(rawPercent);
+  const clamped = Number((position.entryPrice * quantity * leverage * (clampedPercent / 100)).toFixed(4));
 
   return {
     ...position,
     currentPrice: price,
-    currentPnL: Number(raw.toFixed(4)),
-    currentPnLPercent: pnlPercent,
+    currentPnL: clamped,
+    currentPnLPercent: Number(clampedPercent.toFixed(4)),
+    rawPnL: Number(raw.toFixed(4)),
+    rawPnLPercent: Number(rawPercent.toFixed(4)),
   };
 }
 
@@ -444,21 +457,30 @@ class SimulationEngine {
     const position = this.state.openPositions.find((pos) => pos.id === positionId);
     if (!position) return null;
 
-    const raw = position.side === 'long'
-      ? (exitPrice - position.entryPrice) * position.quantity
-      : (position.entryPrice - exitPrice) * position.quantity;
+    const leverage = Number(position.leverage || 1) || 1;
+    const quantity = Number(position.quantity || 0);
+    const side = String(position.side || 'long').toLowerCase();
+    const direction = side === 'short' ? -1 : 1;
 
-    const pnl = Number(raw.toFixed(4));
+    const raw = direction * (exitPrice - position.entryPrice) * quantity * leverage;
+    const rawPercent = position.entryPrice > 0
+      ? (((exitPrice - position.entryPrice) / position.entryPrice) * 100) * direction
+      : 0;
+    const clampedPercent = clampPnlPercent(rawPercent);
+    const settledPnl = Number((position.entryPrice * quantity * leverage * (clampedPercent / 100)).toFixed(4));
     const lockedMargin = Number(position.lockedMargin || 0);
 
-    this.state.portfolio.availableUSDT = Number((this.state.portfolio.availableUSDT + lockedMargin + pnl).toFixed(4));
+    this.state.portfolio.availableUSDT = Number((this.state.portfolio.availableUSDT + lockedMargin + settledPnl).toFixed(4));
     this.state.portfolio.lockedUSDT = Number(Math.max(0, this.state.portfolio.lockedUSDT - lockedMargin).toFixed(4));
     this.state.portfolio.totalEquity = Number((this.state.portfolio.availableUSDT + this.state.portfolio.lockedUSDT).toFixed(4));
 
     const closed = {
       ...position,
       exitPrice: Number(exitPrice.toFixed(8)),
-      realizedPnL: pnl,
+      rawPnL: Number(raw.toFixed(4)),
+      rawPnLPercent: Number(rawPercent.toFixed(4)),
+      realizedPnL: settledPnl,
+      realizedPnLPercent: Number(clampedPercent.toFixed(4)),
       closedAt: new Date().toISOString(),
       closeReason: reason,
     };

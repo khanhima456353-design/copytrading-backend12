@@ -282,13 +282,6 @@ function HomeScreen({ onNavigate, showTopBar = true, showBottomNav = true }: { o
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // Fetch user profile and notifications on component mount
-  useEffect(() => {
-    fetchUserProfile();
-    fetchNotifications();
-    fetchUnreadCount();
-  }, []);
-
   const fetchUserProfile = async () => {
     try {
       const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/profile`, {
@@ -354,6 +347,12 @@ function HomeScreen({ onNavigate, showTopBar = true, showBottomNav = true }: { o
       console.error('Error fetching unread count:', error);
     }
   };
+
+  useEffect(() => {
+    fetchUserProfile();
+    fetchNotifications();
+    fetchUnreadCount();
+  }, []);
 
   const handleNotificationClick = () => {
     setShowNotifications(true);
@@ -436,15 +435,54 @@ function HomeScreen({ onNavigate, showTopBar = true, showBottomNav = true }: { o
 // ─── Portfolio Screen ─────────────────────────────────────────────────────────
 
 function PortfolioScreen({ onNavigate, showTopBar = true, showBottomNav = true }: { onNavigate: (s: Screen) => void; showTopBar?: boolean; showBottomNav?: boolean }) {
+  const [totalValue, setTotalValue] = useState<number>(0);
+  const [holdingsCount, setHoldingsCount] = useState<number>(0);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  const portfolioLabel = loading ? "Loading portfolio..." : totalValue > 0 ? `${holdingsCount} holding${holdingsCount === 1 ? "" : "s"}` : "No holdings yet";
+
+  const fetchPortfolioSummary = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/account/summary`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const available = Number(data.available || 0);
+        const locked = Number(data.locked || 0);
+        const holdingsValue = Array.isArray(data.holdings)
+          ? data.holdings.reduce((sum: number, item: any) => sum + (Number(item.value) || 0), 0)
+          : 0;
+
+        setTotalValue(Math.max(0, available + locked + holdingsValue));
+        setHoldingsCount(Array.isArray(data.holdings) ? data.holdings.length : 0);
+      }
+    } catch (error) {
+      console.error('Error fetching portfolio summary:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPortfolioSummary();
+  }, []);
+
   return (
     <div>
       {showTopBar && <TopBar />}
       <div style={styles.balanceHero}>
         <div style={styles.balLabel}>Total portfolio value</div>
         <div style={styles.balAmount}>
-          0.00 <span style={styles.balUnit}>USDT</span>
+          {loading ? "Loading..." : totalValue.toFixed(2)} <span style={styles.balUnit}>USDT</span>
         </div>
-        <div style={styles.balChange}>Deposit to start building your portfolio</div>
+        <div style={styles.balChange}>{loading ? "Please wait while we load your balance." : totalValue > 0 ? portfolioLabel : "Deposit to start building your portfolio"}</div>
       </div>
       <div style={styles.pnlBar}>
         {[["24h P&L","—"],["7d P&L","—"],["All-time","—"],["Invested","0.00"]].map(([l,v],i) => (
@@ -455,7 +493,7 @@ function PortfolioScreen({ onNavigate, showTopBar = true, showBottomNav = true }
         ))}
       </div>
       <div style={styles.sectionHeader}>
-        <span style={styles.sectionLabel}>Holdings (0)</span>
+        <span style={styles.sectionLabel}>Holdings ({holdingsCount})</span>
       </div>
       <div style={styles.emptyState}>
         <div style={styles.emptyIcon}>

@@ -1,6 +1,4 @@
-const WalletService = require("../services/walletService");
-const OrderService = require("../services/orderService");
-const MarginService = require("../services/marginService");
+const Order = require("../../models/Order");
 const AdminControlService = require("../services/adminControlService");
 
 const getWalletSummary = async (req, res) => {

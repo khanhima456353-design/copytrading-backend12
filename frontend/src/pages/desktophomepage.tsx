@@ -900,47 +900,113 @@ const fetchUserProfile = async () => {
 
         /* Balance hero */
         .dt-balance-hero {
-          background: radial-gradient(circle at top, rgba(120, 200, 255, 0.25), transparent 45%),
-            radial-gradient(circle at top right, rgba(0, 180, 255, 0.18), transparent 55%),
-            radial-gradient(circle at bottom left, rgba(0, 120, 200, 0.20), transparent 60%),
-            linear-gradient(180deg, #0a1a2a 0%, #06121f 60%, #040b14 100%);
-          border: 1px solid rgba(255,255,255,0.08);
+          background: linear-gradient(160deg, #0d1f35 0%, #0a1628 40%, #070f1e 100%);
+          border: 1px solid rgba(255,255,255,0.07);
           border-radius: 20px; overflow: hidden;
           padding: 28px 28px 0;
           position: relative;
         }
-        .dt-hero-glow {
-          position: absolute; top: -40px; left: 50%; transform: translateX(-50%);
-          width: 300px; height: 200px;
-          background: radial-gradient(circle, rgba(124,106,247,0.15) 0%, transparent 70%);
+        .dt-hero-grid {
+          position: absolute; inset: 0;
+          background-image: linear-gradient(rgba(55,138,221,0.04) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(55,138,221,0.04) 1px, transparent 1px);
+          background-size: 40px 40px;
           pointer-events: none;
         }
-        .dt-hero-label { font-size: 12px; color: var(--text3); letter-spacing: 0.5px; margin-bottom: 6px; }
-        .dt-hero-amount {
-          font-family: 'DM Mono', monospace; font-size: 38px; font-weight: 500;
-          color: var(--text); margin-bottom: 4px;
+        .dt-hero-glow {
+          position: absolute; top: -60px; right: -40px;
+          width: 280px; height: 280px; border-radius: 50%;
+          background: radial-gradient(circle, rgba(55,138,221,0.12) 0%, transparent 70%);
+          pointer-events: none;
         }
-        .dt-hero-amount span { font-size: 18px; color: var(--text2); margin-left: 6px; }
-        .dt-hero-sub { font-size: 13px; color: var(--text3); margin-bottom: 24px; }
+        .dt-hero-glow-green {
+          position: absolute; bottom: -40px; left: -20px;
+          width: 180px; height: 180px; border-radius: 50%;
+          background: radial-gradient(circle, rgba(14,203,129,0.07) 0%, transparent 70%);
+          pointer-events: none;
+        }
+        .dt-hero-top {
+          display: flex; justify-content: space-between; align-items: flex-start;
+          position: relative; z-index: 1; margin-bottom: 24px;
+        }
+        .dt-hero-label {
+          display: flex; align-items: center; gap: 7px;
+          font-size: 11px; color: rgba(255,255,255,0.4);
+          text-transform: uppercase; letter-spacing: 0.8px;
+          margin-bottom: 10px;
+          font-family: 'DM Mono', monospace;
+        }
+        .dt-hero-live-dot {
+          display: inline-block; width: 7px; height: 7px;
+          border-radius: 50%; background: #0ecb81;
+          box-shadow: 0 0 8px #0ecb81;
+          animation: dtPulse 2s ease-in-out infinite;
+        }
+        @keyframes dtPulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.6; transform: scale(0.85); }
+        }
+        .dt-hero-amount {
+          font-family: 'DM Mono', monospace;
+          font-size: 44px; font-weight: 600;
+          color: #fff; letter-spacing: -0.03em;
+          line-height: 1; margin-bottom: 12px;
+        }
+        .dt-hero-currency { font-size: 22px; color: rgba(255,255,255,0.45); margin-right: 3px; font-weight: 400; }
+        .dt-hero-unit { font-size: 16px; color: rgba(255,255,255,0.3); margin-left: 10px; font-weight: 400; }
+        .dt-hero-sub-row { display: flex; align-items: center; gap: 10px; }
+        .dt-hero-change-pill {
+          display: inline-flex; align-items: center; gap: 4px;
+          font-size: 11px; font-weight: 600;
+          color: rgba(255,255,255,0.6);
+          background: rgba(255,255,255,0.06);
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 999px; padding: 3px 10px;
+          font-family: 'DM Mono', monospace;
+        }
+        .dt-hero-sub-text { font-size: 12px; color: rgba(255,255,255,0.3); }
+        .dt-hero-stats-row {
+          display: flex; gap: 0;
+          background: rgba(255,255,255,0.04);
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 14px; overflow: hidden;
+          align-self: flex-start; flex-shrink: 0;
+        }
+        .dt-hero-stat {
+          display: flex; flex-direction: column; gap: 4px;
+          padding: 12px 18px; min-width: 90px;
+        }
+        .dt-hero-stat-label {
+          font-size: 10px; color: rgba(255,255,255,0.35);
+          text-transform: uppercase; letter-spacing: 0.6px;
+          font-family: 'DM Mono', monospace;
+        }
+        .dt-hero-stat-val {
+          font-size: 15px; font-weight: 600; color: #fff;
+          font-family: 'DM Mono', monospace;
+        }
 
         /* Quick actions bar */
         .dt-quick-actions {
           display: grid; grid-template-columns: repeat(4, 1fr);
-          border-top: 1px solid rgba(255,255,255,0.08);
+          border-top: 1px solid rgba(255,255,255,0.07);
+          position: relative; z-index: 1;
         }
         .dt-qa-item {
-          display: flex; flex-direction: column; align-items: center; gap: 8px;
-          padding: 16px 8px; cursor: pointer;
-          border-right: 1px solid var(--border);
+          display: flex; flex-direction: column; align-items: center; gap: 9px;
+          padding: 18px 8px; cursor: pointer;
+          border-right: 1px solid rgba(255,255,255,0.05);
           transition: background 0.15s;
         }
         .dt-qa-item:last-child { border-right: none; }
-        .dt-qa-item:hover { background: var(--surface2); }
+        .dt-qa-item:hover { background: rgba(255,255,255,0.03); }
         .dt-qa-icon {
-          width: 44px; height: 44px; border-radius: 14px;
-          display: flex; align-items: center; justify-content: center; font-size: 20px;
+          width: 46px; height: 46px;
+          display: flex; align-items: center; justify-content: center;
+          transition: transform 0.15s;
         }
-        .dt-qa-label { font-size: 12px; color: var(--text2); font-weight: 500; }
+        .dt-qa-item:hover .dt-qa-icon { transform: translateY(-2px); }
+        .dt-qa-label { font-size: 12px; color: rgba(255,255,255,0.5); font-weight: 500; letter-spacing: 0.2px; }
 
         /* Ticker strip */
         .dt-ticker-outer {
@@ -1362,27 +1428,67 @@ const fetchUserProfile = async () => {
               </div>
             ) : (
               <>
-                {/* Balance hero */}
+                {/* Modern Balance Hero */}
                 <div className="dt-balance-hero">
+                  <div className="dt-hero-grid" />
                   <div className="dt-hero-glow" />
-                  <div className="dt-hero-label">Total balance</div>
-                  <div className="dt-hero-amount">{balance.toFixed(2)}<span>USDT</span></div>
-                 <div className="dt-hero-sub">
-  {balance > 0
-    ? "Simplified Trading"
-    : "No change · deposit to get started"}
-</div>
+                  <div className="dt-hero-glow-green" />
+
+                  <div className="dt-hero-top">
+                    <div>
+                      <div className="dt-hero-label">
+                        <span className="dt-hero-live-dot" />
+                        Total Balance
+                      </div>
+                      <div className="dt-hero-amount">
+                        <span className="dt-hero-currency">$</span>
+                        {balance.toFixed(2)}
+                        <span className="dt-hero-unit">USDT</span>
+                      </div>
+                      <div className="dt-hero-sub-row">
+                        <span className="dt-hero-change-pill">
+                          {balance > 0
+                            ? <><span style={{ color: "#0ecb81" }}>▲</span> Active Portfolio</>
+                            : <><span style={{ color: "#f6465d" }}>—</span> No change</>
+                          }
+                        </span>
+                        <span className="dt-hero-sub-text">
+                          {balance > 0 ? "Simplified Trading" : "Deposit to get started"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="dt-hero-stats-row">
+                      <div className="dt-hero-stat">
+                        <span className="dt-hero-stat-label">Available</span>
+                        <span className="dt-hero-stat-val">${balance.toFixed(2)}</span>
+                      </div>
+                      <div className="dt-hero-stat" style={{ borderLeft: "1px solid rgba(255,255,255,0.07)" }}>
+                        <span className="dt-hero-stat-label">In Trade</span>
+                        <span className="dt-hero-stat-val">$0.00</span>
+                      </div>
+                      <div className="dt-hero-stat" style={{ borderLeft: "1px solid rgba(255,255,255,0.07)" }}>
+                        <span className="dt-hero-stat-label">24h P&L</span>
+                        <span className="dt-hero-stat-val" style={{ color: "var(--text3)" }}>—</span>
+                      </div>
+                    </div>
+                  </div>
 
                   <div className="dt-quick-actions">
                     {[
-                      { label: "Deposit",  icon: "＋", bg: "rgba(14,203,129,0.12)",  color: "#0ecb81" },
-                      { label: "Withdraw", icon: "↑",  bg: "rgba(55,138,221,0.12)",  color: "#378ADD" },
-                      { label: "Trade",    icon: "⇄",  bg: "rgba(124,106,247,0.12)", color: "#a78bfa" },
-                      { label: "Transfer", icon: "➤",  bg: "rgba(93,202,165,0.12)",  color: "#5DCAA5" },
+                      { label: "Deposit",  icon: "↓", bg: "linear-gradient(135deg,rgba(14,203,129,0.15),rgba(14,203,129,0.05))", border: "rgba(14,203,129,0.25)", color: "#0ecb81", glow: "rgba(14,203,129,0.2)" },
+                      { label: "Withdraw", icon: "↑", bg: "linear-gradient(135deg,rgba(55,138,221,0.15),rgba(55,138,221,0.05))", border: "rgba(55,138,221,0.25)", color: "#378ADD", glow: "rgba(55,138,221,0.2)" },
+                      { label: "Trade",    icon: "⇄", bg: "linear-gradient(135deg,rgba(124,106,247,0.15),rgba(124,106,247,0.05))", border: "rgba(124,106,247,0.25)", color: "#a78bfa", glow: "rgba(124,106,247,0.2)" },
+                      { label: "Transfer", icon: "⟳", bg: "linear-gradient(135deg,rgba(240,185,11,0.15),rgba(240,185,11,0.05))", border: "rgba(240,185,11,0.25)", color: "#F0B90B", glow: "rgba(240,185,11,0.2)" },
                     ].map((a, i) => (
                       <div key={i} className="dt-qa-item">
-                        <div className="dt-qa-icon" style={{ background: a.bg }}>
-                          <span style={{ fontSize: 20, color: a.color }}>{a.icon}</span>
+                        <div className="dt-qa-icon" style={{
+                          background: a.bg,
+                          border: `1px solid ${a.border}`,
+                          boxShadow: `0 4px 14px ${a.glow}`,
+                          borderRadius: 14,
+                        }}>
+                          <span style={{ fontSize: 22, color: a.color, fontWeight: 300 }}>{a.icon}</span>
                         </div>
                         <span className="dt-qa-label">{a.label}</span>
                       </div>

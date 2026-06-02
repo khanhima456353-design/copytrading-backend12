@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { CSSProperties } from "react";
 import logo from "../assets/logo.jpg";
 import { MARKETS, TICKERS, COIN_COLORS } from "./homeConstants";
@@ -158,31 +158,75 @@ export function BottomNav({
 
 export function HomeMainContent({ onNavigate }: { onNavigate: (path: string) => void }) {
   const [activeTab, setActiveTab] = useState("Hot");
+  const [balance, setBalance] = useState<number>(0);
+useEffect(() => {
+  fetch(`${process.env.REACT_APP_API_URL || "http://localhost:5000"}/api/profile`, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+  }).then(r => r.json()).then(d => { if (d.success) setBalance(d.user.balance || 0); });
+}, []);
 
   return (
     <>
-      <div style={styles.balanceHero}>
-        <div style={styles.balLabel}>Total balance</div>
-        <div style={styles.balAmount}>
-          0.00 <span style={styles.balUnit}>USDT</span>
-        </div>
-        <div style={styles.balChange}>No change · deposit to get started</div>
-      </div>
+      {/* ── Modern Balance Card ── */}
+      <div style={styles.balanceCard}>
+        {/* Subtle animated grid overlay */}
+        <div style={styles.balCardGrid} />
+        <div style={styles.balCardGlow} />
 
-      <div style={styles.quickActions}>
-        {[
-          { label: "Deposit",  icon: "＋", bg: "#0ecb8118", color: "#0ecb81" },
-          { label: "Withdraw", icon: "↑",  bg: "#378ADD18", color: "#378ADD" },
-          { label: "Trade",    icon: "⇄",  bg: "#7C5CFC18", color: "#a78bfa" },
-          { label: "Transfer", icon: "➤",  bg: "#5DCAA518", color: "#5DCAA5" },
-        ].map((a, i) => (
-          <div key={i} style={styles.qaItem}>
-            <div style={{ ...styles.qaIcon, background: a.bg }}>
-              <span style={{ fontSize: 18, color: a.color }}>{a.icon}</span>
+        <div style={styles.balCardTop}>
+          <div>
+            <div style={styles.balLabel}>
+              <span style={styles.balDot} />
+              Total Balance
             </div>
-            <span style={styles.qaLabel}>{a.label}</span>
+            <div style={styles.balAmount}>
+              <span style={styles.balCurrency}>$</span>
+              {balance.toFixed(2)}
+              <span style={styles.balUnit}>USDT</span>
+            </div>
+            <div style={styles.balSubRow}>
+              <span style={styles.balChangePill}>
+                {balance > 0
+  ? <><span style={{ color: "#0ecb81", marginRight: 3 }}>▲</span>Active Portfolio</>
+  : <><span style={{ color: "#f6465d", marginRight: 3 }}>—</span>No change</>
+}
+              </span>
+              <span style={styles.bal24h}>24h change</span>
+            </div>
           </div>
-        ))}
+          <div style={styles.balRightStats}>
+            <div style={styles.balStatBox}>
+              <span style={styles.balStatLabel}>Available</span>
+              <span style={styles.balStatVal}>${balance.toFixed(2)} </span>
+            </div>
+            <div style={{ ...styles.balStatBox, borderLeft: "1px solid rgba(255,255,255,0.07)" }}>
+              <span style={styles.balStatLabel}>In Trade</span>
+              <span style={styles.balStatVal}>${balance.toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick actions */}
+        <div style={styles.quickActions}>
+          {[
+            { label: "Deposit",  icon: "↓", bg: "linear-gradient(135deg,#0ecb8122,#0ecb8108)", border: "#0ecb8133", color: "#0ecb81", glow: "rgba(14,203,129,0.18)" },
+            { label: "Withdraw", icon: "↑", bg: "linear-gradient(135deg,#378ADD22,#378ADD08)", border: "#378ADD33", color: "#378ADD", glow: "rgba(55,138,221,0.18)" },
+            { label: "Trade",    icon: "⇄", bg: "linear-gradient(135deg,#7C5CFC22,#7C5CFC08)", border: "#7C5CFC33", color: "#a78bfa", glow: "rgba(124,92,252,0.18)" },
+            { label: "Transfer", icon: "⟳", bg: "linear-gradient(135deg,#F0B90B22,#F0B90B08)", border: "#F0B90B33", color: "#F0B90B", glow: "rgba(240,185,11,0.18)" },
+          ].map((a, i) => (
+            <div key={i} style={styles.qaItem}>
+              <div style={{
+                ...styles.qaIcon,
+                background: a.bg,
+                border: `1px solid ${a.border}`,
+                boxShadow: `0 4px 14px ${a.glow}`,
+              }}>
+                <span style={{ fontSize: 20, color: a.color, fontWeight: 300 }}>{a.icon}</span>
+              </div>
+              <span style={styles.qaLabel}>{a.label}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div style={styles.tickerStrip}>
@@ -431,40 +475,127 @@ const styles: Record<string, CSSProperties> = {
     fontSize: 12,
     color: "#9ca3af",
   },
-  balanceHero: {
-    background: "#16213e",
-    padding: "22px 20px 18px",
-    textAlign: "center",
-    borderBottom: "0.5px solid rgba(255,255,255,0.06)",
+  balanceCard: {
+    position: "relative" as const,
+    background: "linear-gradient(160deg, #0d1f35 0%, #0a1628 40%, #070f1e 100%)",
+    borderBottom: "1px solid rgba(255,255,255,0.06)",
+    overflow: "hidden" as const,
+    padding: "24px 20px 0",
   },
-  balLabel: { fontSize: 12, color: "rgba(255,255,255,0.4)", letterSpacing: "0.5px", marginBottom: 6 },
-  balAmount: { fontSize: 30, fontWeight: 500, color: "#fff" },
-  balUnit: { fontSize: 14, color: "rgba(255,255,255,0.4)", marginLeft: 4 },
-  balChange: { fontSize: 13, color: "rgba(255,255,255,0.3)", marginTop: 5 },
+  balCardGrid: {
+    position: "absolute" as const,
+    inset: 0,
+    backgroundImage: "linear-gradient(rgba(55,138,221,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(55,138,221,0.04) 1px, transparent 1px)",
+    backgroundSize: "40px 40px",
+    pointerEvents: "none" as const,
+  },
+  balCardGlow: {
+    position: "absolute" as const,
+    top: -60,
+    right: -40,
+    width: 200,
+    height: 200,
+    borderRadius: "50%",
+    background: "radial-gradient(circle, rgba(55,138,221,0.12) 0%, transparent 70%)",
+    pointerEvents: "none" as const,
+  },
+  balCardTop: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    position: "relative" as const,
+    zIndex: 1,
+    marginBottom: 22,
+  },
+  balLabel: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    fontSize: 11,
+    color: "rgba(255,255,255,0.4)",
+    letterSpacing: "0.8px",
+    textTransform: "uppercase" as const,
+    marginBottom: 8,
+    fontFamily: "'DM Mono', monospace",
+  },
+  balDot: {
+    display: "inline-block",
+    width: 6,
+    height: 6,
+    borderRadius: "50%",
+    background: "#0ecb81",
+    boxShadow: "0 0 6px #0ecb81",
+  },
+  balAmount: {
+    fontSize: 38,
+    fontWeight: 600,
+    color: "#fff",
+    letterSpacing: "-0.02em",
+    lineHeight: 1,
+    marginBottom: 10,
+    fontFamily: "'DM Mono', monospace",
+  },
+  balCurrency: { fontSize: 20, color: "rgba(255,255,255,0.5)", marginRight: 2, fontWeight: 400 },
+  balUnit: { fontSize: 14, color: "rgba(255,255,255,0.35)", marginLeft: 8, fontWeight: 400 },
+  balSubRow: { display: "flex", alignItems: "center", gap: 8 },
+  balChangePill: {
+    display: "inline-flex",
+    alignItems: "center",
+    fontSize: 11,
+    fontWeight: 600,
+    color: "#0ecb81",
+    background: "rgba(14,203,129,0.1)",
+    border: "1px solid rgba(14,203,129,0.2)",
+    borderRadius: 999,
+    padding: "3px 8px",
+    fontFamily: "'DM Mono', monospace",
+  },
+  bal24h: { fontSize: 11, color: "rgba(255,255,255,0.3)" },
+  balRightStats: {
+    display: "flex",
+    gap: 0,
+    background: "rgba(255,255,255,0.04)",
+    border: "1px solid rgba(255,255,255,0.08)",
+    borderRadius: 12,
+    overflow: "hidden" as const,
+    flexShrink: 0,
+  },
+  balStatBox: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: 4,
+    padding: "10px 14px",
+    minWidth: 80,
+  },
+  balStatLabel: { fontSize: 10, color: "rgba(255,255,255,0.35)", textTransform: "uppercase" as const, letterSpacing: "0.6px" },
+  balStatVal: { fontSize: 14, fontWeight: 600, color: "#fff", fontFamily: "'DM Mono', monospace" },
   quickActions: {
     display: "grid",
     gridTemplateColumns: "repeat(4, 1fr)",
-    background: "#16213e",
-    borderBottom: "0.5px solid rgba(255,255,255,0.07)",
+    borderTop: "1px solid rgba(255,255,255,0.06)",
+    position: "relative" as const,
+    zIndex: 1,
   },
   qaItem: {
     display: "flex",
-    flexDirection: "column",
+    flexDirection: "column" as const,
     alignItems: "center",
-    gap: 6,
-    padding: "14px 8px",
+    gap: 8,
+    padding: "16px 8px",
     cursor: "pointer",
-    borderRight: "0.5px solid rgba(255,255,255,0.06)",
+    borderRight: "1px solid rgba(255,255,255,0.05)",
+    transition: "background 0.15s",
   },
   qaIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: "50%",
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
+    transition: "transform 0.15s",
   },
-  qaLabel: { fontSize: 11, color: "rgba(255,255,255,0.5)" },
+  qaLabel: { fontSize: 11, color: "rgba(255,255,255,0.55)", fontWeight: 500, letterSpacing: "0.2px" },
   tickerStrip: {
     background: "#0f0f1a",
     padding: "9px 20px",

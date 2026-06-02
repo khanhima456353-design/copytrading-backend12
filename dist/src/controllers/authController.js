@@ -11,8 +11,17 @@ const userIdGenerator_1 = require("../../utils/userIdGenerator");
 const register = async (req, res) => {
     try {
         const { email, password } = req.body;
+        const rawEmail = typeof email === "string" ? email.trim() : "";
+        const rawPassword = typeof password === "string" ? password : "";
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!rawEmail || !rawPassword) {
+            return res.status(400).json({ message: "Email and password are required" });
+        }
+        if (!emailPattern.test(rawEmail)) {
+            return res.status(400).json({ message: "Invalid email format" });
+        }
         const existingUser = await prisma_1.default.user.findUnique({
-            where: { email }
+            where: { email: rawEmail }
         });
         if (existingUser) {
             return res.status(400).json({
@@ -39,9 +48,9 @@ const register = async (req, res) => {
         });
     }
     catch (error) {
+        console.error(error);
         res.status(500).json({
-            message: "Server error",
-            error
+            message: "Server error"
         });
     }
 };
@@ -93,9 +102,9 @@ const login = async (req, res) => {
         });
     }
     catch (error) {
+        console.error(error);
         res.status(500).json({
-            message: "Server error",
-            error
+            message: "Server error"
         });
     }
 };

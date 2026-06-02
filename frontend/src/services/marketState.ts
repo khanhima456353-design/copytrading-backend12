@@ -474,8 +474,6 @@ async function initMarketState(): Promise<void> {
 
   socket.on("positionClosed", (update: any) => {
     if (!update || typeof update !== "object") return;
-    // Release simulation lock for this pair — snap-back will handle gradual return
-    // Lock releases automatically via the 3s auto-release timer in simulatedPriceUpdate
     serverMarketUpdateSubscribers.forEach((cb) => {
       try { cb({ ...update, event: 'positionClosed' } as ServerMarketUpdate); } catch (e) {
         console.error("[marketState] positionClosed subscriber error:", e);
@@ -483,10 +481,22 @@ async function initMarketState(): Promise<void> {
     });
   });
 
-  // When drift stops, keep lock active during snap-back then auto-release
+  socket.on("simulationEnded", (update: any) => {
+    if (!update?.pair) return;
+    setSimulationLock(update.pair, false);
+    if (simulationLockTimers[update.pair]) {
+      clearTimeout(simulationLockTimers[update.pair]);
+      delete simulationLockTimers[update.pair];
+    }
+    serverMarketUpdateSubscribers.forEach((cb) => {
+      try { cb({ event: 'simulationEnded', ...update } as ServerMarketUpdate); } catch (e) {
+        console.error("[marketState] simulationEnded subscriber error:", e);
+      }
+    });
+  });
+
+  // When drift stops, keep lock active during snap-back then release on simulationEnded
   socket.on("driftStopped", (update: any) => {
-    // Lock is maintained during snap-back via simulatedPriceUpdate auto-release timer
-    // Nothing extra needed here — snap-back ends → no more simulatedPriceUpdate → lock auto-releases
     serverMarketUpdateSubscribers.forEach((cb) => {
       try { cb({ event: 'driftStopped', ...update } as ServerMarketUpdate); } catch (e) {
         console.error("[marketState] driftStopped subscriber error:", e);

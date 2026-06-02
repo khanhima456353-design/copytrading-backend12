@@ -8,7 +8,7 @@ router.get("/symbols", (req, res) => {
 });
 router.get("/orderbook/:pair", (req, res) => {
     const { pair } = req.params;
-    const cache = global.orderbookCache;
+    const cache = global.orderbookCache || (global.orderbookCache = {});
     if (!cache[pair]) {
         return res.status(503).json({ error: "No market data available" });
     }

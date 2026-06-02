@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.buildCandles = exports.buildTrades = exports.buildOrderBook = exports.loadSymbols = exports.getBasePrice = exports.setCurrentPrice = exports.currentPrice = exports.symbols = void 0;
 const axios_1 = __importDefault(require("axios"));
+const binanceClient = axios_1.default.create({ timeout: 2000 });
 exports.symbols = ["BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "ADA/USDT"];
 exports.currentPrice = 30000;
 const setCurrentPrice = (price) => {
@@ -35,10 +36,12 @@ const getBasePrice = (pair) => {
 exports.getBasePrice = getBasePrice;
 const loadSymbols = async () => {
     try {
-        const url = "https://api.kraken.com/0/public/AssetPairs";
-        const response = await axios_1.default.get(url);
-        const pairs = Object.keys(response.data.result).filter(pair => pair.endsWith("USDT"));
-        exports.symbols = pairs.slice(0, 50).map(pair => pair.replace("USDT", "/USDT"));
+        const url = "https://api.binance.com/api/v3/exchangeInfo";
+        const response = await binanceClient.get(url);
+        const pairs = (response.data.symbols || [])
+            .filter((item) => typeof item.symbol === "string" && item.symbol.endsWith("USDT"))
+            .map((item) => item.symbol.replace(/USDT$/, "/USDT"));
+        exports.symbols = pairs.slice(0, 50);
     }
     catch (error) {
         console.error("Error loading symbols:", error);
@@ -50,7 +53,7 @@ exports.loadSymbols = loadSymbols;
 const buildOrderBook = async (pair, levels = 18) => {
     const symbol = pair.replace("/", "");
     const url = `https://api.binance.com/api/v3/depth?symbol=${symbol}&limit=${levels}`;
-    const response = await axios_1.default.get(url);
+    const response = await binanceClient.get(url);
     const data = response.data;
     if (!data.bids || !data.asks)
         throw new Error("Invalid orderbook response");
@@ -75,7 +78,7 @@ exports.buildOrderBook = buildOrderBook;
 const buildTrades = async (pair, count = 40) => {
     const symbol = pair.replace("/", "");
     const url = `https://api.binance.com/api/v3/trades?symbol=${symbol}&limit=${count}`;
-    const response = await axios_1.default.get(url);
+    const response = await binanceClient.get(url);
     const data = response.data;
     if (!Array.isArray(data))
         throw new Error("Invalid trades response");
@@ -98,7 +101,7 @@ const buildCandles = async (pair, timeframe, limit = 80) => {
     const symbol = pair.replace("/", "");
     const interval = timeframe === "1m" ? "1m" : timeframe === "5m" ? "5m" : timeframe === "15m" ? "15m" : timeframe === "1h" ? "1h" : timeframe === "4h" ? "4h" : "1d";
     const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
-    const response = await axios_1.default.get(url);
+    const response = await binanceClient.get(url);
     const data = response.data;
     if (!Array.isArray(data))
         throw new Error("Invalid candles response");

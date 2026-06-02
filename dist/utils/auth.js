@@ -12,7 +12,7 @@ async function comparePassword(password, hash) {
 const JWT_SECRET = process.env.JWT_SECRET || "default-secret-change-this";
 // 🔐 Access Token (short life)
 function generateAccessToken(user) {
-    return jwt.sign({ id: user._id, email: user.email }, JWT_SECRET, { expiresIn: "15m" });
+    return jwt.sign({ id: user._id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: "15m" });
 }
 const REFRESH_SECRET = process.env.REFRESH_SECRET || "default-refresh-secret-change-this";
 // 🔄 Refresh Token (long life)

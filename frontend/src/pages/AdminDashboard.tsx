@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getSocket } from "../api";
-import { getAdminStats, getAdminKycSubmissions, getAdminUserById, logoutAdmin } from "../services/adminService";
+import { getAdminStats, getAdminKycSubmissions, getAdminUserById, logoutAdmin, approveAdminKyc, rejectAdminKyc, updateAdminUser } from "../services/adminService";
 
 import AdminSimPanel from "../components/AdminSimPanel";
 import "../styles/Admin.css";
@@ -13,11 +13,19 @@ const AdminDashboard: React.FC = () => {
   const [kycSubmissions, setKycSubmissions] = useState<any[]>([]);
   const [selectedKycUser, setSelectedKycUser] = useState<any>(null);
   const [showKycModal, setShowKycModal] = useState(false);
+  const [kycModalTab, setKycModalTab] = useState<'documents' | 'verify'>('documents');
 
   const [adminSimulatorVisible, setAdminSimulatorVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'simulator'>('dashboard');
   const [loadingKyc, setLoadingKyc] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [processingKycAction, setProcessingKycAction] = useState(false);
+  const [showRejectionForm, setShowRejectionForm] = useState(false);
+  const [rejectionReasons, setRejectionReasons] = useState<string[]>([
+    "Document image was blurry or incomplete",
+    "Address proof is older than 3 months"
+  ]);
+  const [selectedReasons, setSelectedReasons] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const token = localStorage.getItem("adminToken");
@@ -81,7 +89,11 @@ const AdminDashboard: React.FC = () => {
     try {
       setLoadingKyc(true);
       const data = await getAdminUserById(userId);
-      setSelectedKycUser(data.user);
+      const user = data.user;
+      setSelectedKycUser({
+        ...user,
+        id: user.id || user._id,
+      });
       setShowKycModal(true);
     } catch (err) {
       console.error(err);
@@ -94,6 +106,70 @@ const AdminDashboard: React.FC = () => {
   const closeKycModal = () => {
     setSelectedKycUser(null);
     setShowKycModal(false);
+    setKycModalTab('documents');
+  };
+
+  const handleAcceptKyc = async () => {
+    if (!selectedKycUser) return;
+    const userId = selectedKycUser.id || selectedKycUser._id;
+    try {
+      setProcessingKycAction(true);
+      await approveAdminKyc(userId);
+      setSelectedKycUser({ ...selectedKycUser, kycVerified: true, kycStatus: 'approved', id: userId });
+      // Refresh submissions list
+      const data = await getAdminKycSubmissions();
+      setKycSubmissions(data.submissions || []);
+      setError(null);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to approve KYC");
+    } finally {
+      setProcessingKycAction(false);
+    }
+  };
+
+  const handleRejectKyc = async () => {
+    if (!selectedKycUser) return;
+    const userId = selectedKycUser.id || selectedKycUser._id;
+    try {
+      setProcessingKycAction(true);
+      const reasonsList = Array.from(selectedReasons).length > 0 
+        ? Array.from(selectedReasons) 
+        : rejectionReasons;
+      
+      await rejectAdminKyc(userId, reasonsList);
+
+      setSelectedKycUser({ 
+        ...selectedKycUser, 
+        kycVerified: false, 
+        kycStatus: 'rejected',
+        rejectionReasons: reasonsList,
+        id: userId
+      });
+      
+      // Refresh submissions list
+      const data = await getAdminKycSubmissions();
+      setKycSubmissions(data.submissions || []);
+      
+      setShowRejectionForm(false);
+      setSelectedReasons(new Set());
+      setError(null);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to reject KYC");
+    } finally {
+      setProcessingKycAction(false);
+    }
+  };
+
+  const toggleRejectionReason = (reason: string) => {
+    const newReasons = new Set(selectedReasons);
+    if (newReasons.has(reason)) {
+      newReasons.delete(reason);
+    } else {
+      newReasons.add(reason);
+    }
+    setSelectedReasons(newReasons);
   };
 
   return (
@@ -246,10 +322,26 @@ const AdminDashboard: React.FC = () => {
                   <h3>KYC Submission</h3>
                   <button className="admin-modal-close" onClick={closeKycModal}>×</button>
                 </div>
+
+                <div className="admin-kyc-tabs">
+                  <button 
+                    className={`admin-kyc-tab ${kycModalTab === 'documents' ? 'active' : ''}`}
+                    onClick={() => setKycModalTab('documents')}
+                  >
+                    Documents
+                  </button>
+                  <button 
+                    className={`admin-kyc-tab ${kycModalTab === 'verify' ? 'active' : ''}`}
+                    onClick={() => setKycModalTab('verify')}
+                  >
+                    Verify
+                  </button>
+                </div>
+
                 {loadingKyc ? (
                   <div>Loading...</div>
-                ) : (
-                  <div>
+                ) : kycModalTab === 'documents' ? (
+                  <div className="admin-kyc-documents">
                     <p><strong>Name:</strong> {selectedKycUser.name || "—"}</p>
                     <p><strong>Email:</strong> {selectedKycUser.email}</p>
                     <p><strong>KYC Status:</strong> {selectedKycUser.kycVerified ? "Verified" : selectedKycUser.kycStatus || "Pending"}</p>
@@ -288,6 +380,102 @@ const AdminDashboard: React.FC = () => {
                           <div>No selfie uploaded.</div>
                         )}
                       </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="admin-kyc-verify">
+                    <div className="admin-kyc-verify-content">
+                      {!showRejectionForm ? (
+                        <>
+                          <h4>KYC Verification Decision</h4>
+                          <p className="admin-kyc-verify-user">
+                            <strong>User:</strong> {selectedKycUser.name || "—"} ({selectedKycUser.email})
+                          </p>
+                          <p className="admin-kyc-verify-status">
+                            <strong>Current Status:</strong> 
+                            <span className={`status-badge status-${selectedKycUser.kycStatus || 'pending'}`}>
+                              {selectedKycUser.kycVerified ? "Verified" : selectedKycUser.kycStatus || "Pending"}
+                            </span>
+                          </p>
+                          <p style={{ marginTop: "24px", color: "#666", fontSize: "14px" }}>
+                            Review the documents in the Documents tab before making a decision.
+                          </p>
+                          <div className="admin-kyc-verify-actions">
+                            <button 
+                              className="admin-kyc-accept-btn"
+                              onClick={handleAcceptKyc}
+                              disabled={processingKycAction || selectedKycUser.kycStatus === 'approved'}
+                            >
+                              {processingKycAction ? "Processing..." : "✓ Accept"}
+                            </button>
+                            <button 
+                              className="admin-kyc-reject-btn"
+                              onClick={() => setShowRejectionForm(true)}
+                              disabled={processingKycAction || selectedKycUser.kycStatus === 'rejected'}
+                            >
+                              {processingKycAction ? "Processing..." : "✗ Reject"}
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <h4>Select Rejection Reasons</h4>
+                          <p className="admin-kyc-verify-user">
+                            <strong>User:</strong> {selectedKycUser.name || "—"} ({selectedKycUser.email})
+                          </p>
+                          <p style={{ marginTop: "12px", marginBottom: "20px", color: "#666", fontSize: "14px" }}>
+                            Select the reasons why the KYC submission cannot be approved:
+                          </p>
+                          
+                          <div className="admin-kyc-rejection-reasons">
+                            {rejectionReasons.map((reason, idx) => (
+                              <label key={idx} className="admin-kyc-reason-checkbox">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedReasons.has(reason)}
+                                  onChange={() => toggleRejectionReason(reason)}
+                                />
+                                <span>{reason}</span>
+                              </label>
+                            ))}
+                          </div>
+
+                          <div className="admin-kyc-rejection-preview">
+                            <p style={{ marginBottom: "12px", fontSize: "13px", color: "#7a8a99" }}>
+                              <strong>Selected Reasons ({selectedReasons.size}):</strong>
+                            </p>
+                            {selectedReasons.size === 0 ? (
+                              <p style={{ color: "#c0392b", fontSize: "13px" }}>⚠️ Please select at least one reason</p>
+                            ) : (
+                              <ul style={{ margin: "0", padding: "0 0 0 20px", fontSize: "13px" }}>
+                                {Array.from(selectedReasons).map((reason, idx) => (
+                                  <li key={idx} style={{ color: "#e74c3c" }}>{reason}</li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+
+                          <div className="admin-kyc-rejection-actions">
+                            <button 
+                              className="admin-kyc-cancel-btn"
+                              onClick={() => {
+                                setShowRejectionForm(false);
+                                setSelectedReasons(new Set());
+                              }}
+                              disabled={processingKycAction}
+                            >
+                              Cancel
+                            </button>
+                            <button 
+                              className="admin-kyc-confirm-reject-btn"
+                              onClick={handleRejectKyc}
+                              disabled={processingKycAction || selectedReasons.size === 0}
+                            >
+                              {processingKycAction ? "Processing..." : "Confirm Rejection"}
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}

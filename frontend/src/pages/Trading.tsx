@@ -6,6 +6,8 @@ import { MarketState, subscribeConnectionStatus, subscribeMarketState, isValidPr
 
 import { initializeCandles, resetCandles, updateLatestCandle, getCandles } from "../services/candleEngine";
 import PositionsPanel from "../components/PositionsPanel";
+import { calculateUnrealizedPnL } from "../services/tradingUtils";
+import { TradingBalanceCard } from "../components/TradingBalanceCard";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -100,6 +102,8 @@ const DRAWING_TOOLS: { id: DrawingTool; icon: string; label: string; group: stri
   { id: "magnet",    icon: "⊛",  label: "Magnet",      group: "measure" },
 ];
 
+const BINANCE_TRADE_WS = "wss://stream.binance.com:9443/ws/btcusdt@trade";
+
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
 const formatTime = (t: number) =>
@@ -152,19 +156,34 @@ const generateSyntheticPairs = (available: string[]) => {
 
 // ─── Fallback Data ────────────────────────────────────────────────────────────
 
-const createFallbackCandles = (count = 300, startPrice = 80721): Candle[] => {
+const createFallbackCandles = (count = 300, startPrice = 80721, pair = "BTC/USDT", timeframe = "1m"): Candle[] => {
   const now = Math.floor(Date.now() / 1000);
+  const seedBase = `${pair}:${timeframe}:${Math.floor(now / 60)}`;
+  const deterministic = (index: number) => {
+    let hash = 2166136261;
+    const text = `${seedBase}:${index}`;
+    for (let i = 0; i < text.length; i++) {
+      hash ^= text.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0) / 0xffffffff;
+  };
+
   const candles: Candle[] = [];
   let price = startPrice;
   for (let i = count - 1; i >= 0; i--) {
-    price += (Math.random() - 0.5) * 800;
+    price += (deterministic(i * 4) - 0.5) * 800;
     const open = price;
-    const close = price + (Math.random() - 0.5) * 400;
+    const close = price + (deterministic(i * 4 + 1) - 0.5) * 400;
+    const high = Math.max(open, close) + deterministic(i * 4 + 2) * 200;
+    const low = Math.min(open, close) - deterministic(i * 4 + 3) * 200;
     candles.push({
       time: Math.floor((now - i * 60) / 60) * 60,
-      open: +open.toFixed(2), high: +(Math.max(open, close) + Math.random() * 200).toFixed(2),
-      low: +(Math.min(open, close) - Math.random() * 200).toFixed(2), close: +close.toFixed(2),
-      volume: +(Math.random() * 10 + 1).toFixed(2),
+      open: +open.toFixed(2),
+      high: +high.toFixed(2),
+      low: +low.toFixed(2),
+      close: +close.toFixed(2),
+      volume: +(deterministic(i * 4 + 4) * 10 + 1).toFixed(2),
     });
   }
   return candles;
@@ -258,14 +277,17 @@ interface CandleChartProps {
   drawings: DrawingObject[];
   onDrawingsChange: (d: DrawingObject[]) => void;
   drawingColor: string; drawingWidth: number;
+  lastPrice: number;
+  entryPriceLine?: number | null;
 }
 
-function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair, rsiData, macdData, showRSI, showMACD, liveStatus, activeTool, drawings, onDrawingsChange, drawingColor, drawingWidth }: CandleChartProps) {
+function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair, rsiData, macdData, showRSI, showMACD, liveStatus, activeTool, drawings, onDrawingsChange, drawingColor, drawingWidth, lastPrice, entryPriceLine }: CandleChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef({ offset: 0, zoom: 1.0, dragging: false, dragStart: 0, dragOffset: 0, mouseX: -1, mouseY: -1 });
   const drawingRef = useRef<{ active: boolean; current: DrawingObject | null; brushPoints: { x: number; y: number }[] }>({ active: false, current: null, brushPoints: [] });
   const rafRef = useRef<number | null>(null);
+  const [pageVisible, setPageVisible] = useState<boolean>(typeof document !== "undefined" ? !document.hidden : true);
 
   const CHART_WEIGHT = showRSI && showMACD ? 0.52 : (showRSI || showMACD) ? 0.65 : 0.76;
   const VOL_WEIGHT = 0.10;
@@ -552,11 +574,27 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
       }
     }
 
+    // Entry price line (active trade only)
+    if (Number.isFinite(entryPriceLine) && (entryPriceLine as number) > 0) {
+      const entryY = Math.max(mainPlotTop + 2, Math.min(mainPlotBottom - 2, toY(entryPriceLine as number, mainPlotTop, mainPlotH)));
+      ctx.strokeStyle = COLORS.amber;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath(); ctx.moveTo(0, entryY); ctx.lineTo(plotW, entryY); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = COLORS.amber;
+      ctx.font = "10px monospace";
+      ctx.textAlign = "left";
+      ctx.fillText(`Entry ${formatPrice(entryPriceLine as number)}`, 8, entryY - 4);
+    }
+
     // Last price line (Binance style)
     const lastC = visible[visible.length - 1];
     if (lastC) {
-      const lastY = Math.max(mainPlotTop + 2, Math.min(mainPlotBottom - 2, toY(lastC.close, mainPlotTop, mainPlotH)));
-      const isGreen = lastC.close >= lastC.open;
+      const priceForLast = Number.isFinite(lastPrice) && lastPrice > 0 ? lastPrice : lastC.close;
+      const referencePrice = visible.length > 1 ? visible[visible.length - 2].close : lastC.open;
+      const lastY = Math.max(mainPlotTop + 2, Math.min(mainPlotBottom - 2, toY(priceForLast, mainPlotTop, mainPlotH)));
+      const isGreen = priceForLast >= referencePrice;
       ctx.strokeStyle = isGreen ? COLORS.green : COLORS.red;
       ctx.lineWidth = 0.75; ctx.setLineDash([3, 5]);
       ctx.beginPath(); ctx.moveTo(0, lastY); ctx.lineTo(plotW, lastY); ctx.stroke();
@@ -564,7 +602,7 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
       ctx.fillStyle = isGreen ? COLORS.green : COLORS.red;
       ctx.fillRect(plotW, lastY - 10, PRICE_AXIS_W, 20);
       ctx.fillStyle = "#000"; ctx.font = "bold 11px monospace"; ctx.textAlign = "center";
-      ctx.fillText(formatPrice(lastC.close), plotW + PRICE_AXIS_W / 2, lastY + 4);
+      ctx.fillText(formatPrice(priceForLast), plotW + PRICE_AXIS_W / 2, lastY + 4);
     }
 
     // MA info overlay (top-left like Binance)
@@ -577,24 +615,70 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
     maInfo.forEach(m => { ctx.fillStyle = m.color; ctx.textAlign = "left"; ctx.fillText(`${m.label}: ${m.value}`, maX, maInfoY + 15); maX += ctx.measureText(`${m.label}: ${m.value}`).width + 16; });
 
     ctx.restore();
-  }, [candles, indicators, chartType, tf, rsiData, macdData, showRSI, showMACD, liveStatus, CHART_WEIGHT, VOL_WEIGHT, SUB_WEIGHT, getMainPlotBounds, getPriceRange, drawings]);
+  }, [candles, indicators, chartType, tf, rsiData, macdData, showRSI, showMACD, liveStatus, lastPrice, entryPriceLine, CHART_WEIGHT, VOL_WEIGHT, SUB_WEIGHT, getMainPlotBounds, getPriceRange, drawings]);
 
   useEffect(() => {
+    const handleVisibilityChange = () => {
+      setPageVisible(!document.hidden);
+    };
+    if (typeof document !== "undefined") {
+      handleVisibilityChange();
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+    }
+    return () => {
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
+      }
+    };
+  }, []);
 
+  useEffect(() => {
     let alive = true;
-    const loop = () => { if (!alive) return; draw(); rafRef.current = requestAnimationFrame(loop); };
-    rafRef.current = requestAnimationFrame(loop);
-    return () => { alive = false; if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, [draw]);
+    let fallbackTimer: number | null = null;
+
+    const renderLoop = () => {
+      if (!alive) return;
+      draw();
+      rafRef.current = window.requestAnimationFrame(renderLoop);
+    };
+
+    const startFallback = () => {
+      if (!alive || fallbackTimer !== null) return;
+      fallbackTimer = window.setInterval(() => draw(), 500);
+    };
+
+    if (pageVisible) {
+      renderLoop();
+    } else {
+      startFallback();
+    }
+
+    return () => {
+      alive = false;
+      if (rafRef.current !== null) window.cancelAnimationFrame(rafRef.current);
+      if (fallbackTimer !== null) window.clearInterval(fallbackTimer);
+    };
+  }, [draw, pageVisible]);
 
   useEffect(() => {
     const resize = () => {
       const canvas = canvasRef.current;
       if (!canvas) return;
+      const parent = canvas.parentElement;
+      if (!parent) return;
+      const w = parent.clientWidth;
+      const h = parent.clientHeight;
+      if (w <= 0 || h <= 0) return;
       const dpr = window.devicePixelRatio || 1;
-      const w = canvas.parentElement?.clientWidth || 800, h = canvas.parentElement?.clientHeight || 500;
-      canvas.width = w * dpr; canvas.height = h * dpr;
-      canvas.style.width = w + "px"; canvas.style.height = h + "px";
+      const newWidth = w * dpr;
+      const newHeight = h * dpr;
+      if (canvas.width === newWidth && canvas.height === newHeight && canvas.style.width === `${w}px` && canvas.style.height === `${h}px`) {
+        return;
+      }
+      canvas.width = newWidth;
+      canvas.height = newHeight;
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
     };
     resize();
     const ro = new ResizeObserver(resize);
@@ -1239,6 +1323,8 @@ export default function Trading() {
   const [displayPrice, setDisplayPrice] = useState(0);
   const [priceUpdateDirection, setPriceUpdateDirection] = useState<"up" | "down">("up");
   const priceMovementRef = useRef({ direction: "up" as "up" | "down", streak: 0, targetGreenCount: 2 });
+  const lastPriceRef = useRef(0);
+  const binanceReconnectRef = useRef<number | null>(null);
   const [change24h, setChange24h] = useState(0);
   const [changePct, setChangePct] = useState(0);
   const [high24h, setHigh24h] = useState(0);
@@ -1294,6 +1380,9 @@ export default function Trading() {
   const [lockedUSDT, setLockedUSDT] = useState(0);
   const [tradeHistory, setTradeHistory] = useState<TradeHistoryItem[]>(createFallbackTradeHistory());
   const [serverPositions, setServerPositions] = useState<any[]>([]);
+  const [simulationFeedActive, setSimulationFeedActive] = useState(false);
+  const [priceTransitionActive, setPriceTransitionActive] = useState(false);
+  const [entryPriceOverlay, setEntryPriceOverlay] = useState<number | null>(null);
   const closePosition = async (position: { pair: string; id?: string; _id?: string; markPrice?: number; entryPrice?: number; }) => {
     try {
       const token = localStorage.getItem('token');
@@ -1399,6 +1488,91 @@ export default function Trading() {
     };
   }, [symbol]);
 
+  useEffect(() => {
+    lastPriceRef.current = lastPrice;
+  }, [lastPrice]);
+
+  useEffect(() => {
+    if (symbol !== "BTC/USDT") return;
+    // State 1: no open position → live Binance feed only
+    if (simulationFeedActive || priceTransitionActive) return;
+
+    let ws: WebSocket | null = null;
+    let lastUpdateTime = 0;
+    const THROTTLE_INTERVAL = window.innerWidth < 768 ? 100 : 50; // 100ms on mobile, 50ms on desktop
+    
+    const connect = () => {
+      if (ws) {
+        ws.onopen = null;
+        ws.onmessage = null;
+        ws.onclose = null;
+        ws.onerror = null;
+        ws.close();
+      }
+
+      ws = new WebSocket(BINANCE_TRADE_WS);
+      ws.onopen = () => {
+        console.log("[Trading] Binance WS connected");
+      };
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          const price = Number(data.p);
+          const timestamp = Number(data.E ?? data.T ?? Date.now());
+          if (!Number.isFinite(price) || price <= 0) return;
+
+          // Throttle updates to reduce re-renders on mobile
+          const now = Date.now();
+          if (now - lastUpdateTime < THROTTLE_INTERVAL) return;
+          lastUpdateTime = now;
+
+          const normalizedTime = Number.isFinite(timestamp) && timestamp > 0
+            ? (timestamp < 1e12 ? timestamp * 1000 : timestamp)
+            : Date.now();
+
+          const prevPrice = lastPriceRef.current;
+          const direction = price >= prevPrice ? "up" : "down";
+
+          lastPriceRef.current = price;
+          setLastPrice(price);
+          setDisplayPrice(price);
+          setLastPriceUpdate(normalizedTime);
+          setPriceUpdateDirection(direction);
+        } catch (err) {
+          console.warn("[Trading] Binance WS parse error", err);
+        }
+      };
+      ws.onclose = () => {
+        console.warn("[Trading] Binance WS closed, reconnecting...");
+        if (binanceReconnectRef.current) clearTimeout(binanceReconnectRef.current);
+        binanceReconnectRef.current = window.setTimeout(connect, 2000);
+      };
+      ws.onerror = () => {
+        if (ws) ws.close();
+      };
+    };
+
+    connect();
+    return () => {
+      if (ws) ws.close();
+      if (binanceReconnectRef.current) {
+        clearTimeout(binanceReconnectRef.current);
+        binanceReconnectRef.current = null;
+      }
+    };
+  }, [symbol, simulationFeedActive, priceTransitionActive]);
+
+  useEffect(() => {
+    const primary = serverPositions.find((p) => p.pair === symbol);
+    if (primary && Number(primary.entryPrice) > 0) {
+      setSimulationFeedActive(true);
+      setEntryPriceOverlay(Number(primary.entryPrice));
+    } else if (!priceTransitionActive) {
+      setSimulationFeedActive(false);
+      setEntryPriceOverlay(null);
+    }
+  }, [serverPositions, symbol, priceTransitionActive]);
+
   // Refresh account-related data from backend
   const refreshAccountData = useCallback(async () => {
     try {
@@ -1408,11 +1582,33 @@ export default function Trading() {
         api.get('/api/account/summary'),
         api.get('/api/account/open-orders'),
         api.get('/api/account/positions'),
-        api.get('/api/account/balances'),
+        api.get('/api/wallet'),
         api.get('/api/trade/history').catch(() => ({ data: [] })),
       ]);
       
-      if (summaryRes?.data) setAccountSummary((prev) => ({ ...prev, ...summaryRes.data } as any));
+      if (summaryRes?.data) {
+        const data = summaryRes.data;
+        const available = Number(data.available) || 0;
+        const locked = Number(data.locked) || 0;
+        const unrealizedPnl = Number(data.unrealizedPnl) || 0;
+        const holdingsVal = (data.holdings || []).reduce(
+          (sum: number, h: { value?: number }) => sum + (Number(h.value) || 0),
+          0
+        );
+        const derivedEquity = available + locked + holdingsVal;
+        const derivedPortfolio = derivedEquity;
+
+        setAccountSummary((prev) => ({
+          ...prev,
+          ...data,
+          available,
+          locked,
+          unrealizedPnl,
+          equity: derivedEquity,
+          totalEquity: derivedEquity,
+          totalPortfolio: derivedPortfolio,
+        }));
+      }
       if (positionsRes?.data) setServerPositions((positionsRes.data || []).filter((p: any) => p && (p.size || p.quantity) && Number(p.size || p.quantity) !== 0));
       if (ordersRes?.data) {
         const orders = (ordersRes.data || []).map((o: any) => ({
@@ -1441,9 +1637,21 @@ export default function Trading() {
           pnl:        t.pnl ?? t.profit ?? 0,
         })));
       }
-      if (balancesRes?.data) {
-        // balances updated via accountSummary
-      }
+
+      const walletData = balancesRes?.data?.data ?? balancesRes?.data ?? {};
+      const walletAvailable = Number(walletData.availableBalance ?? walletData.available ?? walletData.balance) || 0;
+      const walletLocked = Number(walletData.lockedBalance ?? walletData.locked ?? 0) || 0;
+      const walletTotal = Number(walletData.totalBalance ?? walletData.totalPortfolio ?? walletAvailable + walletLocked) || walletAvailable + walletLocked;
+
+      setLockedUSDT(walletLocked);
+      setAccountSummary((prev) => ({
+        ...prev,
+        available: walletAvailable,
+        locked: walletLocked,
+        equity: walletTotal,
+        totalEquity: walletTotal,
+        totalPortfolio: walletTotal,
+      }));
     } catch (err) {
       console.error('Error refreshing account data:', err);
       // ignore; keep existing fallback
@@ -1476,58 +1684,109 @@ export default function Trading() {
         });
 
         // Balance updated by admin or position close
+        socket.on('balanceUpdated', (data: any) => {
+          const available = Number(data.available ?? data.balance) || 0;
+          const locked = Number(data.locked ?? data.lockedBalance) || 0;
+          const equity = Number(data.totalEquity ?? data.equity ?? data.balance ?? available + locked) || 0;
+          setAccountSummary(prev => ({
+            ...prev,
+            available: available || prev.available,
+            locked,
+            equity,
+            totalEquity: equity,
+            totalPortfolio: Number(data.totalPortfolio ?? data.totalBalance ?? equity) || equity,
+          }));
+          refreshAccountData();
+        });
+
         socket.on('balanceUpdate', (data: any) => {
           if (data?.available != null) {
+            const available = Number(data.available) || 0;
+            const locked = Number(data.locked ?? data.lockedBalance) || 0;
+            const equity = Number(data.totalEquity ?? data.equity ?? data.balance ?? available + locked) || 0;
             setAccountSummary(prev => ({
               ...prev,
-              available: data.available,
-              locked: data.locked ?? prev.locked,
+              available,
+              locked,
+              equity,
+              totalEquity: equity,
+              totalPortfolio: Number(data.totalPortfolio ?? data.totalBalance ?? equity) || equity,
             }));
           }
           // Full refresh to get all updated values
           refreshAccountData();
         });
 
-        // Position closed — refresh everything immediately
-        socket.on('positionClosed', () => {
+        // Position closed — begin gradual transition back to Binance
+        socket.on('positionClosed', (data: any) => {
+          setPriceTransitionActive(true);
+          setSimulationFeedActive(true);
+          setEntryPriceOverlay(null);
           refreshAccountData();
         });
 
-// Drift stopped — refresh positions and balance
-socket.on('driftStopped', () => {
-  refreshAccountData();
-});
+        socket.on('simulationEnded', () => {
+          setPriceTransitionActive(false);
+          setSimulationFeedActive(false);
+          setEntryPriceOverlay(null);
+          refreshAccountData();
+        });
 
-// Update mark price and PnL in real time from simulator
-socket.on('simulatedPriceUpdate', (data: any) => {
-  if (!data?.pair || !data?.price) return;
-  setServerPositions(prev => prev.map((p: any) => {
-    if (p.pair !== data.pair) return p;
-    const side = p.side || 'long';
-    const leverage = p.leverage || 1;
-    const size = Math.abs(p.size || p.quantity || 0);
-    const entry = p.entryPrice || 0;
-    const mark = data.price;
-    const direction = side === 'short' ? -1 : 1;
-    const pnl = (mark - entry) * size * leverage * direction;
-    return { ...p, markPrice: mark, unrealizedPnl: pnl };
-  }));
-});
+        // Drift stopped — snap-back to Binance in progress
+        socket.on('driftStopped', () => {
+          setPriceTransitionActive(true);
+          refreshAccountData();
+        });
+
+        // Per-user simulated price feed (State 2 natural / State 3 admin drift)
+        socket.on('simulatedPriceUpdate', (data: any) => {
+          if (!data?.pair || !data?.price) return;
+          if (data.mode === 'snapback') {
+            setPriceTransitionActive(true);
+          } else if (data.mode === 'natural' || data.mode === 'drift') {
+            setSimulationFeedActive(true);
+            setPriceTransitionActive(false);
+          }
+          setServerPositions(prev => prev.map((p: any) => {
+            if (p.pair !== data.pair) return p;
+            const quantity = Math.abs(p.size || p.quantity || 0);
+            const markPrice = data.price;
+            const pnlData = calculateUnrealizedPnL({
+              entryPrice: p.entryPrice || 0,
+              quantity,
+              leverage: p.leverage || 1,
+              side: p.side || 'long',
+              isGenuine: p.isGenuine !== false,
+              isDemo: p.isDemo === true,
+            }, markPrice);
+            return {
+              ...p,
+              markPrice,
+              unrealizedPnl: pnlData.pnl,
+              unrealizedPnlPercent: pnlData.pnlPercent,
+              rawUnrealizedPnl: pnlData.rawPnl,
+              rawUnrealizedPnlPercent: pnlData.rawPnlPercent,
+            };
+          }));
+        });
 
 socket.on('market_update', (data: any) => {
   if (data?.unrealizedPnl != null) {
+    const available = Number(data.available ?? data.balance ?? 0);
+    const locked = Number(data.locked ?? 0);
+    const unrealizedPnl = Number(data.unrealizedPnl ?? 0);
+    const derivedEquity =
+      Number(data.totalEquity ?? data.equity) ||
+      available + locked + unrealizedPnl;
+
     setAccountSummary(prev => ({
       ...prev,
-      unrealizedPnl: data.unrealizedPnl,
+      unrealizedPnl,
       available: data.available ?? data.balance ?? prev.available,
       locked: data.locked ?? prev.locked,
-      equity: data.equity ?? data.totalEquity ?? (
-        Number(data.available ?? data.balance ?? prev.available ?? 0) +
-        Number(data.locked ?? prev.locked ?? 0) +
-        Number(data.unrealizedPnl ?? 0)
-      ),
-      totalEquity: data.totalEquity ?? data.equity ?? prev.totalEquity,
-      totalPortfolio: data.totalPortfolio ?? data.equity ?? prev.totalPortfolio,
+      equity: derivedEquity,
+      totalEquity: derivedEquity,
+      totalPortfolio: Number(data.totalPortfolio ?? data.totalBalance ?? derivedEquity) || derivedEquity,
     }));
   }
 });
@@ -1627,9 +1886,9 @@ socket.on('market_update', (data: any) => {
   const livePositionsUnrealizedPnl = useMemo(() => {
     if (!serverPositions.length) return null;
     return serverPositions.reduce((sum, p: any) => {
-      const currentPairMark = marketState?.pair === p.pair
-        ? (Number(marketState?.markPrice) || Number(marketState?.lastPrice))
-        : NaN;
+      const currentPairMark = p.pair === symbol
+        ? (Number.isFinite(lastPrice) && lastPrice > 0 ? lastPrice : NaN)
+        : (Number(marketState?.markPrice) || Number(marketState?.lastPrice));
       const storedMark = Number(p.markPrice);
       const mark = Number.isFinite(currentPairMark) && currentPairMark > 0
         ? currentPairMark
@@ -1648,26 +1907,32 @@ socket.on('market_update', (data: any) => {
       const fallbackPnl = Number(p.unrealizedPnl ?? p.unrealizedPnL ?? 0);
       return sum + (Number.isFinite(fallbackPnl) ? fallbackPnl : 0);
     }, 0);
-  }, [serverPositions, marketState?.pair, marketState?.markPrice, marketState?.lastPrice]);
+  }, [serverPositions, symbol, lastPrice, marketState?.pair, marketState?.markPrice, marketState?.lastPrice]);
 
-  const accountUnrealizedPnl = livePositionsUnrealizedPnl !== null
-    ? livePositionsUnrealizedPnl
-    : typeof accountSummary.unrealizedPnl === "number" ? accountSummary.unrealizedPnl : 0;
+  const accountUnrealizedPnl = useMemo(() => {
+    return livePositionsUnrealizedPnl !== null
+      ? livePositionsUnrealizedPnl
+      : typeof accountSummary.unrealizedPnl === "number" ? accountSummary.unrealizedPnl : 0;
+  }, [livePositionsUnrealizedPnl, accountSummary.unrealizedPnl]);
 
-  // 3. Equity Balance ($10,000.00 synchronized baseline)
-  const totalEquity = livePositionsUnrealizedPnl !== null
-    ? availableBalanceRaw + reservedUSDT + accountUnrealizedPnl
-    : Number.isFinite(accountSummary.equity)
-      ? Number(accountSummary.equity)
-      : availableBalanceRaw + reservedUSDT + accountUnrealizedPnl;
+  const holdingsValue = useMemo(
+    () => (accountSummary.holdings || []).reduce((sum, h) => sum + (Number(h.value) || 0), 0),
+    [accountSummary.holdings]
+  );
 
-  // 1. Total Portfolio Value ($10,000.00 baseline)
-  const portfolioTotal = Number.isFinite(accountSummary.totalPortfolio)
-    ? Number(accountSummary.totalPortfolio)
-    : totalEquity;
+  // 3. Equity / portfolio — cash (available + locked) plus marked crypto holdings
+  const totalEquity = useMemo(() => {
+    return availableBalanceRaw + reservedUSDT + holdingsValue;
+  }, [availableBalanceRaw, reservedUSDT, holdingsValue]);
 
-  // 2. Free To Trade / Buying Power ($7,500.00)
-  const freeToTrade = portfolioTotal - reservedUSDT;
+  // 1. Total Portfolio Value — same as equity for spot (USDT + marked positions)
+  const portfolioTotal = useMemo(() => totalEquity, [totalEquity]);
+
+  // 2. Free To Trade — spendable USDT (not equity / unrealized PnL)
+  const freeToTrade = useMemo(
+    () => Math.max(0, availableBalanceRaw),
+    [availableBalanceRaw]
+  );
 
   // Legacy fallback safety mappings
   const accountEquity = totalEquity;
@@ -1716,17 +1981,18 @@ socket.on('market_update', (data: any) => {
   const sellStop = sellStopLoss ? parseNumber(sellStopLoss) : undefined;
   const sellTp = sellTakeProfit ? parseNumber(sellTakeProfit) : undefined;
   const marketPriceUnavailable = orderType === "market" && !isValidPrice(marketPrice);
+  const tradingReady = liveStatus === "live" || isValidPrice(marketPrice);
   const buyError = buyAmount <= 0
     ? "Enter buy amount"
     : buyTotal < MIN_ORDER_TOTAL
       ? "Minimum order is 5 USDT"
-      : buyTotal > freeToTrade
+      : buyTotal > availableBalance
         ? "Insufficient Balance"
         : marketPriceUnavailable
           ? "Market price unavailable"
           : orderType !== "market" && !isValidPrice(buyPrice)
             ? "Enter valid price"
-            : liveStatus !== "live"
+            : !tradingReady
               ? "Connection is offline"
               : buyStop && buyStop >= buyPrice
                 ? "Stop Loss must be below entry price"
@@ -1743,14 +2009,16 @@ socket.on('market_update', (data: any) => {
           ? "Market price unavailable"
           : orderType !== "market" && !isValidPrice(sellPrice)
             ? "Enter valid price"
+            : !tradingReady
+              ? "Connection is offline"
             : sellStop && sellStop <= sellPrice
               ? "Stop Loss must be above entry price"
               : sellTp && sellTp >= sellPrice
                 ? "Take Profit must be below entry price"
                 : "";
-  const isReady = liveStatus === "live" && isValidPrice(marketPrice);
-  const buyDisabled = !!buyError || isPlacingOrder || buyAmount <= 0 || liveStatus !== "live" || (orderType !== "market" && !isValidPrice(buyPrice));
-  const sellDisabled = !!sellError || isPlacingOrder || sellAmount <= 0 || availableBTC <= 0 || liveStatus !== "live" || (orderType !== "market" && !isValidPrice(sellPrice));
+  const isReady = tradingReady && isValidPrice(marketPrice);
+  const buyDisabled = !!buyError || isPlacingOrder || buyAmount <= 0 || !tradingReady || (orderType !== "market" && !isValidPrice(buyPrice));
+  const sellDisabled = !!sellError || isPlacingOrder || sellAmount <= 0 || availableBTC <= 0 || !tradingReady || (orderType !== "market" && !isValidPrice(sellPrice));
   const buyButtonLabel = !isReady ? "Connecting..." : "Buy / Long";
   const marketWarning = orderType === "market"
     ? isValidPrice(marketPrice)
@@ -2229,6 +2497,16 @@ socket.on('market_update', (data: any) => {
     ];
   }, [activeTab, availableBalance, pendingLocked, buyAmountInput, buyPrice, lastPrice, portfolioTotal, totalEquity, lockedUSDT]);
 
+  const confirmOrderDetails = useMemo(() => [
+    { label: "Pair", value: symbol },
+    { label: "Order Type", value: orderType.charAt(0).toUpperCase() + orderType.slice(1) },
+    { label: "Side", value: pendingOrderSide === "buy" ? "Buy / Long" : "Sell / Short", color: pendingOrderSide === "buy" ? COLORS.green : COLORS.red },
+    { label: "Price", value: orderType === "market" ? `~${formatPrice(lastPrice)} USDT (Market)` : `${formatPrice(Number(priceInput))} USDT` },
+    { label: "Amount", value: `${pendingOrderSide === "buy" ? buyAmountInput || "0" : sellAmountInput || "0"} BTC` },
+    { label: "Total", value: `~$${pendingOrderSide === "buy" ? (buyTotal || 0).toFixed(2) : (sellTotal || 0).toFixed(2)} USDT` },
+    { label: "Est. Fee (0.1%)", value: `~$${pendingOrderSide === "buy" ? buyFee.toFixed(4) : sellFee.toFixed(4)} USDT`, color: COLORS.amber },
+  ], [symbol, orderType, pendingOrderSide, lastPrice, priceInput, buyAmountInput, sellAmountInput, buyTotal, sellTotal, buyFee, sellFee]);
+
   const initChartCandles = useCallback((nextCandles: Candle[]) => {
     initializeCandles(nextCandles);
     setCandles(nextCandles);
@@ -2248,7 +2526,7 @@ socket.on('market_update', (data: any) => {
       }
     } catch (err) {
       // Backend endpoint unavailable - use fallback synthetic candles
-      initChartCandles(createFallbackCandles());
+      initChartCandles(createFallbackCandles(300, 80721, sym, tf));
     }
   }, [initChartCandles]);
 
@@ -2408,12 +2686,22 @@ socket.on('market_update', (data: any) => {
   // Pair tab filter
   const pairFilter = pairTab === "fav" ? [] : "USDT";
   const displayedPairs = filteredSymbols.filter(p => pairTab === "fav" || p.endsWith("/" + pairFilter)).slice(0, 50);
-  const dashboardAccountMetrics = [
+  
+  const dashboardAccountMetrics = useMemo(() => [
     { label: "Available", value: `$${availableBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
     { label: "Equity", value: `$${totalEquity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
     { label: "Locked", value: `$${reservedUSDT.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
     { label: "Open PnL", value: `${accountUnrealizedPnl >= 0 ? "+" : ""}$${accountUnrealizedPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, trend: accountUnrealizedPnl >= 0 ? "positive" : "negative" },
-  ];
+  ], [availableBalance, totalEquity, reservedUSDT, accountUnrealizedPnl]);
+
+  const headerStats = useMemo(() => [
+    { label: "24h Chg", value: `${changePct.toFixed(2)}%`, color: isPriceUp ? COLORS.green : COLORS.red },
+    { label: "24h High", value: formatPrice(high24h), color: COLORS.textBright },
+    { label: "24h Low",  value: formatPrice(low24h),  color: COLORS.textBright },
+    { label: "24h Vol(BTC)",  value: formatFullAmount(vol24h),   color: COLORS.textBright },
+    { label: "24h Vol(USDT)", value: formatFullAmount(vol24hUSDT), color: COLORS.textBright },
+    { label: "Networks", value: "BTC (5)", color: COLORS.textBright },
+  ], [changePct, high24h, low24h, vol24h, vol24hUSDT, isPriceUp]);
 
   return (
     <div ref={tradingPageRef} className="trading-page trading-dashboard" style={{ display: "flex", flexDirection: "column", height: "auto", background: COLORS.bg, color: COLORS.textBright, fontFamily: "'IBM Plex Sans', 'Helvetica Neue', sans-serif", fontSize: 13, overflowY: "auto", overflowX: "hidden", minHeight: "100dvh", scrollBehavior: "smooth", WebkitOverflowScrolling: "touch", touchAction: "pan-y", overscrollBehaviorY: "auto" }}>
@@ -2443,14 +2731,7 @@ socket.on('market_update', (data: any) => {
         </div>
         {/* Stats bar */}
         <div style={{ display: "flex", gap: 24, alignItems: "center", flex: 1, overflow: "hidden" }}>
-          {[
-            { label: "24h Chg", value: `${changePct.toFixed(2)}%`, color: isPriceUp ? COLORS.green : COLORS.red },
-            { label: "24h High", value: formatPrice(high24h), color: COLORS.textBright },
-            { label: "24h Low",  value: formatPrice(low24h),  color: COLORS.textBright },
-            { label: "24h Vol(BTC)",  value: formatFullAmount(vol24h),   color: COLORS.textBright },
-            { label: "24h Vol(USDT)", value: formatFullAmount(vol24hUSDT), color: COLORS.textBright },
-            { label: "Networks", value: "BTC (5)", color: COLORS.textBright },
-          ].map(stat => (
+          {headerStats.map(stat => (
             <div key={stat.label} style={{ flexShrink: 0 }}>
               <div style={{ fontSize: 10, color: COLORS.text, marginBottom: 2 }}>{stat.label}</div>
               <div style={{ fontSize: 12, color: stat.color, fontWeight: stat.color !== COLORS.textBright ? 700 : 400, fontFamily: "monospace" }}>{stat.value}</div>
@@ -2478,6 +2759,11 @@ socket.on('market_update', (data: any) => {
           <span style={{ width: 8, height: 8, borderRadius: "50%", background: liveStatus === "live" ? COLORS.green : COLORS.red, display: "inline-block", boxShadow: liveStatus === "live" ? `0 0 6px ${COLORS.green}` : "none" }} />
           <span style={{ fontSize: 11, color: liveStatus === "live" ? COLORS.green : COLORS.red }}>{liveStatus.toUpperCase()}</span>
         </div>
+      </div>
+
+      {/* ── BALANCE CARD ── */}
+      <div style={{ padding: "12px 16px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}` }}>
+        <TradingBalanceCard />
       </div>
 
       {/* ── MAIN BODY ── */}
@@ -2587,7 +2873,7 @@ socket.on('market_update', (data: any) => {
               <div className="trading-chart-layout" style={{ display: "flex", height: "100%" }}>
                 <div className="trading-chart-stage" style={{ flex: 1, position: "relative", minWidth: 0 }}>
                   {activeChartTab === "original" && (
-                    <CandleChart candles={candles} deepMarketData={deepMarketData} indicators={indicators} chartType={chartType} tf={timeframe} pair={symbol} rsiData={rsiData} macdData={macdData} showRSI={showRSI} showMACD={showMACD} liveStatus={liveStatus} activeTool={activeTool} drawings={drawings} onDrawingsChange={setDrawings} drawingColor={drawingColor} drawingWidth={drawingWidth} />
+                    <CandleChart candles={candles} deepMarketData={deepMarketData} indicators={indicators} chartType={chartType} tf={timeframe} pair={symbol} rsiData={rsiData} macdData={macdData} showRSI={showRSI} showMACD={showMACD} liveStatus={liveStatus} activeTool={activeTool} drawings={drawings} onDrawingsChange={setDrawings} drawingColor={drawingColor} drawingWidth={drawingWidth} lastPrice={lastPrice} entryPriceLine={entryPriceOverlay} />
                   )}
                   {activeChartTab === "depth" && (
                     <div style={{ height: "100%", display: "flex", flexDirection: "column", padding: 16, gap: 16, background: COLORS.bgPanel, minHeight: 360 }}>
@@ -3014,15 +3300,7 @@ socket.on('market_update', (data: any) => {
             </div>
             {/* Order Details */}
             <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 10 }}>
-              {[
-                { label: "Pair", value: symbol },
-                { label: "Order Type", value: orderType.charAt(0).toUpperCase() + orderType.slice(1) },
-                { label: "Side", value: pendingOrderSide === "buy" ? "Buy / Long" : "Sell / Short", color: pendingOrderSide === "buy" ? COLORS.green : COLORS.red },
-                { label: "Price", value: orderType === "market" ? `~${formatPrice(lastPrice)} USDT (Market)` : `${formatPrice(Number(priceInput))} USDT` },
-                { label: "Amount", value: `${pendingOrderSide === "buy" ? buyAmountInput || "0" : sellAmountInput || "0"} BTC` },
-                { label: "Total", value: `~$${pendingOrderSide === "buy" ? (buyTotal || 0).toFixed(2) : (sellTotal || 0).toFixed(2)} USDT` },
-                { label: "Est. Fee (0.1%)", value: `~$${pendingOrderSide === "buy" ? buyFee.toFixed(4) : sellFee.toFixed(4)} USDT`, color: COLORS.amber },
-              ].map(row => (
+              {confirmOrderDetails.map(row => (
                 <div key={row.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: `1px solid ${COLORS.border}` }}>
                   <span style={{ fontSize: 12, color: COLORS.text }}>{row.label}</span>
                   <span style={{ fontSize: 13, fontWeight: 600, color: (row as any).color || COLORS.textBright, fontFamily: "monospace" }}>{row.value}</span>
