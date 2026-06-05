@@ -2832,7 +2832,7 @@ export default function Trading() {
       </div>
 
       {/* ── TOP HEADER BAR (Binance style) ── */}
-      <div className="trading-header trading-dashboard__header" style={{ display: "flex", alignItems: "center", height: 52, borderBottom: `1px solid ${COLORS.border}`, padding: "0 16px", gap: 24, background: COLORS.bgPanel, flexShrink: 0, overflow: "hidden", marginLeft: isDesktopLayout && isChartView ? 'var(--left-width, 340px)' : 0, width: isDesktopLayout && isChartView ? 'calc(100% - var(--left-width, 340px) - var(--right-width, 340px))' : '100%' }}>
+      <div className="trading-header trading-dashboard__header" style={{ display: "flex", alignItems: "center", height: 52, borderBottom: `1px solid ${COLORS.border}`, padding: "0 16px", gap: 24, background: COLORS.bgPanel, flexShrink: 0, overflow: "hidden" }}>
         {/* Symbol + price */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
           <div style={{ width: 28, height: 28, background: "transparent", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
@@ -2870,6 +2870,27 @@ export default function Trading() {
         </div>
       </div>
 
+      {/* ── 3-PANEL BODY (desktop: flex row; compact: normal flow) ── */}
+      <div style={{ display: isDesktopLayout ? "flex" : "block", flex: isDesktopLayout ? 1 : undefined, overflow: isDesktopLayout ? "hidden" : undefined, minHeight: isDesktopLayout ? 0 : undefined }}>
+
+        {/* ── LEFT PANEL: Order Book + Market Trades + Top Movers (desktop only) ── */}
+        {isDesktopLayout && isChartView && (
+          <aside style={{ width: 'var(--left-width, 340px)', background: COLORS.bgPanel, borderRight: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden" }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
+              <div style={{ padding: "8px 10px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                <span style={{ fontWeight: 700, fontSize: 12, color: COLORS.textBright }}>Order Book</span>
+                <span style={{ fontSize: 10, color: COLORS.textMuted }}>{symbol}</span>
+              </div>
+              <div style={{ flex: 1, overflow: "hidden", minHeight: 0 }}>
+                {orderBookPanel("side")}
+              </div>
+            </div>
+          </aside>
+        )}
+
+        {/* ── CENTER COLUMN (scrollable on desktop) ── */}
+        <div style={{ flex: isDesktopLayout ? 1 : undefined, overflowY: isDesktopLayout ? "auto" : undefined, display: "flex", flexDirection: "column", minHeight: isDesktopLayout ? 0 : undefined }}>
+
       {/* ── COLLAPSIBLE PAIRS SELECTOR (mobile/tablet) ── */}
       <div className="trading-pairs-dropdown" style={{ maxHeight: showPairSelector && isCompactLayout ? 400 : 0, overflow: "hidden", transition: "max-height 0.35s ease", borderBottom: showPairSelector && isCompactLayout ? `1px solid ${COLORS.border}` : "none", background: COLORS.bgPanel }}>
         {showPairSelector && isCompactLayout && marketPairsPanel()}
@@ -2883,7 +2904,7 @@ export default function Trading() {
       </div>
 
       {/* ── MAIN VIEW TABS (between left & right panels) ── */}
-      <div className="trading-main-tabs" style={{ display: "flex", alignItems: "center", height: 38, borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, padding: "0 12px", gap: 0, flexShrink: 0, marginLeft: isDesktopLayout && isChartView ? 'var(--left-width, 340px)' : 0, width: isDesktopLayout && isChartView ? 'calc(100% - var(--left-width, 340px) - var(--right-width, 340px))' : '100%' }}>
+      <div className="trading-main-tabs" style={{ display: "flex", alignItems: "center", height: 38, borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, padding: "0 12px", gap: 0, flexShrink: 0 }}>
         {([
           { id: "chart", label: "Chart" },
           { id: "trades", label: "Trades" },
@@ -2903,7 +2924,7 @@ export default function Trading() {
 
       {/* ── TIMEFRAME TOOLBAR (between left & right panels) ── */}
       {isChartView && (
-      <div style={{ display: "flex", alignItems: "center", height: 34, borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, padding: "0 10px", gap: 2, flexShrink: 0, flexWrap: "nowrap", overflow: "hidden", marginLeft: isDesktopLayout && isChartView ? 'var(--left-width, 340px)' : 0, width: isDesktopLayout && isChartView ? 'calc(100% - var(--left-width, 340px) - var(--right-width, 340px))' : '100%' }}>
+      <div style={{ display: "flex", alignItems: "center", height: 34, borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, padding: "0 10px", gap: 2, flexShrink: 0, flexWrap: "nowrap", overflow: "hidden" }}>
         {/* Pinned Timeframes */}
         <div style={{ display: "flex", gap: 1 }}>
           {["1m", "15m", "1h", "4h", "1d", "1w"].map(tf => (
@@ -2953,7 +2974,7 @@ export default function Trading() {
       )}
 
       {/* ── CHART / CONTENT AREA (between left & right panels) ── */}
-      <div className="trading-chart-panel trading-dashboard__chart-panel" style={{ flex: 1, position: "relative", overflow: "hidden", minHeight: 0, background: COLORS.bg, marginLeft: isDesktopLayout && isChartView ? 'var(--left-width, 340px)' : 0, width: isDesktopLayout && isChartView ? 'calc(100% - var(--left-width, 340px) - var(--right-width, 340px))' : '100%' }}>
+      <div className="trading-chart-panel trading-dashboard__chart-panel" style={{ flex: 1, position: "relative", overflow: "hidden", minHeight: 0, background: COLORS.bg }}>
         {activeViewTab === "chart" && (
           <div className="trading-chart-layout" style={{ display: "flex", height: "100%" }}>
             <div className="trading-chart-stage" style={{ flex: 1, position: "relative", minWidth: 0 }}>
@@ -3034,7 +3055,7 @@ export default function Trading() {
 
       {/* ── BALANCE STRIP (between left & right panels) ── */}
       {isChartView && (
-      <div className="trading-balance-strip" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, padding: "8px 16px", borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, flexShrink: 0, marginLeft: isDesktopLayout && isChartView ? 'var(--left-width, 340px)' : 0, width: isDesktopLayout && isChartView ? 'calc(100% - var(--left-width, 340px) - var(--right-width, 340px))' : '100%' }}>
+      <div className="trading-balance-strip" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, padding: "8px 16px", borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, flexShrink: 0 }}>
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 10, color: COLORS.text }}>Available USDT</div>
           <div style={{ fontSize: 12, color: COLORS.textBright, fontWeight: 600, fontFamily: "monospace" }}>${availableBalance.toFixed(2)}</div>
@@ -3056,7 +3077,7 @@ export default function Trading() {
 
       {/* ── ORDER FORM (between left & right panels) ── */}
       {isChartView && (
-      <div className="trading-order-form trading-dashboard__ticket" style={{ height: isDesktopLayout ? "auto" : 210, minHeight: isDesktopLayout ? 320 : undefined, borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, display: "flex", flexShrink: 0, overflow: isDesktopLayout ? "visible" : "hidden", marginLeft: isDesktopLayout && isChartView ? 'var(--left-width, 340px)' : 0, width: isDesktopLayout && isChartView ? 'calc(100% - var(--left-width, 340px) - var(--right-width, 340px))' : '100%' }}>
+      <div className="trading-order-form trading-dashboard__ticket" style={{ height: isDesktopLayout ? "auto" : 210, minHeight: isDesktopLayout ? 320 : undefined, borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, display: "flex", flexShrink: 0, overflow: isDesktopLayout ? "visible" : "hidden" }}>
         {/* Spot/Cross tabs */}
         <div className="trading-order-form__inner" style={{ width: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
           {/* Tab row */}
@@ -3311,7 +3332,7 @@ export default function Trading() {
       {isCompactLayout && isChartView && orderBookPanel("embedded")}
 
       {/* ── BOTTOM TAB BAR (between left & right panels) ── */}
-      <div ref={bottomScrollRef} className="trading-bottom-panel trading-dashboard__activity" style={{ borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, flexShrink: 0, marginLeft: isDesktopLayout && isChartView ? 'var(--left-width, 340px)' : 0, width: isDesktopLayout && isChartView ? 'calc(100% - var(--left-width, 340px) - var(--right-width, 340px))' : '100%' }}>
+      <div ref={bottomScrollRef} className="trading-bottom-panel trading-dashboard__activity" style={{ borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", height: 36, padding: "0 12px", gap: 0, borderBottom: `1px solid ${COLORS.border}` }}>
           {[["openorders", `Open Orders(${activeOrders.length})`], ["positions", `Positions(${serverPositions.length})`], ["orderhistory", "Order History"], ["tradehistory", "Trade History"], ["holdings", "Holdings"], ["bots", "Bots"]].map(([key, label]) => (
             <button key={key} onClick={() => setBottomTab(key as any)} style={{ padding: "0 14px", height: "100%", background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: bottomTab === key ? COLORS.textBright : COLORS.text, borderBottom: bottomTab === key ? `2px solid ${COLORS.amber}` : "2px solid transparent", whiteSpace: "nowrap" }}>{label}</button>
@@ -3417,20 +3438,7 @@ serverPositions.length === 0
       {/* ── MAIN BODY ── */}
       <div className="trading-body trading-dashboard__body" style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0 }}>
 
-        {/* ── LEFT: Order Book (desktop only, 280px) ── */}
-        {isDesktopLayout && isChartView && (
-          <aside className="trading-left-panel" style={{ width: 340, background: COLORS.bgPanel, borderRight: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden", minHeight: 0 }}>
-            <div style={{ padding: "8px 10px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ fontWeight: 700, fontSize: 12, color: COLORS.textBright }}>Order Book</span>
-              <span style={{ fontSize: 10, color: COLORS.textMuted }}>{symbol}</span>
-            </div>
-            <div style={{ flex: 1, overflow: "hidden", minHeight: 0 }}>
-              {orderBookPanel("side")}
-            </div>
-          </aside>
-        )}
-
-        {/* ── LEFT: Drawing Toolbar (mobile/tablet) ── */}
+        {/* ── Drawing Toolbar (mobile/tablet) ── */}
         {!isDesktopLayout && isChartView && (
           <div className="trading-toolbar trading-dashboard__tools" style={{ width: 44, background: COLORS.bgPanel, borderRight: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 8, gap: 2, flexShrink: 0 }}>
             {DRAWING_TOOLS.map(tool => (
@@ -3452,22 +3460,23 @@ serverPositions.length === 0
           </div>
         )}
 
-        {/* ── CENTER: (empty - all content moved above) ── */}
+        {/* ── CENTER: (empty) ── */}
         <div className="trading-main trading-dashboard__main" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden" }}>
         </div>
 
+        {/* COMPACT: Market Trades + Pairs */}
+        {isCompactLayout && marketPanel()}
+      </div>
+      </div>
+
+        {/* ── RIGHT PANEL: Trading Pairs + Market Trades (desktop only) ── */}
         {isDesktopLayout && (
-          <aside className="trading-right trading-dashboard__side" style={{ display: "flex", flexDirection: "column", flexShrink: 0, minHeight: 0, width: 340, background: COLORS.bgPanel, borderLeft: `1px solid ${COLORS.border}` }}>
+          <aside style={{ width: 'var(--right-width, 340px)', background: COLORS.bgPanel, borderLeft: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden" }}>
             {marketPairsPanel()}
-            <div style={{ flex: 1, overflow: "hidden", minHeight: 0 }}>
-              {marketTradesPanel(false)}
-            </div>
+            {marketTradesPanel(false)}
             {topMoversSection()}
           </aside>
         )}
-
-        {/* RIGHT PANEL: Market Trades + Pairs */}
-        {isCompactLayout && marketPanel()}
       </div>
 
       {/* ── TOAST NOTIFICATIONS ── */}
@@ -3665,8 +3674,9 @@ serverPositions.length === 0
 
         @media (min-width: 1024px) {
           .trading-dashboard { --left-width: 340px; --right-width: 340px; }
-          .trading-page { height: auto !important; min-height: 100dvh !important; overflow-y: auto !important; }
+          .trading-page { height: 100dvh !important; min-height: 0 !important; overflow: hidden !important; }
           .trading-body { flex: 1 1 auto !important; flex-wrap: nowrap !important; gap: 0 !important; min-height: 0 !important; overflow: hidden !important; }
+          .trading-page.trading-dashboard .trading-body.trading-dashboard__body { display: flex !important; grid-template-columns: none !important; gap: 0 !important; padding: 0 !important; overflow: hidden !important; }
           .trading-toolbar { flex: 0 0 44px !important; width: 44px !important; }
           .trading-main { width: auto !important; min-height: 0 !important; overflow: hidden !important; }
           .trading-chart-panel { flex: 1 1 auto !important; min-height: 0 !important; overflow: hidden !important; }
@@ -3723,6 +3733,7 @@ serverPositions.length === 0
             height: auto !important;
             min-height: 100svh !important;
             overflow-y: visible !important;
+            overflow-x: hidden !important;
             -webkit-overflow-scrolling: touch;
             overscroll-behavior-y: auto;
             touch-action: pan-y;
