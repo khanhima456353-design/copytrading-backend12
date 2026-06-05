@@ -62,8 +62,6 @@ const TF_SECONDS: Record<string, number> = {
   "1w": 604800,
 };
 
-const BINANCE_TIMEFRAMES = ["1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "1w"];
-
 function normalizeTimeframe(value: string | undefined) {
   if (!value || typeof value !== "string") return "1d";
   return value.toLowerCase().trim();
