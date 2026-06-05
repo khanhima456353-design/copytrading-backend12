@@ -1446,6 +1446,7 @@ export default function Trading() {
   const [filteredSymbols, setFilteredSymbols] = useState<string[]>([]);
   const [coinImages, setCoinImages] = useState<Record<string, string>>(DEFAULT_COIN_IMAGES);
   const [marketMovers, setMarketMovers] = useState<{ pair: string; change: number; volume: number; high: number; low: number }[]>([]);
+  const [allTickerPrices, setAllTickerPrices] = useState<Record<string, number>>({});
   const [marketState, setMarketState] = useState<MarketState | null>(null);
   const [priceInput, setPriceInput] = useState("");
   const [savedManualPriceInput, setSavedManualPriceInput] = useState("");
@@ -1942,6 +1943,58 @@ socket.on('market_update', (data: any) => {
     };
   }, [refreshAccountData]);
 
+  // Public socket for allTickers — no auth required
+  useEffect(() => {
+    let publicSocket: any = null;
+    let cancelled = false;
+
+    const connectPublic = async () => {
+      try {
+        const { io } = await import('socket.io-client');
+        const API_BASE = process.env.REACT_APP_API_URL
+          ? process.env.REACT_APP_API_URL.replace(/\/+$/, '')
+          : 'http://localhost:5000';
+
+        publicSocket = io(API_BASE, {
+          transports: ['websocket', 'polling'],
+          path: '/socket.io',
+        });
+
+        publicSocket.on('allTickers', (tickers: any[]) => {
+          if (cancelled || !Array.isArray(tickers)) return;
+          const priceMap: Record<string, number> = {};
+          const movers: { pair: string; change: number; volume: number; high: number; low: number }[] = [];
+          for (const t of tickers) {
+            const price = Number(t.price) || Number(t.lastPrice) || 0;
+            const sym = t.symbol;
+            if (!sym) continue;
+            if (price > 0) priceMap[sym] = price;
+            if (sym.endsWith('USDT')) {
+              const base = sym.replace('USDT', '');
+              movers.push({
+                pair: `${base}/USDT`,
+                change: Number(t.changePct) || 0,
+                volume: Number(t.quoteVol) || Number(t.volume24h) || 0,
+                high: Number(t.high24h) || 0,
+                low: Number(t.low24h) || 0,
+              });
+            }
+          }
+          if (Object.keys(priceMap).length) setAllTickerPrices(prev => ({ ...prev, ...priceMap }));
+          if (movers.length) setMarketMovers(movers);
+        });
+      } catch (err) {
+        console.error('Public socket error:', err);
+      }
+    };
+
+    connectPublic();
+    return () => {
+      cancelled = true;
+      if (publicSocket) publicSocket.disconnect();
+    };
+  }, []);
+
   useEffect(() => {
     if (!marketState) return;
     setOrderbook({ buy: marketState.orderbook.bids, sell: marketState.orderbook.asks });
@@ -2400,11 +2453,11 @@ socket.on('market_update', (data: any) => {
                   <div style={{ fontSize: 12, fontWeight: pair === symbol ? 700 : 500, color: COLORS.textBright }}>
                     {symbolLabel}/<span style={{ color: COLORS.textMuted, fontSize: 10 }}>{pair.split("/")[1]}</span>
                   </div>
-                  {mover && <div style={{ fontSize: 9, color: COLORS.textMuted }}>{formatVol(mover.volume)}M</div>}
+                  {mover && <div style={{ fontSize: 9, color: COLORS.textMuted }}>{formatVol(mover.volume)}</div>}
                 </div>
               </div>
               <div style={{ textAlign: "right", fontFamily: "monospace", fontSize: 11, color: COLORS.textBright }}>
-                {pair === symbol ? formatPrice(lastPrice) : formatPrice(30000 + Math.random() * 50000)}
+                {pair === symbol ? formatPrice(lastPrice) : formatPrice(allTickerPrices[pair.replace("/", "")] || 0)}
               </div>
               <div style={{ textAlign: "right" }}>
                 <span style={{ fontSize: 11, fontFamily: "monospace", background: chg >= 0 ? COLORS.greenDim : COLORS.redDim, color: chg >= 0 ? COLORS.green : COLORS.red, padding: "1px 5px", borderRadius: 3 }}>{chg >= 0 ? "+" : ""}{chg.toFixed(2)}%</span>
