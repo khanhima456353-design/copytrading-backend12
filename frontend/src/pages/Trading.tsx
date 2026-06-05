@@ -108,6 +108,137 @@ const BINANCE_TRADE_WS = "wss://stream.binance.com:9443/ws/btcusdt@trade";
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
+const DEFAULT_COIN_IMAGES: Record<string, string> = {
+  BTC: "https://assets.coingecko.com/coins/images/1/small/bitcoin.png",
+  ETH: "https://assets.coingecko.com/coins/images/279/small/ethereum.png",
+  BNB: "https://assets.coingecko.com/coins/images/825/small/bnb-icon2_2x.png",
+  SOL: "https://assets.coingecko.com/coins/images/4128/small/solana.png",
+  XRP: "https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png",
+  ADA: "https://assets.coingecko.com/coins/images/975/small/cardano.png",
+  DOGE: "https://assets.coingecko.com/coins/images/5/small/dogecoin.png",
+  DOT: "https://assets.coingecko.com/coins/images/12171/small/polkadot.png",
+  AVAX: "https://assets.coingecko.com/coins/images/12559/small/Avalanche_Circle_RedWhite_Trans.png",
+  LINK: "https://assets.coingecko.com/coins/images/877/small/chainlink-new-logo.png",
+  TRX: "https://assets.coingecko.com/coins/images/1094/small/tron-logo.png",
+  SHIB: "https://assets.coingecko.com/coins/images/11939/small/shiba.png",
+  LTC: "https://assets.coingecko.com/coins/images/2/small/litecoin.png",
+  MATIC: "https://assets.coingecko.com/coins/images/4713/small/polygon.png",
+  UNI: "https://assets.coingecko.com/coins/images/12504/small/uniswap-logo.png",
+  ATOM: "https://assets.coingecko.com/coins/images/1481/small/cosmos_hub.png",
+  FIL: "https://assets.coingecko.com/coins/images/12817/small/filecoin.png",
+  APT: "https://assets.coingecko.com/coins/images/26455/small/aptos_round.png",
+  ARB: "https://assets.coingecko.com/coins/images/16547/small/photo_2023-03-29_21.47.00.jpeg",
+  OP: "https://assets.coingecko.com/coins/images/25244/small/Optimism.png",
+  NEAR: "https://assets.coingecko.com/coins/images/10365/small/near.jpg",
+  AAVE: "https://assets.coingecko.com/coins/images/12645/small/AAVE.png",
+  ALGO: "https://assets.coingecko.com/coins/images/7598/small/algorand.png",
+  APE: "https://assets.coingecko.com/coins/images/24383/small/apecoin.jpg",
+  AXS: "https://assets.coingecko.com/coins/images/25952/small/photo_2023-09-14_22.28.39.jpeg",
+  BUSD: "https://assets.coingecko.com/coins/images/9576/small/BUSD.png",
+  CRV: "https://assets.coingecko.com/coins/images/12124/small/Curve.png",
+  ENJ: "https://assets.coingecko.com/coins/images/1102/small/enjin-coin-logo.png",
+  ETC: "https://assets.coingecko.com/coins/images/79/small/ethereum-classic-logo.png",
+  FTM: "https://assets.coingecko.com/coins/images/10090/small/Opera_Symbol_Circle_Black_Transparent.png",
+  GRT: "https://assets.coingecko.com/coins/images/13269/small/graph-token.png",
+  HBAR: "https://assets.coingecko.com/coins/5/360px-Hedera_Hashgraph_logo.png",
+  ICP: "https://assets.coingecko.com/coins/images/14490/small/Internet_Computer_logo.png",
+  KCS: "https://assets.coingecko.com/coins/images/9545/small/thumbnail-97.png",
+  KLAY: "https://assets.coingecko.com/coins/images/9672/small/klaytn_logo_1.png",
+  MANA: "https://assets.coingecko.com/coins/images/12813/small/manana_round.png",
+  SAND: "https://assets.coingecko.com/coins/images/12141/small/sandbox_logo.jpg",
+  THETA: "https://assets.coingecko.com/coins/images/25783/small/theta-token-logo.png",
+  TUSD: "https://assets.coingecko.com/coins/images/3011/small/tusd.png",
+  USDC: "https://assets.coingecko.com/coins/images/6319/small/usdc.png",
+  USDT: "https://assets.coingecko.com/coins/images/325/small/Tether.png",
+  VET: "https://assets.coingecko.com/coins/images/1167/small/VeChain-Logo-768x768.png",
+  WAVES: "https://assets.coingecko.com/coins/images/12504/small/waves.png",
+  XLM: "https://assets.coingecko.com/coins/images/100/small/Stellar_symbol_black_RGB.png",
+  XMR: "https://assets.coingecko.com/coins/images/69/small/monero_logo.png",
+  XTZ: "https://assets.coingecko.com/coins/images/976/small/tezos-logo.png",
+  ZEC: "https://assets.coingecko.com/coins/images/434/small/zcash.png",
+  ZIL: "https://assets.coingecko.com/coins/images/2687/small/Zilliqa-logo.png",
+  "1INCH": "https://assets.coingecko.com/coins/images/13469/small/1inch-logo.png",
+  COMP: "https://assets.coingecko.com/coins/images/10775/small/COMP.png",
+  MKR: "https://assets.coingecko.com/coins/images/1364/small/Maker_logo.png",
+  SUSHI: "https://assets.coingecko.com/coins/images/12271/small/swap_token.jpg",
+  YFI: "https://assets.coingecko.com/coins/images/11849/small/yfi-192x192.png",
+  BAL: "https://assets.coingecko.com/coins/images/12951/small/balancer.png",
+  SNX: "https://assets.coingecko.com/coins/images/2589/small/SNX.png",
+  CHZ: "https://assets.coingecko.com/coins/images/11784/small/chz.png",
+  ANKR: "https://assets.coingecko.com/coins/images/10717/small/ANKR.png",
+  RUNE: "https://assets.coingecko.com/coins/images/6741/small/rune.png",
+  FLOW: "https://assets.coingecko.com/coins/images/13439/small/flow-fav-icon_512x512.png",
+  IOTA: "https://assets.coingecko.com/coins/images/692/small/IOTA_White_logo.png",
+  EOS: "https://assets.coingecko.com/coins/images/738/small/eos-logo.png",
+  NEO: "https://assets.coingecko.com/coins/images/480/small/NEO_512_512.png",
+  EGLD: "https://assets.coingecko.com/coins/images/12133/small/elrond.png",
+  KAVA: "https://assets.coingecko.com/coins/images/9719/small/kava.png",
+  MINA: "https://assets.coingecko.com/coins/images/15628/small/Mina_Logotype_PNG_Transparent.png",
+  TFUEL: "https://assets.coingecko.com/coins/images/8003/small/theta_fuel.png",
+  OCEAN: "https://assets.coingecko.com/coins/images/5321/small/ocean-protocol-logo.jpg",
+  FET: "https://assets.coingecko.com/coins/images/5681/small/Fetch.jpg",
+  RSR: "https://assets.coingecko.com/coins/images/5011/small/rsr.png",
+  CKB: "https://assets.coingecko.com/coins/images/9546/small/nervos.png",
+  IMX: "https://assets.coingecko.com/coins/images/17233/small/ImmutableX_round_2.png",
+  BLUR: "https://assets.coingecko.com/coins/images/28454/small/BLUR-Token.png",
+  LDO: "https://assets.coingecko.com/coins/images/13573/small/Lido_DAO_logo.png",
+  SSV: "https://assets.coingecko.com/coins/images/24053/small/ssv3.jpg",
+  MANTA: "https://assets.coingecko.com/coins/images/34402/small/manta.jpg",
+  WLD: "https://assets.coingecko.com/coins/images/31370/small/worldcoin-icon_001_i7XJL1Aq_1722325632283.png",
+  JUP: "https://assets.coingecko.com/coins/images/34433/small/jup.png",
+  TIA: "https://assets.coingecko.com/coins/images/26718/small/ce2018fc35b18dc603752826f446378c.jpg",
+  SEI: "https://assets.coingecko.com/coins/images/28205/small/Sei_Logo_200x200.png",
+  PEPE: "https://assets.coingecko.com/coins/images/29850/small/pepe-token.jpg",
+  WIF: "https://assets.coingecko.com/coins/images/37734/small/wif.png",
+  BONK: "https://assets.coingecko.com/coins/images/28830/small/bonk.jpg",
+  RENDER: "https://assets.coingecko.com/coins/images/11636/small/rndr.png",
+  STX: "https://assets.coingecko.com/coins/images/2062/small/Stacks_Logo_png.png",
+  INJ: "https://assets.coingecko.com/coins/images/12882/small/INJ_round.png",
+  ONDO: "https://assets.coingecko.com/coins/images/31099/small/Ondo.svg",
+  AR: "https://assets.coingecko.com/coins/images/28284/small/arround.png",
+};
+
+function CoinIcon({ symbol, size, images }: { symbol: string; size?: number; images?: Record<string, string> }) {
+  const s = size || 20;
+  const url = images?.[symbol] || DEFAULT_COIN_IMAGES[symbol];
+  if (url) {
+    return (
+      <img
+        src={url}
+        alt={symbol}
+        style={{ width: s, height: s, objectFit: "contain", borderRadius: "50%" }}
+        onError={(e) => {
+          const el = e.target as HTMLImageElement;
+          if (!el.dataset.retried) {
+            el.dataset.retried = "1";
+            el.src = `/api/coin-icon/${symbol}`;
+          } else {
+            el.style.display = "none";
+            const span = document.createElement("span");
+            span.style.cssText = `font-size:${s * 0.55}px;font-weight:700;color:${COLORS.amber}`;
+            span.textContent = symbol.slice(0, 3);
+            el.parentElement?.appendChild(span);
+          }
+        }}
+      />
+    );
+  }
+  return (
+    <img
+      src={`/api/coin-icon/${symbol}`}
+      alt={symbol}
+      style={{ width: s, height: s, objectFit: "contain", borderRadius: "50%" }}
+      onError={(e) => {
+        (e.target as HTMLImageElement).style.display = "none";
+        const span = document.createElement("span");
+        span.style.cssText = `font-size:${s * 0.55}px;font-weight:700;color:${COLORS.amber}`;
+        span.textContent = symbol.slice(0, 3);
+        e.currentTarget.parentElement?.appendChild(span);
+      }}
+    />
+  );
+}
+
 const formatTime = (t: number) =>
   new Date(t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
@@ -1313,6 +1444,7 @@ export default function Trading() {
   const [deepMarketData, setDeepMarketData] = useState<{ time: number; value: number }[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredSymbols, setFilteredSymbols] = useState<string[]>([]);
+  const [coinImages, setCoinImages] = useState<Record<string, string>>(DEFAULT_COIN_IMAGES);
   const [marketMovers, setMarketMovers] = useState<{ pair: string; change: number; volume: number; high: number; low: number }[]>([]);
   const [marketState, setMarketState] = useState<MarketState | null>(null);
   const [priceInput, setPriceInput] = useState("");
@@ -2261,7 +2393,9 @@ socket.on('market_update', (data: any) => {
               onMouseLeave={e => { if (pair !== symbol) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 28, height: 28, borderRadius: 999, background: COLORS.bgAlt, display: "grid", placeItems: "center", color: COLORS.amber, fontSize: 11, fontWeight: 700 }}>{symbolLabel.slice(0, 3)}</div>
+                <div style={{ width: 28, height: 28, borderRadius: 999, background: COLORS.bgAlt, display: "grid", placeItems: "center", overflow: "hidden", flexShrink: 0 }}>
+                  <CoinIcon symbol={symbolLabel} size={20} images={coinImages} />
+                </div>
                 <div>
                   <div style={{ fontSize: 12, fontWeight: pair === symbol ? 700 : 500, color: COLORS.textBright }}>
                     {symbolLabel}/<span style={{ color: COLORS.textMuted, fontSize: 10 }}>{pair.split("/")[1]}</span>
@@ -2554,6 +2688,17 @@ socket.on('market_update', (data: any) => {
 
   useEffect(() => { fetchSymbols(); }, []);
 
+  useEffect(() => {
+    fetch("/api/coin-images")
+      .then(r => r.json())
+      .then((map: Record<string, string>) => {
+        if (map && Object.keys(map).length) {
+          setCoinImages(prev => ({ ...map, ...prev }));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const applyDisplayPriceUpdate = useCallback((rawPrice: number) => {
     const state = priceMovementRef.current;
     let direction = state.direction;
@@ -2718,7 +2863,9 @@ socket.on('market_update', (data: any) => {
       <div className="trading-header trading-dashboard__header" style={{ display: "flex", alignItems: "center", height: 52, borderBottom: `1px solid ${COLORS.border}`, padding: "0 16px", gap: 24, background: COLORS.bgPanel, flexShrink: 0, overflow: "hidden", marginLeft: isDesktopLayout && isChartView ? 44 : 0, width: isDesktopLayout && isChartView ? 'calc(100% - 44px - 280px)' : '100%' }}>
         {/* Symbol + price */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-          <div style={{ width: 28, height: 28, background: COLORS.amber, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: "#000" }}>₿</div>
+          <div style={{ width: 28, height: 28, background: COLORS.amber, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+            <CoinIcon symbol={symbol.split("/")[0]} size={20} images={coinImages} />
+          </div>
           <div>
             <div style={{ fontWeight: 700, fontSize: 15, letterSpacing: 0.3 }}>{symbol}</div>
             <div style={{ fontSize: 10, color: COLORS.text }}>Bitcoin Price ↑</div>
@@ -2728,9 +2875,11 @@ socket.on('market_update', (data: any) => {
             <div style={{ fontSize: 10, color: COLORS.textMuted }}>{formatMsTime(lastPriceUpdate)}</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 12, flexShrink: 0 }}>
+            {!isDesktopLayout && (
             <button className="trading-pairs-toggle" onClick={() => setShowPairSelector(p => !p)} style={{ padding: "3px 8px", height: 26, background: showPairSelector ? COLORS.amber : "transparent", border: `1px solid ${showPairSelector ? COLORS.amber : COLORS.border}`, borderRadius: 4, color: showPairSelector ? "#000" : COLORS.text, cursor: "pointer", fontSize: 10, fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
               {showPairSelector ? "▲" : "☰"} <span style={{ fontSize: 9, opacity: 0.7 }}>Pairs</span>
             </button>
+            )}
             <button onClick={() => setShowWallet(p => !p)} style={{ padding: "3px 8px", height: 26, background: showWallet ? COLORS.amber : "transparent", border: `1px solid ${showWallet ? COLORS.amber : COLORS.border}`, borderRadius: 4, color: showWallet ? "#000" : COLORS.text, cursor: "pointer", fontSize: 10, fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
               <span>👛</span> Wallet {showWallet ? "▲" : "▼"}
             </button>
@@ -3446,7 +3595,6 @@ socket.on('market_update', (data: any) => {
         input:focus { outline: none; border-color: #f0b90b !important; }
 
         .trading-header { flex-wrap: nowrap; gap: 12px; }
-        .trading-pairs-toggle { display: none; }
         .trading-body { display: flex !important; align-items: stretch !important; }
         .trading-toolbar,
         .trading-orderbook,
@@ -3651,8 +3799,6 @@ socket.on('market_update', (data: any) => {
         @media (max-width: 767px) {
           .trading-main-tabs { height: 34px !important; padding: 0 6px !important; }
           .trading-main-tabs button { padding: 0 8px !important; font-size: 11px !important; }
-          .trading-pairs-toggle { display: flex; }
-          .trading-pairs-desktop { display: none; }
           .trading-header > div:nth-child(2) { width: 100%; overflow-x: auto !important; padding-bottom: 2px; }
           .trading-header > div:nth-child(2) > div:nth-child(n+5) { display: none !important; }
           .trading-chart-stage { height: 240px !important; min-height: 240px !important; }

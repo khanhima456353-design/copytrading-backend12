@@ -1474,26 +1474,24 @@ app.get("/api/coins", async (_req, res) => {
 const coinImagesCache = { data: null, expiry: 0 };
 app.get("/api/coin-images", async (_req, res) => {
   if (coinImagesCache.data && Date.now() < coinImagesCache.expiry) return res.json(coinImagesCache.data);
+  const map = {};
   try {
-    const map = {};
-    for (let page = 1; page <= 2; page++) {
-      const { data } = await axios.get("https://api.coingecko.com/api/v3/coins/markets", {
-        params: { vs_currency: "usd", order: "market_cap_desc", per_page: 250, page },
-        timeout: 8_000,
-      });
-      if (Array.isArray(data)) {
-        for (const c of data) {
-          if (c.symbol && c.image) map[c.symbol.toUpperCase()] = c.image;
+    const { data: symbols } = await axios.get("https://api.binance.com/api/v3/exchangeInfo", { timeout: 5_000 });
+    if (symbols?.symbols) {
+      const seen = new Set();
+      for (const s of symbols.symbols) {
+        const base = s.baseAsset;
+        if (base && !seen.has(base)) {
+          seen.add(base);
+          map[base] = `/api/coin-icon/${base}`;
         }
       }
     }
-    if (Object.keys(map).length) {
-      coinImagesCache.data = map;
-      coinImagesCache.expiry = Date.now() + 300_000;
-      return res.json(map);
-    }
-  } catch (err) {
-    console.error("Coin-images fetch failed:", err.message);
+  } catch {}
+  if (Object.keys(map).length) {
+    coinImagesCache.data = map;
+    coinImagesCache.expiry = Date.now() + 3_600_000;
+    return res.json(map);
   }
   res.json(coinImagesCache.data || {});
 });
@@ -1506,33 +1504,13 @@ app.get("/api/coin-icon/:symbol", async (req, res) => {
     if (cached.data) return res.type(cached.type).set("Access-Control-Allow-Origin", "*").set("Cache-Control", "public,max-age=86400").send(cached.data);
     return res.status(404).end();
   }
-  // Try Binance CDN (server-side to bypass CloudFront origin check)
   try {
-    const { data, headers } = await axios.get(`https://bin.bnbstatic.com/static/images/coin/${sym.toLowerCase()}.svg`, {
+    const { data } = await axios.get(`https://bin.bnbstatic.com/static/images/coin/${sym.toLowerCase()}.svg`, {
       responseType: "arraybuffer", timeout: 5_000, headers: { "User-Agent": "Mozilla/5.0" },
     });
     if (data && data.length > 100) {
       coinIconCache[sym] = { data, type: "image/svg+xml", expiry: Date.now() + 86_400_000 };
       return res.type("image/svg+xml").set("Access-Control-Allow-Origin", "*").set("Cache-Control", "public,max-age=86400").send(data);
-    }
-  } catch {}
-  // Try CoinGecko individual coin API
-  try {
-    const { data: list } = await axios.get("https://api.coingecko.com/api/v3/coins/list", { timeout: 5_000 });
-    const coin = Array.isArray(list) ? list.find(c => c.symbol && c.symbol.toUpperCase() === sym) : null;
-    if (coin?.id) {
-      const { data: detail } = await axios.get(
-        `https://api.coingecko.com/api/v3/coins/${coin.id}?localization=false&tickers=false&community_data=false&developer_data=false&sparkline=false`,
-        { timeout: 8_000 }
-      );
-      const imgUrl = detail?.image?.large;
-      if (imgUrl) {
-        const { data: imgData } = await axios.get(imgUrl, { responseType: "arraybuffer", timeout: 8_000 });
-        if (imgData && imgData.length > 100) {
-          coinIconCache[sym] = { data: imgData, type: "image/png", expiry: Date.now() + 86_400_000 };
-          return res.type("image/png").set("Access-Control-Allow-Origin", "*").set("Cache-Control", "public,max-age=86400").send(imgData);
-        }
-      }
     }
   } catch {}
   coinIconCache[sym] = { data: null, type: null, expiry: Date.now() + 3_600_000 };
