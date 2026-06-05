@@ -1088,7 +1088,7 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
 }
 
 type DepthOrder = Order & { cumulative?: number };
-type DepthChartProps = { buyLevels: DepthOrder[]; sellLevels: DepthOrder[]; depthLimit: number };
+type DepthChartProps = { buyLevels: DepthOrder[]; sellLevels: DepthOrder[]; depthLimit: number; baseSymbol: string; quoteSymbol: string };
 
 type DepthHoverState = {
   x: number;
@@ -1101,7 +1101,7 @@ type DepthHoverState = {
   snapY: number;
 };
 
-function DepthChart({ buyLevels, sellLevels, depthLimit }: DepthChartProps) {
+function DepthChart({ buyLevels, sellLevels, depthLimit, baseSymbol, quoteSymbol }: DepthChartProps) {
   const [hoverPoint, setHoverPoint] = useState<DepthHoverState | null>(null);
   const [zoom, setZoom] = useState(1);
   const [priceStepIndex, setPriceStepIndex] = useState(2);
@@ -1344,7 +1344,7 @@ function DepthChart({ buyLevels, sellLevels, depthLimit }: DepthChartProps) {
       </div>
       <div className="depth-chart__canvas">
         <div className="depth-chart__mid-pill">
-          <strong>{formatPrice(midPrice)} USDT</strong>
+          <strong>{formatPrice(midPrice)} {quoteSymbol}</strong>
           <span>Spread {spreadPct}%</span>
         </div>
         {hoverPoint && (
@@ -1352,15 +1352,15 @@ function DepthChart({ buyLevels, sellLevels, depthLimit }: DepthChartProps) {
             <div className="depth-chart__tooltip-label">{hoverPoint.side === "buy" ? "Bid" : "Ask"} depth</div>
             <div className="depth-chart__tooltip-row">
               <span>Price</span>
-              <strong>{formatPrice(hoverPoint.price)} USDT</strong>
+              <strong>{formatPrice(hoverPoint.price)} {quoteSymbol}</strong>
             </div>
             <div className="depth-chart__tooltip-row">
               <span>Size</span>
-              <strong>{formatVol(hoverPoint.size)} BTC</strong>
+              <strong>{formatVol(hoverPoint.size)} {baseSymbol}</strong>
             </div>
             <div className="depth-chart__tooltip-row">
               <span>Total</span>
-              <strong>{formatVol(hoverPoint.total)} BTC</strong>
+              <strong>{formatVol(hoverPoint.total)} {quoteSymbol}</strong>
             </div>
           </div>
         )}
@@ -1458,6 +1458,7 @@ export default function Trading() {
   const lastPriceRef = useRef(0);
   const symbolRef = useRef(symbol);
   symbolRef.current = symbol;
+  const [baseSymbol, quoteSymbol] = symbol.includes("/") ? symbol.split("/") as [string, string] : [symbol, "USDT"] as [string, string];
   const [change24h, setChange24h] = useState(0);
   const [changePct, setChangePct] = useState(0);
   const [high24h, setHigh24h] = useState(0);
@@ -2145,20 +2146,6 @@ export default function Trading() {
   const askPctNum = parseFloat(askPct) || 0;
   const orderbookSummary = (
     <div className="orderbook__summary">
-      <div className="orderbook__summary-row">
-        <div className="orderbook__summary-item">
-          <span>Best Bid</span>
-          <strong className="orderbook__summary-value orderbook__summary-value--bid">{formatPrice(bestBid)}</strong>
-        </div>
-        <div className="orderbook__summary-item">
-          <span>Spread</span>
-          <strong className="orderbook__summary-value">{formatPrice(spread)} ({spreadPct.toFixed(4)}%)</strong>
-        </div>
-        <div className="orderbook__summary-item">
-          <span>Best Ask</span>
-          <strong className="orderbook__summary-value orderbook__summary-value--ask">{formatPrice(bestAsk)}</strong>
-        </div>
-      </div>
       <div className="orderbook__bid-ask-bar">
         <span className="orderbook__bid-pct">B {bidPct}%</span>
         <span className="orderbook__ask-pct">S {askPct}%</span>
@@ -2171,9 +2158,9 @@ export default function Trading() {
 
     const header = (
       <div className="orderbook__col-headers">
-        <span>Price</span>
-        <span className="col-amount">Size</span>
-        <span className="col-total">Total</span>
+        <span>Price ({quoteSymbol})</span>
+        <span className="col-amount">Size ({baseSymbol})</span>
+        <span className="col-total">Total ({quoteSymbol})</span>
       </div>
     );
 
@@ -2206,12 +2193,7 @@ export default function Trading() {
               </div>
             )}
           </div>
-          <div className={`orderbook__spread ${spreadDirection}`}>
-            <div className="orderbook__spread-price">
-              <span className={`orderbook__mid-price ${priceUpdateDirection}`}>{formatPrice(midPrice)}</span>
-              <span>{`Spread ${formatPrice(spread)} (${spreadPct.toFixed(4)}%)`}</span>
-            </div>
-          </div>
+          {/* spread/mid-price removed as requested */}
           <div className="orderbook__bids">
             {bidRows.length > 0 ? bidRows.map((bid, index) => renderRow(bid, "buy", index)) : (
               <div className="orderbook__row" style={{ justifyContent: "center", color: COLORS.textMuted }}>
@@ -2262,12 +2244,6 @@ export default function Trading() {
       <div style={{ padding: "8px 10px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ fontWeight: 700, fontSize: 13, color: COLORS.textBright }}>Order Book</span>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 11, color: COLORS.textMuted }}>Spread</span>
-            <span style={{ fontWeight: 700, color: spreadDirection === 'tighten' ? COLORS.green : spreadDirection === 'widen' ? COLORS.red : COLORS.text }}>
-              {spread ? `${formatPrice(spread)} (${spreadPct.toFixed(4)}%)` : "—"}
-            </span>
-          </div>
         </div>
         <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
           {(["combined", "bids", "asks"] as const).map(mode => (
@@ -2425,7 +2401,7 @@ export default function Trading() {
         ))}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", padding: "4px 10px", fontSize: 10, color: COLORS.textMuted }}>
-        <span>Price (USDT)</span><span style={{ textAlign: "right" }}>Amount (BTC)</span><span style={{ textAlign: "right" }}>Time</span>
+        <span>Price ({quoteSymbol})</span><span style={{ textAlign: "right" }}>Amount ({baseSymbol})</span><span style={{ textAlign: "right" }}>Time</span>
       </div>
       <div style={{ maxHeight: 180, overflow: "auto" }}>
         {(rightTab === "market" ? trades : tradeHistory).slice(0, 15).map((t, i) => {
@@ -3009,7 +2985,7 @@ export default function Trading() {
               )}
               {activeChartTab === "depth" && (
                 <div style={{ height: "100%", display: "flex", flexDirection: "column", padding: 16, gap: 16, background: COLORS.bgPanel, minHeight: 360 }}>
-                  <DepthChart buyLevels={buyDisplay} sellLevels={sellDisplay} depthLimit={depthLimit} />
+                  <DepthChart buyLevels={buyDisplay} sellLevels={sellDisplay} depthLimit={depthLimit} baseSymbol={baseSymbol} quoteSymbol={quoteSymbol} />
                 </div>
               )}
               {activeChartTab === "tradingview" && (
