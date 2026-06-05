@@ -3032,6 +3032,28 @@ export default function Trading() {
         )}
       </div>
 
+      {/* ── BALANCE STRIP (between left & right panels) ── */}
+      {isChartView && (
+      <div className="trading-balance-strip" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, padding: "8px 16px", borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, flexShrink: 0, marginLeft: isDesktopLayout && isChartView ? 'var(--left-width, 340px)' : 0, width: isDesktopLayout && isChartView ? 'calc(100% - var(--left-width, 340px) - var(--right-width, 340px))' : '100%' }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 10, color: COLORS.text }}>Available USDT</div>
+          <div style={{ fontSize: 12, color: COLORS.textBright, fontWeight: 600, fontFamily: "monospace" }}>${availableBalance.toFixed(2)}</div>
+        </div>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 10, color: COLORS.text }}>Locked USDT</div>
+          <div style={{ fontSize: 12, color: COLORS.textBright, fontWeight: 600, fontFamily: "monospace" }}>${lockedUSDT.toFixed(2)}</div>
+        </div>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 10, color: COLORS.text }}>Total Equity</div>
+          <div style={{ fontSize: 12, color: COLORS.textBright, fontWeight: 600, fontFamily: "monospace" }}>${totalEquity.toFixed(2)}</div>
+        </div>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 10, color: COLORS.text }}>Total Portfolio</div>
+          <div style={{ fontSize: 12, color: COLORS.textBright, fontWeight: 600, fontFamily: "monospace" }}>${portfolioTotal.toFixed(2)}</div>
+        </div>
+      </div>
+      )}
+
       {/* ── ORDER FORM (between left & right panels) ── */}
       {isChartView && (
       <div className="trading-order-form trading-dashboard__ticket" style={{ height: isDesktopLayout ? "auto" : 210, minHeight: isDesktopLayout ? 320 : undefined, borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, display: "flex", flexShrink: 0, overflow: isDesktopLayout ? "visible" : "hidden", marginLeft: isDesktopLayout && isChartView ? 'var(--left-width, 340px)' : 0, width: isDesktopLayout && isChartView ? 'calc(100% - var(--left-width, 340px) - var(--right-width, 340px))' : '100%' }}>
@@ -3589,9 +3611,9 @@ serverPositions.length === 0
         .trading-chart-stage canvas { touch-action: pan-y; }
         .trading-balance-strip {
           display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
+          grid-template-columns: repeat(4, 1fr);
           gap: 8px;
-          padding: 8px 12px;
+          padding: 8px 16px;
           border-bottom: 1px solid #2a2e35;
           flex-shrink: 0;
         }
@@ -3691,7 +3713,7 @@ serverPositions.length === 0
             min-width: 280px !important;
             max-width: 280px !important;
           }
-          .trading-balance-strip { grid-template-columns: repeat(3, minmax(110px, 1fr)); }
+          .trading-balance-strip { grid-template-columns: repeat(4, 1fr); }
         }
 
         @media (max-width: 1023px) {
@@ -3747,11 +3769,13 @@ serverPositions.length === 0
           }
           .trading-order-form__inner { min-height: 0 !important; overflow: visible !important; }
           .trading-balance-strip {
-            grid-template-columns: repeat(3, minmax(126px, 1fr));
-            overflow-x: auto;
-            padding: 8px;
-            -webkit-overflow-scrolling: touch;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 4px;
+            padding: 4px 6px;
+            overflow: hidden;
           }
+          .trading-balance-strip > div > div { font-size: 8px !important; }
+          .trading-balance-strip > div > div:last-child { font-size: 10px !important; }
           .trading-order-form__columns { overflow: visible !important; min-height: 0 !important; }
           .trading-bottom-panel { order: 4 !important; overflow: visible !important; }
           .trading-bottom-panel > div:last-child { max-height: none !important; overflow: visible !important; }
@@ -3819,7 +3843,9 @@ serverPositions.length === 0
           .trading-order-form { height: auto !important; min-height: 0 !important; }
           .trading-order-form__tabs { overflow-x: auto !important; }
           .trading-order-form__tabs button { padding: 0 10px !important; white-space: nowrap; }
-          .trading-balance-strip { display: none !important; }
+          .trading-balance-strip { grid-template-columns: repeat(4, 1fr); gap: 2px; padding: 3px 4px; }
+          .trading-balance-strip > div > div { font-size: 7px !important; }
+          .trading-balance-strip > div > div:last-child { font-size: 9px !important; }
           .trading-order-form__side { min-height: 0 !important; }
           .trading-order-actions__button { min-width: 0 !important; height: 38px !important; }
           .trading-orderbook--embedded { height: 320px !important; min-height: 320px !important; }
