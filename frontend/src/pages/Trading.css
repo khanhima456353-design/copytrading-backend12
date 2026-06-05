@@ -530,6 +530,57 @@ input:focus {
   text-align: right;
 }
 
+.orderbook__summary {
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--clr-border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.orderbook__summary-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.orderbook__summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 100px;
+}
+
+.orderbook__summary-item span {
+  font-size: 10px;
+  color: var(--clr-text-muted);
+}
+
+.orderbook__summary-value {
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--clr-text-bright);
+}
+
+.orderbook__summary-value--bid {
+  color: var(--clr-green);
+}
+
+.orderbook__summary-value--ask {
+  color: var(--clr-red);
+}
+
+.orderbook__row--best.orderbook__row--ask {
+  border-left: 2px solid var(--clr-red);
+}
+
+.orderbook__row--best.orderbook__row--bid {
+  border-left: 2px solid var(--clr-green);
+}
+
 /* Ask/bid rows */
 .orderbook__asks {
   flex: 1;

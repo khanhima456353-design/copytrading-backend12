@@ -1961,11 +1961,16 @@ export default function Trading() {
   const buyDisplay  = buyOrders.map(o => { buyCum += o.total || 0;  return { ...o, cumulative: buyCum }; });
   const sellDisplay = sellOrders.map(o => { sellCum += o.total || 0; return { ...o, cumulative: sellCum }; });
   
-  const maxBid = Math.max(...buyDisplay.map(b => b.total || 0), 1);
-  const maxAsk = Math.max(...sellDisplay.map(a => a.total || 0), 1);
+  const maxBid = Math.max(...buyDisplay.map(b => b.cumulative || 0), 1);
+  const maxAsk = Math.max(...sellDisplay.map(a => a.cumulative || 0), 1);
   
   const totalBidVol  = buyCum;
   const totalAskVol  = sellCum;
+  const bestBid = buyDisplay[0]?.price || 0;
+  const bestAsk = sellDisplay[0]?.price || 0;
+  const midPrice = isValidPrice(bestBid) && isValidPrice(bestAsk) ? (bestBid + bestAsk) / 2 : lastPrice;
+  const askRows = sellDisplay.slice().reverse();
+  const bidRows = buyDisplay;
   
   const bidPct = totalBidVol + totalAskVol > 0 ? (totalBidVol / (totalBidVol + totalAskVol) * 100).toFixed(1) : "50.0";
   const askPct = totalBidVol + totalAskVol > 0 ? (totalAskVol / (totalBidVol + totalAskVol) * 100).toFixed(1) : "50.0";
@@ -2139,81 +2144,101 @@ export default function Trading() {
   const bidPctNum = parseFloat(bidPct) || 0;
   const askPctNum = parseFloat(askPct) || 0;
   const orderbookSummary = (
-    <div style={{ padding: "10px 12px", borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bgAlt }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", padding: "10px", borderRadius: 12, border: `1px solid ${COLORS.red}`, background: "rgba(246,70,93,0.08)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: "1 1 auto" }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.textBright, whiteSpace: "nowrap" }}>Bid / Ask Balance</span>
-          <span style={{ padding: "2px 8px", borderRadius: 999, background: COLORS.greenDim, color: COLORS.green, fontSize: 11, fontWeight: 700 }}>B {bidPct}%</span>
-          <span style={{ padding: "2px 8px", borderRadius: 999, background: COLORS.redDim, color: COLORS.red, fontSize: 11, fontWeight: 700 }}>S {askPct}%</span>
+    <div className="orderbook__summary">
+      <div className="orderbook__summary-row">
+        <div className="orderbook__summary-item">
+          <span>Best Bid</span>
+          <strong className="orderbook__summary-value orderbook__summary-value--bid">{formatPrice(bestBid)}</strong>
         </div>
-        <div style={{ flex: "1 1 120px", minWidth: 120, height: 10, borderRadius: 999, overflow: "hidden", background: COLORS.border }}>
-          <div style={{ width: `${bidPctNum}%`, height: "100%", background: COLORS.green, float: "left" }} />
-          <div style={{ width: `${askPctNum}%`, height: "100%", background: COLORS.red, float: "right" }} />
+        <div className="orderbook__summary-item">
+          <span>Spread</span>
+          <strong className="orderbook__summary-value">{formatPrice(spread)} ({spreadPct.toFixed(4)}%)</strong>
         </div>
+        <div className="orderbook__summary-item">
+          <span>Best Ask</span>
+          <strong className="orderbook__summary-value orderbook__summary-value--ask">{formatPrice(bestAsk)}</strong>
+        </div>
+      </div>
+      <div className="orderbook__bid-ask-bar">
+        <span className="orderbook__bid-pct">B {bidPct}%</span>
+        <span className="orderbook__ask-pct">S {askPct}%</span>
       </div>
     </div>
   );
   const renderOrderbook = () => {
-    const askRows = sellDisplay.slice().reverse();
-    const bidRows = buyDisplay;
     const showAsk = orderbookViewMode !== "bids";
     const showBid = orderbookViewMode !== "asks";
-    const rows = showAsk
-      ? [...askRows.map(o => ({ ...o, side: "sell" as const })), ...(showBid ? bidRows.map(o => ({ ...o, side: "buy" as const })) : [])]
-      : showBid
-        ? bidRows.map(o => ({ ...o, side: "buy" as const }))
-        : [];
+
+    const header = (
+      <div className="orderbook__col-headers">
+        <span>Price</span>
+        <span className="col-amount">Size</span>
+        <span className="col-total">Total</span>
+      </div>
+    );
+
+    const renderRow = (row: DepthOrder, side: "buy" | "sell", index: number) => {
+      const isBest = side === "buy" ? row.price === bestBid : row.price === bestAsk;
+      const rowFillWidth = Math.min(100, ((row.cumulative || row.total || 0) / (side === "sell" ? maxAsk : maxBid)) * 100);
+      return (
+        <div
+          key={`${side}-${row.price}-${index}`}
+          className={`orderbook__row orderbook__row--${side === "sell" ? "ask" : "bid"}${isBest ? " orderbook__row--best" : ""}`}
+          onClick={() => { if (orderType === "market") return; setPriceInput(row.price.toFixed(2)); }}
+        >
+          <div className={`orderbook__row-fill orderbook__row-fill--${side === "sell" ? "ask" : "bid"}`} style={{ width: `${rowFillWidth}%` }} />
+          <span className="col-price">{formatPrice(row.price)}</span>
+          <span className="col-amount">{row.amount.toFixed(5)}</span>
+          <span className="col-total">{(row.total || 0).toFixed(2)}</span>
+        </div>
+      );
+    };
 
     if (orderbookViewMode === "combined") {
-      const rowCount = Math.max(askRows.length, bidRows.length);
       return (
         <>
           {orderbookSummary}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 0.9fr 0.9fr 1fr", padding: "6px 8px", fontSize: 10, fontWeight: 600, color: COLORS.textMuted, borderBottom: `1px solid ${COLORS.border}` }}>
-            <span style={{ textAlign: "left" }}>Bid Amount</span>
-            <span style={{ textAlign: "left" }}>Price</span>
-            <span style={{ textAlign: "right" }}>Price</span>
-            <span style={{ textAlign: "right" }}>Ask Amount</span>
+          {header}
+          <div className="orderbook__asks">
+            {askRows.length > 0 ? askRows.map((ask, index) => renderRow(ask, "sell", index)) : (
+              <div className="orderbook__row" style={{ justifyContent: "center", color: COLORS.textMuted }}>
+                No ask data available
+              </div>
+            )}
           </div>
-          <div style={{ flex: 1, overflow: "auto" }}>
-            {Array.from({ length: rowCount }).map((_, index) => {
-              const ask = askRows[index];
-              const bid = bidRows[index];
-              return (
-                <div key={index} onClick={() => { if (orderType === "market") return; const picked = bid || ask; if (picked) setPriceInput(picked.price.toFixed(2)); }} style={{ display: "grid", gridTemplateColumns: "1fr 0.9fr 0.9fr 1fr", padding: "4px 8px", alignItems: "center", minHeight: 24, fontSize: 10, fontFamily: "monospace", color: COLORS.text, background: index % 2 === 0 ? COLORS.bg : "transparent", cursor: bid || ask ? "pointer" : "default" }}>
-                  <span style={{ color: COLORS.textBright, textAlign: "left", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{bid ? bid.amount.toFixed(5) : ""}</span>
-                  <span style={{ color: bid ? COLORS.green : COLORS.textMuted, textAlign: "left", whiteSpace: "nowrap" }}>{bid ? bid.price.toFixed(2) : ""}</span>
-                  <span style={{ color: ask ? COLORS.red : COLORS.textMuted, textAlign: "right", whiteSpace: "nowrap" }}>{ask ? ask.price.toFixed(2) : ""}</span>
-                  <span style={{ color: COLORS.textBright, textAlign: "right", whiteSpace: "nowrap" }}>{ask ? ask.amount.toFixed(5) : ""}</span>
-                </div>
-              );
-            })}
+          <div className={`orderbook__spread ${spreadDirection}`}>
+            <div className="orderbook__spread-price">
+              <span className={`orderbook__mid-price ${priceUpdateDirection}`}>{formatPrice(midPrice)}</span>
+              <span>{`Spread ${formatPrice(spread)} (${spreadPct.toFixed(4)}%)`}</span>
+            </div>
+          </div>
+          <div className="orderbook__bids">
+            {bidRows.length > 0 ? bidRows.map((bid, index) => renderRow(bid, "buy", index)) : (
+              <div className="orderbook__row" style={{ justifyContent: "center", color: COLORS.textMuted }}>
+                No bid data available
+              </div>
+            )}
           </div>
         </>
       );
     }
 
-    const header = (
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", padding: "8px 10px", fontSize: 11, fontWeight: 600, color: COLORS.textMuted, borderBottom: `1px solid ${COLORS.border}` }}>
-        <span>Price</span>
-        <span style={{ textAlign: "center" }}>Amount</span>
-        <span style={{ textAlign: "right" }}>Total</span>
-      </div>
-    );
+    const visibleRows = showAsk
+      ? askRows.map(o => ({ ...o, side: "sell" as const }))
+      : showBid
+        ? bidRows.map(o => ({ ...o, side: "buy" as const }))
+        : [];
 
     return (
       <>
         {orderbookSummary}
         {header}
         <div style={{ flex: 1, overflow: "auto" }}>
-          {rows.map((row, index) => (
-            <div key={index} onClick={() => { if (orderType === "market") return; setPriceInput(row.price.toFixed(2)); }} style={{ position: "relative", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", padding: "8px 10px", alignItems: "center", minHeight: 32, fontSize: 11, fontFamily: "monospace", color: row.side === "sell" ? COLORS.red : COLORS.green, background: index % 2 === 0 ? COLORS.bg : "transparent", cursor: "pointer" }}>
-              <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.min(100, ((row.total || 0) / Math.max(maxAsk, maxBid)) * 100)}%`, background: row.side === "sell" ? COLORS.redDim : COLORS.greenDim, zIndex: 0 }} />
-              <span style={{ position: "relative", zIndex: 1, textAlign: "left" }}>{row.price.toFixed(2)}</span>
-              <span style={{ position: "relative", zIndex: 1, textAlign: "center", color: COLORS.textBright }}>{row.amount.toFixed(5)}</span>
-              <span style={{ position: "relative", zIndex: 1, textAlign: "right", color: COLORS.text }}>{(row.total || 0).toFixed(2)}</span>
+          {visibleRows.length > 0 ? visibleRows.map((row, index) => renderRow(row, row.side, index)) : (
+            <div className="orderbook__row" style={{ justifyContent: "center", color: COLORS.textMuted }}>
+              No orderbook rows available
             </div>
-          ))}
+          )}
         </div>
       </>
     );
