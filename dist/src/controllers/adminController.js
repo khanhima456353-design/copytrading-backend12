@@ -8,6 +8,7 @@ const Setting = require("../../models/Setting");
 const marketSimulator = require("../services/marketSimulator");
 const Order = require("../../models/Order");
 const Wallet = require("../../models/Wallet");
+const walletService = require("../../services/walletService");
 const { generateAccessToken, generateRefreshToken } = require("../../utils/auth");
 const { sendKycApprovedNotification, sendKycRejectedNotification } = require("../../utils/emailNotifications");
 const emitSocket = (event, payload = {}) => {
@@ -196,7 +197,7 @@ exports.getDashboardStats = async (req, res) => {
 exports.getUserOpenOrders = async (req, res) => {
     try {
         const { id } = req.params;
-        const query = { userId: id, status: { $in: ['open', 'partially_filled'] } };
+        const query = { userId: id, status: { $in: ['pending', 'open', 'partially_filled'] } };
         console.log('ADMIN_SIM_USER', id);
         console.log('ADMIN_SIM_QUERY', { collection: 'Order', query });
         const orders = await Order.find(query).sort({ createdAt: -1 });
@@ -364,6 +365,16 @@ const getSettingValue = async (key, defaultValue) => {
 const upsertSetting = async (key, value) => {
     return Setting.findOneAndUpdate({ key }, { value }, { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true });
 };
+const syncUserWalletBalances = async (userId, availableBalance, lockedBalance) => {
+    const wallet = await walletService.ensureWallet(userId);
+    wallet.availableBalance = Number(availableBalance) || 0;
+    wallet.lockedBalance = Number(lockedBalance) || 0;
+    if (wallet.availableBalance < 0 || wallet.lockedBalance < 0) {
+        throw new Error("Wallet balances cannot be negative");
+    }
+    await wallet.save();
+    return wallet;
+};
 // Deposit/audit-related admin endpoints removed because corresponding models were deleted.
 exports.getSettings = async (req, res) => {
     try {
@@ -478,8 +489,14 @@ exports.addBalance = async (req, res) => {
         else {
             await user.save();
         }
+        await syncUserWalletBalances(userId, user.balance, user.frozenBalance || 0);
         const syncedUser = await User.findById(userId).lean();
-        emitSocket("balanceUpdate", { userId: user._id, balance: syncedUser?.balance || user.balance, available: syncedUser?.balance || user.balance });
+        emitSocket("balanceUpdate", {
+            userId: user._id,
+            balance: syncedUser?.balance || user.balance,
+            available: syncedUser?.balance || user.balance,
+            locked: syncedUser?.frozenBalance || 0
+        });
         await createBalanceTransaction({
             userId,
             amount,
@@ -520,8 +537,14 @@ exports.removeBalance = async (req, res) => {
         else {
             await user.save();
         }
+        await syncUserWalletBalances(userId, user.balance, user.frozenBalance || 0);
         const syncedUser = await User.findById(userId).lean();
-        emitSocket("balanceUpdate", { userId: user._id, balance: syncedUser?.balance || user.balance });
+        emitSocket("balanceUpdate", {
+            userId: user._id,
+            balance: syncedUser?.balance || user.balance,
+            available: syncedUser?.balance || user.balance,
+            locked: syncedUser?.frozenBalance || 0
+        });
         await createBalanceTransaction({
             userId,
             amount,
@@ -559,8 +582,14 @@ exports.creditBonus = async (req, res) => {
         else {
             await user.save();
         }
+        await syncUserWalletBalances(userId, user.balance, user.frozenBalance || 0);
         const syncedUser = await User.findById(userId).lean();
-        emitSocket("balanceUpdate", { userId: user._id, balance: syncedUser?.balance || user.balance, available: syncedUser?.balance || user.balance });
+        emitSocket("balanceUpdate", {
+            userId: user._id,
+            balance: syncedUser?.balance || user.balance,
+            available: syncedUser?.balance || user.balance,
+            locked: syncedUser?.frozenBalance || 0
+        });
         await createBalanceTransaction({
             userId,
             amount,
@@ -602,8 +631,14 @@ exports.freezeFunds = async (req, res) => {
         else {
             await user.save();
         }
+        await syncUserWalletBalances(userId, user.balance, user.frozenBalance || 0);
         const syncedUser = await User.findById(userId);
-        emitSocket("balanceUpdate", { userId: user._id, balance: syncedUser?.balance || user.balance, frozenBalance: syncedUser?.frozenBalance || user.frozenBalance });
+        emitSocket("balanceUpdate", {
+            userId: user._id,
+            balance: syncedUser?.balance || user.balance,
+            available: syncedUser?.balance || user.balance,
+            locked: syncedUser?.frozenBalance || user.frozenBalance
+        });
         await createBalanceTransaction({
             userId,
             amount,

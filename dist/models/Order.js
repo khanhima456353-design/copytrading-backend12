@@ -6,7 +6,7 @@ const orderSchema = new mongoose.Schema({
     walletType: { type: String, enum: ['spot', 'cross', 'isolated'] },
     pair: { type: String, required: true },
     side: { type: String, enum: ['buy', 'sell'], required: true },
-    type: { type: String, enum: ['limit', 'market', 'stop-loss'], default: 'limit' },
+    type: { type: String, enum: ['limit', 'market', 'stop-loss', 'stop-limit', 'oco', 'take-profit'], default: 'limit' },
     price: { type: Number },
     amount: { type: Number },
     quantity: { type: Number },
@@ -33,9 +33,10 @@ const orderSchema = new mongoose.Schema({
     riskParameters: { type: mongoose.Schema.Types.Mixed },
     leverage: { type: Number, default: 1 },
     positionSide: { type: String, enum: ['long', 'short'], default: 'long' },
+    ocoGroupId: { type: mongoose.Schema.Types.ObjectId },
     status: {
         type: String,
-        enum: ['open', 'filled', 'cancelled', 'partially_filled', 'rejected', 'closed'],
+        enum: ['pending', 'open', 'filled', 'cancelled', 'partially_filled', 'rejected', 'closed'],
         default: 'open',
     },
 }, { timestamps: true });

@@ -26,8 +26,8 @@ async function syncTotalBalanceForUpdate() {
     const doc = await this.model.findOne(this.getQuery()).lean();
     if (!doc)
         return;
-    const available = (doc.availableBalance || 0) + (update.$inc?.availableBalance || 0);
-    const locked = (doc.lockedBalance || 0) + (update.$inc?.lockedBalance || 0);
+    const available = (update.$set?.availableBalance ?? doc.availableBalance ?? 0) + (update.$inc?.availableBalance || 0);
+    const locked = (update.$set?.lockedBalance ?? doc.lockedBalance ?? 0) + (update.$inc?.lockedBalance || 0);
     update.$set = {
         ...(update.$set || {}),
         totalBalance: available + locked,
