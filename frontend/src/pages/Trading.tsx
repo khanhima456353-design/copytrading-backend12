@@ -10,6 +10,7 @@ import { initializeCandles, resetCandles, updateLatestCandle, getCandles } from 
 import PositionsPanel from "../components/PositionsPanel";
 import { calculateUnrealizedPnL } from "../services/tradingUtils";
 import { TradingBalanceCard } from "../components/TradingBalanceCard";
+import { Wallet } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -2853,7 +2854,7 @@ export default function Trading() {
             </button>
             )}
             <button onClick={() => setShowWallet(p => !p)} style={{ padding: "3px 8px", height: 26, background: showWallet ? COLORS.amber : "transparent", border: `1px solid ${showWallet ? COLORS.amber : COLORS.border}`, borderRadius: 4, color: showWallet ? "#000" : COLORS.text, cursor: "pointer", fontSize: 10, fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
-              <span>👛</span> Wallet {showWallet ? "▲" : "▼"}
+              <Wallet size={12} /> Wallet {showWallet ? "▲" : "▼"}
             </button>
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: liveStatus === "live" ? COLORS.green : COLORS.red, display: "inline-block", boxShadow: liveStatus === "live" ? `0 0 6px ${COLORS.green}` : "none" }} />
             <span style={{ fontSize: 11, color: liveStatus === "live" ? COLORS.green : COLORS.red }}>{liveStatus.toUpperCase()}</span>
