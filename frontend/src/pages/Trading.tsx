@@ -34,7 +34,7 @@ type UserOrder = {
   stopLoss?: number; takeProfit?: number; createdAt: number;
 };
 
-type TradeHistoryItem = { time: number; price: number; quantity: number; side: "buy" | "sell"; pair: string; type: "market" | "limit"; profit?: number; };
+type TradeHistoryItem = { time: number; price: number; quantity: number; side: "buy" | "sell"; pair: string; type: "market" | "limit"; profit?: number; entryPrice?: number; pnl?: number; };
 type DrawingTool = "cursor" | "crosshair" | "trendline" | "hline" | "vline" | "rect" | "fib" | "text" | "brush" | "eraser" | "measure" | "pitchfork" | "magnet";
 type DrawingObject = {
   id: string; tool: DrawingTool; points: { x: number; y: number; price?: number; time?: number }[];
@@ -103,8 +103,6 @@ const DRAWING_TOOLS: { id: DrawingTool; icon: string; label: string; group: stri
   { id: "measure",   icon: "⟺",  label: "Measure",     group: "measure" },
   { id: "magnet",    icon: "⊛",  label: "Magnet",      group: "measure" },
 ];
-
-const BINANCE_TRADE_WS = "wss://stream.binance.com:9443/ws/btcusdt@trade";
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
@@ -748,7 +746,7 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
     maInfo.forEach(m => { ctx.fillStyle = m.color; ctx.textAlign = "left"; ctx.fillText(`${m.label}: ${m.value}`, maX, maInfoY + 15); maX += ctx.measureText(`${m.label}: ${m.value}`).width + 16; });
 
     ctx.restore();
-  }, [candles, indicators, chartType, tf, rsiData, macdData, showRSI, showMACD, liveStatus, lastPrice, entryPriceLine, CHART_WEIGHT, VOL_WEIGHT, SUB_WEIGHT, getMainPlotBounds, getPriceRange, drawings]);
+  }, [candles, indicators, chartType, tf, rsiData, macdData, showRSI, showMACD, liveStatus, lastPrice, entryPriceLine, CHART_WEIGHT, VOL_WEIGHT, SUB_WEIGHT, getMainPlotBounds, getPriceRange, drawings, deepMarketData]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -1441,7 +1439,7 @@ export default function Trading() {
   const [orderbook, setOrderbook] = useState<{ buy: Order[]; sell: Order[] }>({ buy: [], sell: [] });
   const [trades, setTrades] = useState<Trade[]>([]);
   const [candles, setCandles] = useState<Candle[]>([]);
-  const [deepMarketData, setDeepMarketData] = useState<{ time: number; value: number }[]>([]);
+  const deepMarketData: { time: number; value: number }[] = [];
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredSymbols, setFilteredSymbols] = useState<string[]>([]);
   const [coinImages, setCoinImages] = useState<Record<string, string>>(DEFAULT_COIN_IMAGES);
@@ -1459,7 +1457,8 @@ export default function Trading() {
   const [priceUpdateDirection, setPriceUpdateDirection] = useState<"up" | "down">("up");
   const priceMovementRef = useRef({ direction: "up" as "up" | "down", streak: 0, targetGreenCount: 2 });
   const lastPriceRef = useRef(0);
-  const binanceReconnectRef = useRef<number | null>(null);
+  const symbolRef = useRef(symbol);
+  symbolRef.current = symbol;
   const [change24h, setChange24h] = useState(0);
   const [changePct, setChangePct] = useState(0);
   const [high24h, setHigh24h] = useState(0);
@@ -1520,25 +1519,13 @@ export default function Trading() {
   const [entryPriceOverlay, setEntryPriceOverlay] = useState<number | null>(null);
   const closePosition = async (position: { pair: string; id?: string; _id?: string; markPrice?: number; entryPrice?: number; }) => {
     try {
-      const token = localStorage.getItem('token');
       const positionId = position.id || position._id;
       if (!positionId) {
         console.error('Close position failed: missing position id', position);
         return;
       }
-      const currentPrice = isValidPrice(lastPrice)
-        ? lastPrice
-        : position.markPrice || position.entryPrice;
-      const response = await fetch('/api/trade/close-position', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: "Bearer " + token },
-        body: JSON.stringify({ pair: position.pair, positionId }),
-      });
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Close position failed:', response.status, errorText);
-        return;
-      }
+      const api = await getAxios();
+      await api.post('/api/trade/close-position', { pair: position.pair, positionId });
       await refreshAccountData();
     } catch (err) {
       console.error('Close position error:', err);
@@ -1633,76 +1620,6 @@ export default function Trading() {
   }, [lastPrice]);
 
   useEffect(() => {
-    if (symbol !== "BTC/USDT") return;
-    // State 1: no open position → live Binance feed only
-    if (simulationFeedActive || priceTransitionActive) return;
-
-    let ws: WebSocket | null = null;
-    let lastUpdateTime = 0;
-    const THROTTLE_INTERVAL = window.innerWidth < 768 ? 100 : 50; // 100ms on mobile, 50ms on desktop
-    
-    const connect = () => {
-      if (ws) {
-        ws.onopen = null;
-        ws.onmessage = null;
-        ws.onclose = null;
-        ws.onerror = null;
-        ws.close();
-      }
-
-      ws = new WebSocket(BINANCE_TRADE_WS);
-      ws.onopen = () => {
-        console.log("[Trading] Binance WS connected");
-      };
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          const price = Number(data.p);
-          const timestamp = Number(data.E ?? data.T ?? Date.now());
-          if (!Number.isFinite(price) || price <= 0) return;
-
-          // Throttle updates to reduce re-renders on mobile
-          const now = Date.now();
-          if (now - lastUpdateTime < THROTTLE_INTERVAL) return;
-          lastUpdateTime = now;
-
-          const normalizedTime = Number.isFinite(timestamp) && timestamp > 0
-            ? (timestamp < 1e12 ? timestamp * 1000 : timestamp)
-            : Date.now();
-
-          const prevPrice = lastPriceRef.current;
-          const direction = price >= prevPrice ? "up" : "down";
-
-          lastPriceRef.current = price;
-          setLastPrice(price);
-          setDisplayPrice(price);
-          setLastPriceUpdate(normalizedTime);
-          setPriceUpdateDirection(direction);
-        } catch (err) {
-          console.warn("[Trading] Binance WS parse error", err);
-        }
-      };
-      ws.onclose = () => {
-        console.warn("[Trading] Binance WS closed, reconnecting...");
-        if (binanceReconnectRef.current) clearTimeout(binanceReconnectRef.current);
-        binanceReconnectRef.current = window.setTimeout(connect, 2000);
-      };
-      ws.onerror = () => {
-        if (ws) ws.close();
-      };
-    };
-
-    connect();
-    return () => {
-      if (ws) ws.close();
-      if (binanceReconnectRef.current) {
-        clearTimeout(binanceReconnectRef.current);
-        binanceReconnectRef.current = null;
-      }
-    };
-  }, [symbol, simulationFeedActive, priceTransitionActive]);
-
-  useEffect(() => {
     const primary = serverPositions.find((p) => p.pair === symbol);
     if (primary && Number(primary.entryPrice) > 0) {
       setSimulationFeedActive(true);
@@ -1713,8 +1630,11 @@ export default function Trading() {
     }
   }, [serverPositions, symbol, priceTransitionActive]);
 
-  // Refresh account-related data from backend
+  // Refresh account-related data from backend (debounced to prevent flooding)
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refreshAccountData = useCallback(async () => {
+    if (refreshTimerRef.current) return;
+    refreshTimerRef.current = setTimeout(() => { refreshTimerRef.current = null; }, 3000);
     try {
       const api = await getAxios();
 
@@ -1810,7 +1730,6 @@ export default function Trading() {
     const connectSocket = async () => {
       try {
         const token = localStorage.getItem('token') || localStorage.getItem('sessionToken') || '';
-        if (!token) return;
 
         const { io } = await import('socket.io-client');
         const API_BASE = process.env.REACT_APP_API_URL
@@ -1818,7 +1737,7 @@ export default function Trading() {
           : 'http://localhost:5000';
 
         socket = io(API_BASE, {
-          auth: { token },
+          auth: token ? { token } : undefined,
           transports: ['websocket', 'polling'],
           path: '/socket.io',
         });
@@ -1931,44 +1850,17 @@ socket.on('market_update', (data: any) => {
   }
 });
 
-      } catch (err) {
-        console.error('Socket connection error:', err);
-      }
-    };
-
-    connectSocket();
-
-    return () => {
-      if (socket) socket.disconnect();
-    };
-  }, [refreshAccountData]);
-
-  // Public socket for allTickers — no auth required
-  useEffect(() => {
-    let publicSocket: any = null;
-    let cancelled = false;
-
-    const connectPublic = async () => {
-      try {
-        const { io } = await import('socket.io-client');
-        const API_BASE = process.env.REACT_APP_API_URL
-          ? process.env.REACT_APP_API_URL.replace(/\/+$/, '')
-          : 'http://localhost:5000';
-
-        publicSocket = io(API_BASE, {
-          transports: ['websocket', 'polling'],
-          path: '/socket.io',
-        });
-
-        publicSocket.on('allTickers', (tickers: any[]) => {
-          if (cancelled || !Array.isArray(tickers)) return;
+        // allTickers — live prices for ALL pairs from backend
+        socket.on('allTickers', (tickers: any[]) => {
+          if (!Array.isArray(tickers)) return;
           const priceMap: Record<string, number> = {};
           const movers: { pair: string; change: number; volume: number; high: number; low: number }[] = [];
+          const currentSym = symbolRef.current.replace("/", "");
           for (const t of tickers) {
             const price = Number(t.price) || Number(t.lastPrice) || 0;
             const sym = t.symbol;
             if (!sym) continue;
-            if (price > 0) priceMap[sym] = price;
+            if (sym !== currentSym && price > 0) priceMap[sym] = price;
             if (sym.endsWith('USDT')) {
               const base = sym.replace('USDT', '');
               movers.push({
@@ -1983,17 +1875,36 @@ socket.on('market_update', (data: any) => {
           if (Object.keys(priceMap).length) setAllTickerPrices(prev => ({ ...prev, ...priceMap }));
           if (movers.length) setMarketMovers(movers);
         });
+
+        // priceUpdate — real-time price for tracked pairs
+        socket.on('priceUpdate', (data: any) => {
+          if (!data?.pair || !data?.price) return;
+          const price = Number(data.price);
+          if (!Number.isFinite(price) || price <= 0) return;
+          const binanceSym = data.pair.replace("/", "");
+          setAllTickerPrices(prev => ({ ...prev, [binanceSym]: price }));
+          if (data.pair === symbolRef.current) {
+            const prevPrice = lastPriceRef.current;
+            const direction = price >= prevPrice ? "up" : "down";
+            lastPriceRef.current = price;
+            setLastPrice(price);
+            setDisplayPrice(price);
+            setPriceUpdateDirection(direction);
+            setLastPriceUpdate(data.time || Date.now());
+          }
+        });
+
       } catch (err) {
-        console.error('Public socket error:', err);
+        console.error('Socket connection error:', err);
       }
     };
 
-    connectPublic();
+    connectSocket();
+
     return () => {
-      cancelled = true;
-      if (publicSocket) publicSocket.disconnect();
+      if (socket) socket.disconnect();
     };
-  }, []);
+  }, [refreshAccountData]);
 
   useEffect(() => {
     if (!marketState) return;
@@ -2377,6 +2288,17 @@ socket.on('market_update', (data: any) => {
     </aside>
   );
 
+  const switchSymbol = (pair: string) => {
+    setSymbol(pair);
+    const binanceSym = pair.replace("/", "");
+    const tickerPrice = allTickerPrices[binanceSym];
+    if (tickerPrice && tickerPrice > 0) {
+      setLastPrice(tickerPrice);
+      setDisplayPrice(tickerPrice);
+      lastPriceRef.current = tickerPrice;
+    }
+  };
+
   const topMoversSection = () => (
     <div style={{ borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ padding: "6px 10px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -2389,7 +2311,7 @@ socket.on('market_update', (data: any) => {
         ))}
       </div>
       {marketMovers.slice().sort((a, b) => Math.abs(b.change) - Math.abs(a.change)).slice(0, 3).map(m => (
-        <div key={m.pair} onClick={() => setSymbol(m.pair)} style={{ display: "flex", alignItems: "center", padding: "4px 10px", cursor: "pointer", gap: 8 }}
+        <div key={m.pair} onClick={() => switchSymbol(m.pair)} style={{ display: "flex", alignItems: "center", padding: "4px 10px", cursor: "pointer", gap: 8 }}
           onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = COLORS.bgAlt}
           onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
         >
@@ -2441,7 +2363,7 @@ socket.on('market_update', (data: any) => {
           const chg = mover?.change || 0;
           const symbolLabel = pair.split("/")[0];
           return (
-            <div key={pair} onClick={() => setSymbol(pair)} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", padding: "5px 10px", minHeight: 46, cursor: "pointer", background: pair === symbol ? COLORS.bgHover : "transparent", borderLeft: pair === symbol ? `2px solid ${COLORS.amber}` : "2px solid transparent" }}
+            <div key={pair} onClick={() => switchSymbol(pair)} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", padding: "5px 10px", minHeight: 46, cursor: "pointer", background: pair === symbol ? COLORS.bgHover : "transparent", borderLeft: pair === symbol ? `2px solid ${COLORS.amber}` : "2px solid transparent" }}
               onMouseEnter={e => { if (pair !== symbol) (e.currentTarget as HTMLElement).style.background = COLORS.bgAlt; }}
               onMouseLeave={e => { if (pair !== symbol) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
             >
@@ -2654,7 +2576,6 @@ socket.on('market_update', (data: any) => {
     setSellTotalInput((amount * price).toFixed(2));
   };
 
-  const krakenPair = symbol.replace("/", "").replace(/USDT$/, "USD"); // e.g., "BTC/USDT" → "BTCUSD"
   const effectiveBuyPrice = Number.isFinite(buyPrice) && buyPrice > 0 ? buyPrice : lastPrice;
   const effectiveBuyPriceForMax = (Number.isFinite(effectiveBuyPrice) && effectiveBuyPrice > 0)
     ? effectiveBuyPrice
@@ -2746,7 +2667,7 @@ socket.on('market_update', (data: any) => {
       .then(r => r.json())
       .then((map: Record<string, string>) => {
         if (map && Object.keys(map).length) {
-          setCoinImages(prev => ({ ...map, ...prev }));
+          setCoinImages(prev => ({ ...prev, ...map }));
         }
       })
       .catch(() => {});
@@ -2892,7 +2813,7 @@ socket.on('market_update', (data: any) => {
   const displayedPairs = filteredSymbols.filter(p => pairTab === "fav" || p.endsWith("/" + pairFilter)).slice(0, 50);
   
   const headerStats = useMemo(() => [
-    { label: "24h Chg", value: `${changePct.toFixed(2)}%`, color: isPriceUp ? COLORS.green : COLORS.red },
+    { label: "24h Chg", value: `${changePct.toFixed(2)}%`, color: changePct >= 0 ? COLORS.green : COLORS.red },
     { label: "24h High", value: formatPrice(high24h), color: COLORS.textBright },
     { label: "24h Low",  value: formatPrice(low24h),  color: COLORS.textBright },
     { label: "24h Vol(BTC)",  value: formatFullAmount(vol24h),   color: COLORS.textBright },
@@ -2916,12 +2837,12 @@ socket.on('market_update', (data: any) => {
       <div className="trading-header trading-dashboard__header" style={{ display: "flex", alignItems: "center", height: 52, borderBottom: `1px solid ${COLORS.border}`, padding: "0 16px", gap: 24, background: COLORS.bgPanel, flexShrink: 0, overflow: "hidden", marginLeft: isDesktopLayout && isChartView ? 44 : 0, width: isDesktopLayout && isChartView ? 'calc(100% - 44px - 280px)' : '100%' }}>
         {/* Symbol + price */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-          <div style={{ width: 28, height: 28, background: COLORS.amber, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+          <div style={{ width: 28, height: 28, background: "transparent", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
             <CoinIcon symbol={symbol.split("/")[0]} size={20} images={coinImages} />
           </div>
           <div>
             <div style={{ fontWeight: 700, fontSize: 15, letterSpacing: 0.3 }}>{symbol}</div>
-            <div style={{ fontSize: 10, color: COLORS.text }}>Bitcoin Price ↑</div>
+            <div style={{ fontSize: 10, color: isPriceUp ? COLORS.green : COLORS.red }}>{symbol.split("/")[0]} Price {isPriceUp ? "↑" : "↓"}</div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 2, marginLeft: 8 }}>
             <div style={{ fontWeight: 700, fontSize: 22, color: isPriceUp ? COLORS.green : COLORS.red }}>{isValidPrice(displayPrice) ? formatPrice(displayPrice) : isValidPrice(lastPrice) ? formatPrice(lastPrice) : "Market price unavailable"}</div>
@@ -3419,9 +3340,9 @@ socket.on('market_update', (data: any) => {
         <div key={p.id || p._id || String(idx)} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr 1fr 100px", padding: "6px 14px", fontSize: 11, fontFamily: "monospace", borderBottom: `1px solid ${COLORS.border}` }}>
           <span style={{ color: COLORS.textBright }}>{p.pair}</span>
           <span style={{ color: p.side === "long" ? COLORS.green : COLORS.red }}>{p.side.toUpperCase()}</span>
-          <span style={{ color: COLORS.text }}>{p.entryPrice?.toFixed(2)}</span>
-          <span style={{ color: COLORS.text }}>{(marketState?.pair === p.pair && marketState?.markPrice ? marketState.markPrice : p.markPrice ?? p.entryPrice)?.toFixed(2)}</span>
-          <span style={{ color: COLORS.text }}>{(p.quantity ?? p.size ?? 0).toFixed(4)}</span>
+          <span style={{ color: COLORS.text }}>{Number(p.entryPrice || 0).toFixed(2)}</span>
+          <span style={{ color: COLORS.text }}>{Number((marketState?.pair === p.pair && marketState?.markPrice ? marketState.markPrice : p.markPrice ?? p.entryPrice ?? 0)).toFixed(2)}</span>
+          <span style={{ color: COLORS.text }}>{Number(p.quantity ?? p.size ?? 0).toFixed(4)}</span>
           <span style={{ color: COLORS.text }}>
   {(() => {
     const mark = (marketState?.pair === p.pair && marketState?.markPrice) ? marketState.markPrice : (p.markPrice ?? p.entryPrice ?? 0);

@@ -559,6 +559,36 @@ app.get("/api/market/deepmarket/:pair", async (req, res) => {
   res.json(candles.map((c) => ({ time: c.time, value: c.close * (1 + Math.sin(c.time / 1000) * 0.02) })));
 });
 
+app.get("/api/market/all-tickers", async (_req, res) => {
+  try {
+    const { data } = await axios.get(`${BINANCE_API_BASE}/api/v3/ticker/24hr`, { timeout: 10_000 });
+    if (Array.isArray(data)) {
+      const tickers = data
+        .filter(t => t.symbol && t.symbol.endsWith('USDT'))
+        .map(t => ({
+          symbol:          t.symbol,
+          price:           parseFloat(t.lastPrice),
+          lastPrice:       parseFloat(t.lastPrice),
+          high24h:         parseFloat(t.highPrice),
+          low24h:          parseFloat(t.lowPrice),
+          volume24h:       parseFloat(t.volume),
+          quoteVol:        parseFloat(t.quoteVolume),
+          change24h:       parseFloat(t.priceChange),
+          changePct:       parseFloat(t.priceChangePercent),
+          priceChangePercent: parseFloat(t.priceChangePercent),
+          highPrice:       parseFloat(t.highPrice),
+          lowPrice:        parseFloat(t.lowPrice),
+          quoteVolume:     parseFloat(t.quoteVolume),
+        }))
+        .filter(t => Number.isFinite(t.price) && t.price > 0);
+      return res.json(tickers);
+    }
+  } catch (err) {
+    console.error('all-tickers REST failed:', err.message);
+  }
+  res.json([]);
+});
+
 app.get("/api/market/ticker/:pair", async (req, res) => {
   const pair  = cleanPair(req.params.pair);
   const ticker = await fetchBinanceTicker(pair);
