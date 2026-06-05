@@ -2,9 +2,11 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { FaEye, FaEyeSlash, FaSpinner, FaGoogle } from "react-icons/fa";
+import { Sun, Moon } from "lucide-react";
 import i18n from "../i18n";
 import logo from "../assets/logo.jpg";
 import authService from "../services/authService";
+import { useTheme } from "../components/theme/ThemeContext";
 import "../styles/Login.css";
 
 import { SiTether, SiRipple } from "react-icons/si";
@@ -13,6 +15,7 @@ import '../landing.css';
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { theme, toggleTheme } = useTheme();
 
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -173,12 +176,18 @@ const Login: React.FC = () => {
               </option>
             ))}
           </select>
+          <button onClick={toggleTheme} className="login-theme-toggle">
+            {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </button>
         </div>
 
         <div className="login-card">
           {/* Logo */}
-          <div className="login-logo-wrap">
-            <img src={logo} alt="SwanCore Logo" className="login-logo" />
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 24 }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "8px 14px", borderRadius: 10, background: "#ff8c32", border: "1px solid #ff8c32" }}>
+              <img src={logo} alt="SwanCore Logo" style={{ width: 32, height: 32, borderRadius: 4, objectFit: "contain", background: "#0b0e11", padding: 2 }} />
+              <span style={{ color: "var(--text-current)", fontSize: 18, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Inter', 'SF Pro Display', -apple-system, sans-serif" }}>SwanCore</span>
+            </div>
           </div>
 
           <h1 className="login-title">Welcome Back!</h1>

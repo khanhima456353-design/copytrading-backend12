@@ -1,0 +1,16 @@
+Port 5000 already in use ??? set PORT env var to override.
+⚠ allTickers: no WS data after 10s, starting REST fallback
+CoinGecko fallback poll failed: Request failed with status code 429
+  ??? CoinGecko rate-limited, backing off to 30000ms
+CoinGecko fallback poll failed: Request failed with status code 429
+  ??? CoinGecko rate-limited, backing off to 60000ms
+CoinGecko fallback poll failed: Request failed with status code 429
+  ??? CoinGecko rate-limited, backing off to 30000ms
+CoinGecko fallback poll failed: Request failed with status code 429
+  ??? CoinGecko rate-limited, backing off to 60000ms
+CoinGecko fallback poll failed: Request failed with status code 429
+  ??? CoinGecko rate-limited, backing off to 30000ms
+CoinGecko fallback poll failed: Request failed with status code 429
+  ??? CoinGecko rate-limited, backing off to 60000ms
+CoinGecko fallback poll failed: Request failed with status code 429
+  ??? CoinGecko rate-limited, backing off to 30000ms

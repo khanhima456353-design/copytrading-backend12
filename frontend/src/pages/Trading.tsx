@@ -1,7 +1,9 @@
 ﻿import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import logo from "../assets/logo.jpg";
 import "./Trading.css";
 import { getAxios } from "../api";
+import authService from "../services/authService";
 import { MarketState, subscribeConnectionStatus, subscribeMarketState, isValidPrice } from "../services/marketState";
 
 import { initializeCandles, resetCandles, updateLatestCandle, getCandles } from "../services/candleEngine";
@@ -1421,6 +1423,8 @@ export default function Trading() {
   const [activeTab, setActiveTab] = useState<"spot" | "cross" | "isolated" | "grid">("spot");
   const [gridBotActive, setGridBotActive] = useState(false);
   const [showTimeDropdown, setShowTimeDropdown] = useState(false);
+  const [showWallet, setShowWallet] = useState(false);
+  const [showPairSelector, setShowPairSelector] = useState(false);
   const [gridBotConfig, setGridBotConfig] = useState({ lowerPrice: "", upperPrice: "", gridNum: "10", investAmount: "" });
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== "undefined" ? window.innerWidth : 1200);
   const [orderbookViewMode, setOrderbookViewMode] = useState<"combined" | "bids" | "asks">("combined");
@@ -1433,6 +1437,9 @@ export default function Trading() {
   const isChartView = activeViewTab === "chart";
   const isDesktopLayout = windowWidth >= 1024;
   const isCompactLayout = !isDesktopLayout;
+  const [orderSide, setOrderSide] = useState<"buy" | "sell">("buy");
+  const isAuthenticated = authService.isSessionValid();
+  const navigate = useNavigate();
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
     window.addEventListener("resize", handleResize);
@@ -2687,13 +2694,6 @@ socket.on('market_update', (data: any) => {
   const pairFilter = pairTab === "fav" ? [] : "USDT";
   const displayedPairs = filteredSymbols.filter(p => pairTab === "fav" || p.endsWith("/" + pairFilter)).slice(0, 50);
   
-  const dashboardAccountMetrics = useMemo(() => [
-    { label: "Available", value: `$${availableBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
-    { label: "Equity", value: `$${totalEquity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
-    { label: "Locked", value: `$${reservedUSDT.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
-    { label: "Open PnL", value: `${accountUnrealizedPnl >= 0 ? "+" : ""}$${accountUnrealizedPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, trend: accountUnrealizedPnl >= 0 ? "positive" : "negative" },
-  ], [availableBalance, totalEquity, reservedUSDT, accountUnrealizedPnl]);
-
   const headerStats = useMemo(() => [
     { label: "24h Chg", value: `${changePct.toFixed(2)}%`, color: isPriceUp ? COLORS.green : COLORS.red },
     { label: "24h High", value: formatPrice(high24h), color: COLORS.textBright },
@@ -2728,6 +2728,19 @@ socket.on('market_update', (data: any) => {
             <div style={{ fontWeight: 700, fontSize: 22, color: isPriceUp ? COLORS.green : COLORS.red }}>{isValidPrice(displayPrice) ? formatPrice(displayPrice) : isValidPrice(lastPrice) ? formatPrice(lastPrice) : "Market price unavailable"}</div>
             <div style={{ fontSize: 10, color: COLORS.textMuted }}>{formatMsTime(lastPriceUpdate)}</div>
           </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 12, flexShrink: 0 }}>
+            <button className="trading-pairs-toggle" onClick={() => setShowPairSelector(p => !p)} style={{ padding: "3px 8px", height: 26, background: showPairSelector ? COLORS.amber : "transparent", border: `1px solid ${showPairSelector ? COLORS.amber : COLORS.border}`, borderRadius: 4, color: showPairSelector ? "#000" : COLORS.text, cursor: "pointer", fontSize: 10, fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
+              {showPairSelector ? "▲" : "☰"} <span style={{ fontSize: 9, opacity: 0.7 }}>Pairs</span>
+            </button>
+            <button className="trading-pairs-desktop" onClick={() => setShowPairSelector(p => !p)} style={{ padding: "3px 8px", height: 26, background: showPairSelector ? COLORS.amber : "transparent", border: `1px solid ${showPairSelector ? COLORS.amber : COLORS.border}`, borderRadius: 4, color: showPairSelector ? "#000" : COLORS.text, cursor: "pointer", fontSize: 10, fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
+              {showPairSelector ? "▲" : "☰"} <span style={{ fontSize: 9, opacity: 0.7 }}>Pairs</span>
+            </button>
+            <button onClick={() => setShowWallet(p => !p)} style={{ padding: "3px 8px", height: 26, background: showWallet ? COLORS.amber : "transparent", border: `1px solid ${showWallet ? COLORS.amber : COLORS.border}`, borderRadius: 4, color: showWallet ? "#000" : COLORS.text, cursor: "pointer", fontSize: 10, fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
+              <span>👛</span> Wallet {showWallet ? "▲" : "▼"}
+            </button>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: liveStatus === "live" ? COLORS.green : COLORS.red, display: "inline-block", boxShadow: liveStatus === "live" ? `0 0 6px ${COLORS.green}` : "none" }} />
+            <span style={{ fontSize: 11, color: liveStatus === "live" ? COLORS.green : COLORS.red }}>{liveStatus.toUpperCase()}</span>
+          </div>
         </div>
         {/* Stats bar */}
         <div style={{ display: "flex", gap: 24, alignItems: "center", flex: 1, overflow: "hidden" }}>
@@ -2737,33 +2750,19 @@ socket.on('market_update', (data: any) => {
               <div style={{ fontSize: 12, color: stat.color, fontWeight: stat.color !== COLORS.textBright ? 700 : 400, fontFamily: "monospace" }}>{stat.value}</div>
             </div>
           ))}
-          <div style={{ flexShrink: 0 }}>
-            <div style={{ fontSize: 10, color: COLORS.text, marginBottom: 2 }}>Token Tags</div>
-            <div style={{ display: "flex", gap: 4 }}>
-              {["POW", "Payments", "Vol", "Hot", "Price Protection"].map(tag => (
-                <span key={tag} style={{ fontSize: 10, padding: "1px 5px", borderRadius: 2, background: COLORS.bgAlt, color: COLORS.text, border: `1px solid ${COLORS.border}` }}>{tag}</span>
-              ))}
-            </div>
-          </div>
-        </div>
-        <div className="trading-dashboard__account-strip" aria-label="Account summary">
-          {dashboardAccountMetrics.map(metric => (
-            <div key={metric.label} className="trading-dashboard__account-metric">
-              <span>{metric.label}</span>
-              <strong className={metric.trend ? `trading-dashboard__metric--${metric.trend}` : undefined}>{metric.value}</strong>
-            </div>
-          ))}
-        </div>
-        {/* Live status */}
-        <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ width: 8, height: 8, borderRadius: "50%", background: liveStatus === "live" ? COLORS.green : COLORS.red, display: "inline-block", boxShadow: liveStatus === "live" ? `0 0 6px ${COLORS.green}` : "none" }} />
-          <span style={{ fontSize: 11, color: liveStatus === "live" ? COLORS.green : COLORS.red }}>{liveStatus.toUpperCase()}</span>
         </div>
       </div>
 
-      {/* ── BALANCE CARD ── */}
-      <div style={{ padding: "12px 16px", background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}` }}>
-        <TradingBalanceCard />
+      {/* ── COLLAPSIBLE PAIRS SELECTOR (mobile/tablet) ── */}
+      <div className="trading-pairs-dropdown" style={{ maxHeight: showPairSelector && isCompactLayout ? 400 : 0, overflow: "hidden", transition: "max-height 0.35s ease", borderBottom: showPairSelector && isCompactLayout ? `1px solid ${COLORS.border}` : "none", background: COLORS.bgPanel }}>
+        {showPairSelector && isCompactLayout && marketPairsPanel()}
+      </div>
+
+      {/* ── COLLAPSIBLE WALLET PANEL ── */}
+      <div style={{ maxHeight: showWallet ? 600 : 0, overflow: "hidden", transition: "max-height 0.35s ease", borderBottom: showWallet ? `1px solid ${COLORS.border}` : "1px solid transparent" }}>
+        <div style={{ padding: "12px 16px", background: COLORS.bg }}>
+          <TradingBalanceCard />
+        </div>
       </div>
 
       {/* ── MAIN BODY ── */}
@@ -2798,7 +2797,7 @@ socket.on('market_update', (data: any) => {
         {/* ── CENTER: Chart + Order Form ── */}
         <div className="trading-main trading-dashboard__main" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden" }}>
           {/* Main view tabs */}
-          <div style={{ display: "flex", alignItems: "center", height: 38, borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, padding: "0 12px", gap: 0, flexShrink: 0 }}>
+          <div className="trading-main-tabs" style={{ display: "flex", alignItems: "center", height: 38, borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, padding: "0 12px", gap: 0, flexShrink: 0 }}>
             {([
               { id: "chart", label: "Chart" },
               { id: "trades", label: "Trades" },
@@ -2963,23 +2962,20 @@ socket.on('market_update', (data: any) => {
                 ) : (
 
                   <>
-                    <div className="trading-balance-strip">
-                      {modeBalanceSummary.map(item => (
-                        <div key={item.label} style={{ padding: "10px", borderRadius: 10, background: COLORS.bg, border: `1px solid ${COLORS.border}` }}>
-                          <div style={{ fontSize: 10, color: COLORS.textMuted, marginBottom: 6 }}>{item.label}</div>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.textBright, fontFamily: "monospace" }}>{item.value}</div>
-                        </div>
-                      ))}
-                    </div>
+                    {!isDesktopLayout && (
+                      <div style={{ display: "flex", borderBottom: `1px solid ${COLORS.border}`, flexShrink: 0 }}>
+                        <button onClick={() => setOrderSide("buy")} style={{ flex: 1, height: 34, background: orderSide === "buy" ? COLORS.green : "transparent", border: "none", borderRadius: 0, color: orderSide === "buy" ? "#000" : COLORS.text, fontWeight: 700, fontSize: 13, cursor: "pointer", borderRight: `1px solid ${COLORS.border}` }}>BUY / Long</button>
+                        <button onClick={() => setOrderSide("sell")} style={{ flex: 1, height: 34, background: orderSide === "sell" ? COLORS.red : "transparent", border: "none", borderRadius: 0, color: orderSide === "sell" ? "#fff" : COLORS.text, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>SELL / Short</button>
+                      </div>
+                    )}
                     <div className="trading-order-form__columns" style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0 }}>
                   {/* Left: Buy form */}
-                  <div className="trading-order-form__side trading-order-form__side--buy" style={{ flex: 1, padding: "10px 16px", borderRight: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div className="trading-order-form__side trading-order-form__side--buy" style={{ flex: 1, padding: "10px 16px", borderRight: `1px solid ${COLORS.border}`, display: !isDesktopLayout && orderSide !== "buy" ? "none" : "flex", flexDirection: "column", gap: 6 }}>
                   {/* Order type tabs */}
                   <div style={{ display: "flex", gap: 12, marginBottom: 2 }}>
                     {(["Limit", "Market", "Stop Limit", "OCO"] as const).map(t => (
                       <button key={t} onClick={() => handleOrderTypeChange(t.toLowerCase().replace(" ", "-") as any)} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: orderType === t.toLowerCase().replace(" ", "-") ? COLORS.textBright : COLORS.text, borderBottom: orderType === t.toLowerCase().replace(" ", "-") ? `2px solid ${COLORS.amber}` : "2px solid transparent", paddingBottom: 2 }}>{t}</button>
                     ))}
-                    <span style={{ fontSize: 12, color: COLORS.text, marginLeft: 4, cursor: "pointer" }}>ⓘ</span>
                   </div>
                   {/* Price input */}
                   <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 34 }}>
@@ -3041,7 +3037,7 @@ socket.on('market_update', (data: any) => {
                   )}
                 </div>
                 {/* Right: Sell form */}
-                <div className="trading-order-form__side trading-order-form__side--sell" style={{ flex: 1, padding: "10px 16px", display: "flex", flexDirection: "column", gap: 6 }}>
+                <div className="trading-order-form__side trading-order-form__side--sell" style={{ flex: 1, padding: "10px 16px", display: !isDesktopLayout && orderSide !== "sell" ? "none" : "flex", flexDirection: "column", gap: 6 }}>
                   <div style={{ display: "flex", gap: 12, marginBottom: 2 }}>
                     {(["Limit", "Market", "Stop Limit", "OCO"] as const).map(t => (
                       <button key={t} onClick={() => handleOrderTypeChange(t.toLowerCase().replace(" ", "-") as any)} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: orderType === t.toLowerCase().replace(" ", "-") ? COLORS.textBright : COLORS.text, borderBottom: orderType === t.toLowerCase().replace(" ", "-") ? `2px solid ${COLORS.amber}` : "2px solid transparent", paddingBottom: 2 }}>{t}</button>
@@ -3098,7 +3094,54 @@ socket.on('market_update', (data: any) => {
               </div>
               {/* BUY / SELL buttons */}
               <div className="trading-order-actions" style={{ display: "flex", gap: 8, padding: "8px 16px", borderTop: `1px solid ${COLORS.border}`, flexShrink: 0 }}>
-                <div className="trading-order-actions__balance" style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+                {!isAuthenticated ? (
+                  <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 8, gridColumn: "1 / -1" }}>
+                    {isDesktopLayout ? (
+                      <>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button className="login-prompt-btn" onClick={() => navigate("/login")} style={{ flex: 1, height: 44, background: COLORS.green, border: "none", borderRadius: 8, color: "#000", fontWeight: 700, fontSize: 15, cursor: "pointer" }}>Log in</button>
+                      <button className="login-prompt-btn" onClick={() => navigate("/login")} style={{ flex: 1, height: 44, background: COLORS.red, border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer" }}>Log in</button>
+                    </div>
+                    <div style={{ display: "flex", gap: 4 }}>
+                      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+                        <div style={{ fontSize: 10, color: COLORS.textMuted }}>Available USDT</div>
+                        <div style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace" }}>$0.00</div>
+                        <div style={{ fontSize: 10, color: COLORS.textMuted }}>Estimated Max Buy</div>
+                        <div style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace" }}>0.00000000 BTC</div>
+                      </div>
+                      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+                        <div style={{ fontSize: 10, color: COLORS.textMuted }}>Available BTC</div>
+                        <div style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace" }}>0.000000 BTC</div>
+                        <div style={{ fontSize: 10, color: COLORS.textMuted }}>Estimated Max Sell</div>
+                        <div style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace" }}>$0.00</div>
+                      </div>
+                    </div>
+                      </>
+                    ) : orderSide === "buy" ? (
+                      <>
+                    <button className="login-prompt-btn" onClick={() => navigate("/login")} style={{ width: "100%", height: 44, background: COLORS.green, border: "none", borderRadius: 8, color: "#000", fontWeight: 700, fontSize: 15, cursor: "pointer" }}>Log in</button>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: "nowrap" }}>Available USDT</span>
+                      <span style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace", whiteSpace: "nowrap" }}>$0.00</span>
+                      <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: "nowrap" }}>Est. Max Buy</span>
+                      <span style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace", whiteSpace: "nowrap" }}>0.00000000 BTC</span>
+                    </div>
+                      </>
+                    ) : (
+                      <>
+                    <button className="login-prompt-btn" onClick={() => navigate("/login")} style={{ width: "100%", height: 44, background: COLORS.red, border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer" }}>Log in</button>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: "nowrap" }}>Available BTC</span>
+                      <span style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace", whiteSpace: "nowrap" }}>0.000000 BTC</span>
+                      <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: "nowrap" }}>Est. Max Sell</span>
+                      <span style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace", whiteSpace: "nowrap" }}>$0.00</span>
+                    </div>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                <>
+                <div className="trading-order-actions__balance" style={{ flex: 1, display: !isDesktopLayout && orderSide !== "buy" ? "none" : "flex", flexDirection: "column", gap: 4 }}>
                   <div style={{ fontSize: 10, color: COLORS.textMuted }}>Available USDT</div>
                   <div style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace" }}>${availableBalance.toFixed(2)}</div>
                   <div style={{ fontSize: 10, color: COLORS.textMuted }}>Estimated Max Buy</div>
@@ -3120,6 +3163,7 @@ socket.on('market_update', (data: any) => {
                     fontSize: 13,
                     cursor: buyDisabled ? "not-allowed" : "pointer",
                     opacity: buyDisabled ? 0.5 : 1,
+                    display: !isDesktopLayout && orderSide !== "buy" ? "none" : undefined,
                   }}
                 >{buyButtonLabel}</button>
                 <button
@@ -3138,14 +3182,17 @@ socket.on('market_update', (data: any) => {
                     fontSize: 13,
                     cursor: sellDisabled ? "not-allowed" : "pointer",
                     opacity: sellDisabled ? 0.5 : 1,
+                    display: !isDesktopLayout && orderSide !== "sell" ? "none" : undefined,
                   }}
                 >Sell / Short</button>
-                <div className="trading-order-actions__balance" style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+                <div className="trading-order-actions__balance" style={{ flex: 1, display: !isDesktopLayout && orderSide !== "sell" ? "none" : "flex", flexDirection: "column", gap: 4 }}>
                   <div style={{ fontSize: 10, color: COLORS.textMuted }}>Available BTC</div>
                   <div style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace" }}>{availableBTC.toFixed(6)} BTC</div>
                   <div style={{ fontSize: 10, color: COLORS.textMuted }}>Estimated Max Sell</div>
                   <div style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace" }}>${estimatedMaxSellUSDT}</div>
                 </div>
+                </>
+                )}
               </div>
                   </>
                 )}
@@ -3403,6 +3450,8 @@ socket.on('market_update', (data: any) => {
         input:focus { outline: none; border-color: #f0b90b !important; }
 
         .trading-header { flex-wrap: nowrap; gap: 12px; }
+        .trading-pairs-toggle { display: none; }
+        .trading-pairs-desktop { display: flex; }
         .trading-body { display: flex !important; align-items: stretch !important; }
         .trading-toolbar,
         .trading-orderbook,
@@ -3605,6 +3654,10 @@ socket.on('market_update', (data: any) => {
         }
 
         @media (max-width: 767px) {
+          .trading-main-tabs { height: 34px !important; padding: 0 6px !important; }
+          .trading-main-tabs button { padding: 0 8px !important; font-size: 11px !important; }
+          .trading-pairs-toggle { display: flex; }
+          .trading-pairs-desktop { display: none; }
           .trading-header > div:nth-child(2) { width: 100%; overflow-x: auto !important; padding-bottom: 2px; }
           .trading-header > div:nth-child(2) > div:nth-child(n+5) { display: none !important; }
           .trading-chart-stage { height: 240px !important; min-height: 240px !important; }
@@ -3633,6 +3686,8 @@ socket.on('market_update', (data: any) => {
         }
 
         @media (max-width: 479px) {
+          .trading-main-tabs { height: 30px !important; padding: 0 4px !important; overflow-x: auto !important; }
+          .trading-main-tabs button { padding: 0 6px !important; font-size: 10px !important; white-space: nowrap; }
           .trading-header { min-height: 62px !important; }
           .trading-header button,
           .trading-header span,

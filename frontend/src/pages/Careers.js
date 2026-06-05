@@ -35,7 +35,10 @@ export default function Careers() {
     </div>
 
     <div className="hero1-image">
-      <img src={logo} alt="SwanCore Logo" />
+      <div style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "8px 14px", borderRadius: 10, background: "#ff8c32", border: "1px solid #ff8c32" }}>
+        <img src={logo} alt="SwanCore Logo" style={{ width: 32, height: 32, borderRadius: 4, objectFit: "contain", background: "#0b0e11", padding: 2 }} />
+        <span style={{ color: "var(--text-current)", fontSize: 18, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Inter', 'SF Pro Display', -apple-system, sans-serif" }}>SwanCore</span>
+      </div>
     </div>
 
   </div>

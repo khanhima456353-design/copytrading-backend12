@@ -1,0 +1,2 @@
+Port 5000 already in use ??? set PORT env var to override.
+⚠ allTickers: no WS data after 10s, starting REST fallback

@@ -117,7 +117,11 @@ export async function fetchWalletBalances(): Promise<BalanceData> {
 
     return balanceData;
   } catch (error) {
-    console.error("Error fetching wallet balances:", error);
+    if ((error as any)?.response?.data) {
+      console.error("Error fetching wallet balances:", (error as any).response.status, JSON.stringify((error as any).response.data));
+    } else {
+      console.error("Error fetching wallet balances:", error);
+    }
     return {
       spot: null,
       cross: null,

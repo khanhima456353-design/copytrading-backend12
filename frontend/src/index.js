@@ -7,6 +7,7 @@ import reportWebVitals from "./reportWebVitals";
 
 import { BrowserRouter, useLocation } from "react-router-dom";
 import { ThemeProvider } from "./components/theme/ThemeContext";
+import { MobileMenuProvider } from "./components/theme/MobileMenuContext";
 
 // Components
 import App from "./App";
@@ -23,13 +24,16 @@ function AppLayout() {
   const showNavbar =
     location.pathname !== "/" &&
     location.pathname !== "/register" &&
+    location.pathname !== "/login" &&
     !(isTradingPage && isAuthenticated);
 
   return (
-    <div className="app-layout">
-      {showNavbar && <Navbar showAuth={true} minimal={location.pathname === "/login"} />}
-      <App />
-    </div>
+    <MobileMenuProvider>
+      <div className="app-layout">
+        {showNavbar && <Navbar showAuth={true} minimal={location.pathname === "/login"} homepage={location.pathname === "/home"} />}
+        <App />
+      </div>
+    </MobileMenuProvider>
   );
 }
 

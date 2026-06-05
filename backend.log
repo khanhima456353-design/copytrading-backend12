@@ -1,0 +1,9 @@
+◇ injected env (12) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+🚀 Starting Binance WebSocket price feed...
+🔌 Connecting to Binance combined stream...
+Connecting to MongoDB with URL: mongodb://127.0.0.1:27017/trading?retryWrites=false
+??? MongoDB connected
+??? Redis connecting???
+✅ Binance WebSocket connected
+📡 Subscribed to 10 streams (ticker + depth)
+??? Redis ready

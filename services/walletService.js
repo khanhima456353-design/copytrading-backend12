@@ -19,6 +19,10 @@ async function recordTransaction(
   { userId, type, amount, balanceBefore, balanceAfter, lockedBefore, lockedAfter, reference, description }
 ) {
   const options = session ? { session } : undefined;
+  let ref = reference ?? null;
+  if (ref !== null && typeof ref === "string") {
+    try { ref = new mongoose.Types.ObjectId(ref); } catch { ref = null; }
+  }
   await Transaction.create(
     [
       {
@@ -29,7 +33,7 @@ async function recordTransaction(
         balanceAfter,
         lockedBefore,
         lockedAfter,
-        reference: reference ?? null,
+        reference: ref,
         description,
       },
     ],
@@ -54,7 +58,7 @@ async function createWallet(userId) {
     },
     {
       upsert: true,
-      new: true,
+      returnDocument: 'after',
       setDefaultsOnInsert: true,
     }
   );
@@ -88,7 +92,7 @@ async function creditBalance(userId, amount, description, type) {
   const before = await Wallet.findOneAndUpdate(
     { userId },
     { $inc: { availableBalance: amount } },
-    { new: false }
+    { returnDocument: 'before' }
   );
 
   if (!before) {
@@ -117,7 +121,7 @@ async function lockBalance(userId, amount, orderId) {
   const before = await Wallet.findOneAndUpdate(
     { userId, availableBalance: { $gte: amount } },
     { $inc: { availableBalance: -amount, lockedBalance: amount } },
-    { new: false }
+    { returnDocument: 'before' }
   );
 
   if (!before) {
@@ -158,7 +162,7 @@ async function unlockBalance(userId, amount, pnlAmount, orderId) {
   const before = await Wallet.findOneAndUpdate(
     filter,
     { $inc: { lockedBalance: -amount, availableBalance: amount + pnlAmount } },
-    { new: false }
+    { returnDocument: 'before' }
   );
 
   if (!before) {
@@ -194,7 +198,7 @@ async function debitBalance(userId, amount, description) {
   const before = await Wallet.findOneAndUpdate(
     { userId, availableBalance: { $gte: amount } },
     { $inc: { availableBalance: -amount } },
-    { new: false }
+    { returnDocument: 'before' }
   );
 
   if (!before) {
@@ -242,7 +246,7 @@ async function ensureWallet(userId) {
     },
     {
       upsert: true,
-      new: true,
+      returnDocument: 'after',
       setDefaultsOnInsert: true,
     }
   );

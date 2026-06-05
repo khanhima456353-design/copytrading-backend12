@@ -1,0 +1,342 @@
+⚠ allTickers: no WS data after 10s, starting REST fallback
+(node:8888) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+???? Redis error: read ECONNRESET
+???? Redis: reconnecting in 100ms (attempt 1)
+???? Redis reconnecting???
+Redis update live candle failed: BTC/USDT@5m read ECONNRESET
+Redis update live candle failed: BTC/USDT@15m read ECONNRESET
+Redis update live candle failed: BTC/USDT@1h read ECONNRESET
+Redis update live candle failed: BTC/USDT@1m read ECONNRESET
+Redis update live candle failed: BTC/USDT@5m read ECONNRESET
+Redis update live candle failed: BTC/USDT@15m read ECONNRESET
+Redis update live candle failed: BTC/USDT@1h read ECONNRESET
+Redis update live candle failed: BTC/USDT@1m read ECONNRESET
+Redis update live candle failed: BTC/USDT@5m read ECONNRESET
+Redis update live candle failed: BTC/USDT@15m read ECONNRESET
+Redis update live candle failed: BTC/USDT@1h read ECONNRESET
+Redis update live candle failed: BTC/USDT@1m read ECONNRESET
+Redis update live candle failed: BTC/USDT@5m read ECONNRESET
+Redis update live candle failed: BTC/USDT@15m read ECONNRESET
+Redis update live candle failed: BTC/USDT@1h read ECONNRESET
+Redis update live candle failed: BTC/USDT@1m read ECONNRESET
+Redis update live candle failed: BTC/USDT@5m read ECONNRESET
+Redis update live candle failed: BTC/USDT@15m read ECONNRESET
+Redis update live candle failed: BTC/USDT@1h read ECONNRESET
+Redis update live candle failed: BTC/USDT@1m read ECONNRESET
+Redis update live candle failed: BTC/USDT@5m read ECONNRESET
+Redis update live candle failed: BTC/USDT@15m read ECONNRESET
+Redis update live candle failed: BTC/USDT@1h read ECONNRESET
+Redis update live candle failed: BTC/USDT@1m read ECONNRESET
+Redis update live candle failed: BTC/USDT@5m read ECONNRESET
+Redis update live candle failed: BTC/USDT@15m read ECONNRESET
+Redis update live candle failed: BTC/USDT@1h read ECONNRESET
+Redis update live candle failed: BTC/USDT@1m read ECONNRESET
+Redis update live candle failed: BTC/USDT@5m read ECONNRESET
+Redis update live candle failed: BTC/USDT@15m read ECONNRESET
+Redis update live candle failed: BTC/USDT@1h read ECONNRESET
+Redis update live candle failed: ETH/USDT@1m read ECONNRESET
+Redis update live candle failed: ETH/USDT@5m read ECONNRESET
+Redis update live candle failed: ETH/USDT@15m read ECONNRESET
+Redis update live candle failed: ETH/USDT@1h read ECONNRESET
+Redis update live candle failed: ETH/USDT@1m read ECONNRESET
+Redis update live candle failed: ETH/USDT@5m read ECONNRESET
+Redis update live candle failed: ETH/USDT@15m read ECONNRESET
+Redis update live candle failed: ETH/USDT@1h read ECONNRESET
+Redis update live candle failed: ETH/USDT@1m read ECONNRESET
+Redis update live candle failed: ETH/USDT@5m read ECONNRESET
+Redis update live candle failed: ETH/USDT@15m read ECONNRESET
+Redis update live candle failed: ETH/USDT@1h read ECONNRESET
+Redis update live candle failed: ETH/USDT@1m read ECONNRESET
+Redis update live candle failed: ETH/USDT@5m read ECONNRESET
+Redis update live candle failed: ETH/USDT@15m read ECONNRESET
+Redis update live candle failed: ETH/USDT@1h read ECONNRESET
+Redis update live candle failed: BTC/USDT@1m read ECONNRESET
+Redis update live candle failed: BTC/USDT@5m read ECONNRESET
+Redis update live candle failed: BTC/USDT@15m read ECONNRESET
+Redis update live candle failed: BTC/USDT@1h read ECONNRESET
+Redis update live candle failed: BTC/USDT@1m read ECONNRESET
+Redis update live candle failed: BTC/USDT@5m read ECONNRESET
+Redis update live candle failed: BTC/USDT@15m read ECONNRESET
+Redis update live candle failed: BTC/USDT@1h read ECONNRESET
+Redis update live candle failed: BTC/USDT@1m read ECONNRESET
+Redis update live candle failed: BTC/USDT@5m read ECONNRESET
+Redis update live candle failed: BTC/USDT@15m read ECONNRESET
+Redis update live candle failed: BTC/USDT@1h read ECONNRESET
+Redis update live candle failed: BTC/USDT@1m read ECONNRESET
+Redis update live candle failed: BTC/USDT@5m read ECONNRESET
+Redis update live candle failed: BTC/USDT@15m read ECONNRESET
+Redis update live candle failed: BTC/USDT@1h read ECONNRESET
+Redis update live candle failed: BTC/USDT@1m read ECONNRESET
+Redis update live candle failed: BTC/USDT@5m read ECONNRESET
+Redis update live candle failed: BTC/USDT@15m read ECONNRESET
+Redis update live candle failed: BTC/USDT@1h read ECONNRESET
+Redis update live candle failed: SOL/USDT@1m read ECONNRESET
+Redis update live candle failed: SOL/USDT@5m read ECONNRESET
+Redis update live candle failed: SOL/USDT@15m read ECONNRESET
+Redis update live candle failed: SOL/USDT@1h read ECONNRESET
+Redis update live candle failed: BTC/USDT@1m read ECONNRESET
+Redis update live candle failed: BTC/USDT@5m read ECONNRESET
+Redis update live candle failed: BTC/USDT@15m read ECONNRESET
+Redis update live candle failed: BTC/USDT@1h read ECONNRESET
+Redis update live candle failed: BTC/USDT@1m read ECONNRESET
+Redis update live candle failed: BTC/USDT@5m read ECONNRESET
+Redis update live candle failed: BTC/USDT@15m read ECONNRESET
+Redis update live candle failed: BTC/USDT@1h read ECONNRESET
+Redis update live candle failed: BTC/USDT@1m read ECONNRESET
+Redis update live candle failed: BTC/USDT@5m read ECONNRESET
+Redis update live candle failed: BTC/USDT@15m read ECONNRESET
+Redis update live candle failed: BTC/USDT@1h read ECONNRESET
+Redis update live candle failed: BTC/USDT@1m read ECONNRESET
+Redis update live candle failed: BTC/USDT@5m read ECONNRESET
+Redis update live candle failed: BTC/USDT@15m read ECONNRESET
+Redis update live candle failed: BTC/USDT@1h read ECONNRESET
+Redis update live candle failed: BTC/USDT@1m read ECONNRESET
+Redis update live candle failed: BTC/USDT@5m read ECONNRESET
+Redis update live candle failed: BTC/USDT@15m read ECONNRESET
+Redis update live candle failed: BTC/USDT@1h read ECONNRESET
+Redis update live candle failed: ETH/USDT@1m read ECONNRESET
+Redis update live candle failed: ETH/USDT@5m read ECONNRESET
+Redis update live candle failed: ETH/USDT@15m read ECONNRESET
+Redis update live candle failed: ETH/USDT@1h read ECONNRESET
+Redis update live candle failed: BTC/USDT@1m read ECONNRESET
+Redis update live candle failed: BTC/USDT@5m read ECONNRESET
+Redis update live candle failed: BTC/USDT@15m read ECONNRESET
+Redis update live candle failed: BTC/USDT@1h read ECONNRESET
+Redis update live candle failed: BTC/USDT@1m read ECONNRESET
+Redis update live candle failed: BTC/USDT@5m read ECONNRESET
+Redis update live candle failed: BTC/USDT@15m read ECONNRESET
+Redis update live candle failed: BTC/USDT@1h read ECONNRESET
+Redis update live candle failed: BTC/USDT@1m read ECONNRESET
+Redis update live candle failed: BTC/USDT@5m read ECONNRESET
+Redis update live candle failed: BTC/USDT@15m read ECONNRESET
+Redis update live candle failed: BTC/USDT@1h read ECONNRESET
+Redis update live candle failed: BTC/USDT@1m read ECONNRESET
+Redis update live candle failed: BTC/USDT@5m read ECONNRESET
+Redis update live candle failed: BTC/USDT@15m read ECONNRESET
+Redis update live candle failed: BTC/USDT@1h read ECONNRESET
+Redis update live candle failed: BTC/USDT@1m read ECONNRESET
+Redis update live candle failed: BTC/USDT@5m read ECONNRESET
+Redis update live candle failed: BTC/USDT@15m read ECONNRESET
+Redis update live candle failed: SOL/USDT@1m read ECONNRESET
+Redis update live candle failed: SOL/USDT@5m read ECONNRESET
+Redis update live candle failed: SOL/USDT@15m read ECONNRESET
+Redis update live candle failed: SOL/USDT@1h read ECONNRESET
+Redis update live candle failed: BTC/USDT@1h read ECONNRESET
+Redis update live candle failed: BTC/USDT@1m read ECONNRESET
+Redis update live candle failed: BTC/USDT@5m read ECONNRESET
+Redis update live candle failed: ETH/USDT@1m read ECONNRESET
+Redis update live candle failed: ETH/USDT@5m read ECONNRESET
+Redis update live candle failed: ETH/USDT@1m read ECONNRESET
+Redis update live candle failed: ETH/USDT@5m read ECONNRESET
+Redis update live candle failed: SOL/USDT@1m read ECONNRESET
+Redis update live candle failed: SOL/USDT@5m read ECONNRESET
+Redis update live candle failed: BTC/USDT@1m read ECONNRESET
+Redis update live candle failed: BTC/USDT@5m read ECONNRESET
+Redis update live candle failed: BTC/USDT@1m read ECONNRESET
+Redis update live candle failed: BTC/USDT@5m read ECONNRESET
+Redis update live candle failed: BTC/USDT@1m read ECONNRESET
+CoinGecko fallback poll failed: timeout of 8000ms exceeded
+allTickers REST fallback failed: timeout of 10000ms exceeded
+???? Redis: reconnecting in 100ms (attempt 1)
+???? Redis error: Connection timeout
+???? Redis reconnecting???
+???? Redis: reconnecting in 200ms (attempt 2)
+???? Redis error: getaddrinfo ENOTFOUND redis-13568.c14.us-east-1-3.ec2.cloud.redislabs.com
+???? Redis reconnecting???
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+MX lookup failed (permissive): DNS timeout
+send-otp wallet error: walletService is not defined
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+MX lookup failed (permissive): DNS timeout
+send-otp wallet error: walletService is not defined
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+MX lookup failed (permissive): DNS timeout
+send-otp wallet error: walletService is not defined
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+MX lookup failed (permissive): DNS timeout
+send-otp wallet error: walletService is not defined
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running

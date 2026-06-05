@@ -122,12 +122,6 @@ body {
   text-decoration: none;
 }
 
-.logo-box {
-  background-color: var(--primary);
-  padding: 8px;
-  border-radius: 12px;
-}
-
 .logo-text {
   font-size: 22px;
   font-weight: 800;
@@ -193,6 +187,18 @@ body {
 .theme-toggle:hover {
   border-color: var(--primary);
   color: var(--primary);
+}
+
+.mobile-menu {
+  background: none;
+  border: 1px solid var(--border-current);
+  padding: 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--text-current);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* =========================
@@ -1045,6 +1051,101 @@ body {
   .nav-links, .nav-auth { display: none; }
   .hero-actions { flex-direction: column; }
   .hero-title { font-size: 40px; }
+  .nav-left, .nav-right { gap: 12px; }
   .footer-content { flex-direction: column; gap: 40px; }
   .footer-links { flex-wrap: wrap; gap: 40px; }
+}
+
+/* =========================
+   MOBILE MENU OVERLAY (prefixed "lm-" to avoid CSS global conflict with Trading.css)
+========================= */
+.lm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0,0,0,0.5);
+}
+
+.lm-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 280px;
+  height: 100%;
+  background: #1a1e24;
+  border-left: 1px solid #2a2e35;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  animation: lm-slideIn 0.2s ease;
+  box-shadow: -4px 0 20px rgba(0,0,0,0.3);
+}
+
+@keyframes lm-slideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.lm-drawer-body {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-top: 60px;
+}
+
+.lm-nav-links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lm-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #eaecef;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.lm-nav-item:hover {
+  background: #2a2e35;
+}
+
+.lm-nav-auth {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lm-btn-ghost {
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #2a2e35;
+  background: transparent;
+  color: #eaecef;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.lm-btn-ghost:hover {
+  background: #2a2e35;
+}
+
+.lm-btn-primary {
+  padding: 12px;
+  border-radius: 8px;
+  border: none;
+  background: #ff8c32;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.lm-btn-primary:hover {
+  background: #e67a22;
 }

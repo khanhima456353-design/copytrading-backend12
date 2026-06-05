@@ -12,9 +12,8 @@ const walletSchema = new mongoose.Schema({
     totalBalance: { type: Number, default: 0 },
     currency: { type: String, default: "USDT" },
 }, { timestamps: true });
-walletSchema.pre("save", function (next) {
+walletSchema.pre("save", function () {
     this.totalBalance = this.availableBalance + this.lockedBalance;
-    next();
 });
 async function syncTotalBalanceForUpdate() {
     const update = this.getUpdate();

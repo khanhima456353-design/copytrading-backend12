@@ -5,6 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useTheme } from "./components/theme/ThemeContext";
 import "./landing.css";
 
+import logo from "./assets/logo.jpg";
 import {
   ShieldCheck,
   TrendingUp,
@@ -17,6 +18,7 @@ import {
   Globe,
   ChevronDown,
   Menu,
+  X,
   Zap,
   BarChart3,
   Users,
@@ -71,6 +73,7 @@ export default function Landing() {
   const [email, setEmail] = useState("");
   const [company, setCompany] = useState("");
   const [activeFAQ, setActiveFAQ] = useState(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const faqs = [
     {
@@ -134,16 +137,16 @@ export default function Landing() {
         <div className="container nav-content">
           <div className="nav-left">
             <Link to="/" className="logo">
-              <div className="logo-box">
-                <ShieldCheck className="w-6 h-6 text-white" />
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", borderRadius: 10, background: "#ff8c32", border: "1px solid #ff8c32" }}>
+                <img src={logo} alt="SwanCore" style={{ width: 32, height: 32, borderRadius: 4, objectFit: "contain", background: "#0b0e11", padding: 2 }} />
+                <span style={{ color: "var(--text-current)", fontSize: 18, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Inter', 'SF Pro Display', -apple-system, sans-serif" }}>SwanCore</span>
               </div>
-              <span className="logo-text">SwanCore</span>
             </Link>
 
             <nav className="nav-links">
-              <div className="nav-dropdown">
+              <Link to="/trade" className="nav-dropdown">
                 Trade <ChevronDown className="w-4 h-4" />
-              </div>
+              </Link>
               <Link to="/markets">Markets</Link>
               <Link to="/earn">Earn</Link>
               <Link to="/research">Research</Link>
@@ -158,10 +161,34 @@ export default function Landing() {
               <button onClick={() => navigate("/login")} className="btn-ghost">Log in</button>
               <button onClick={redirectToRegister} className="btn-primary">Sign Up</button>
             </div>
-            <button className="mobile-menu"><Menu className="w-6 h-6" /></button>
+            <button className="mobile-menu" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
           </div>
         </div>
       </header>
+
+      {mobileMenuOpen && (
+        <div className="lm-overlay" onClick={() => setMobileMenuOpen(false)}>
+          <div className="lm-drawer" onClick={e => e.stopPropagation()}>
+            <div className="lm-drawer-body">
+              <nav className="lm-nav-links">
+                <Link to="/trade" className="lm-nav-item" onClick={() => setMobileMenuOpen(false)}>
+                  <ChevronDown className="w-4 h-4" /> Trade
+                </Link>
+                <Link to="/markets" className="lm-nav-item" onClick={() => setMobileMenuOpen(false)}>Markets</Link>
+                <Link to="/earn" className="lm-nav-item" onClick={() => setMobileMenuOpen(false)}>Earn</Link>
+                <Link to="/research" className="lm-nav-item" onClick={() => setMobileMenuOpen(false)}>Research</Link>
+              </nav>
+              <div className="lm-nav-auth">
+                <button onClick={() => { navigate("/login"); setMobileMenuOpen(false); }} className="lm-btn-ghost">Log in</button>
+                <button onClick={() => { redirectToRegister(); setMobileMenuOpen(false); }} className="lm-btn-primary">Sign Up</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <main>
         {/* HERO SECTION */}
         <section className="hero">
@@ -397,8 +424,10 @@ export default function Landing() {
         <div className="container footer-content">
           <div className="footer-brand">
             <Link to="/" className="logo">
-              <div className="logo-box"><ShieldCheck className="w-6 h-6 text-white" /></div>
-              <span className="logo-text">SwanCore</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", borderRadius: 10, background: "#ff8c32", border: "1px solid #ff8c32" }}>
+                <img src={logo} alt="SwanCore" style={{ width: 32, height: 32, borderRadius: 4, objectFit: "contain", background: "#0b0e11", padding: 2 }} />
+                <span style={{ color: "var(--text-current)", fontSize: 18, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Inter', 'SF Pro Display', -apple-system, sans-serif" }}>SwanCore</span>
+              </div>
             </Link>
             <p>Pioneering the next generation of global financial sovereignty.</p>
             <div className="footer-socials">

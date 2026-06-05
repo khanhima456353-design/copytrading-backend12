@@ -7,34 +7,23 @@ const router = express.Router();
 
 router.get("/", authenticateUser, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select("balance frozenBalance");
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-
-    const availableBalance = Math.max(0, Number(user.balance || 0) - Number(user.frozenBalance || 0));
-    const lockedBalance = Math.max(0, Number(user.frozenBalance || 0));
-    const totalBalance = Number(user.balance || 0);
-
     const wallet = await walletService.ensureWallet(req.user._id);
-    wallet.availableBalance = availableBalance;
-    wallet.lockedBalance = lockedBalance;
-    await wallet.save();
 
     return res.json({
       success: true,
       data: {
-        availableBalance,
-        lockedBalance,
-        totalBalance,
-        balance: totalBalance,
-        frozenBalance: lockedBalance,
+        availableBalance: wallet.availableBalance,
+        lockedBalance: wallet.lockedBalance,
+        totalBalance: wallet.totalBalance,
+        balance: wallet.totalBalance,
+        frozenBalance: wallet.lockedBalance,
         currency: wallet.currency,
         userId: wallet.userId,
       },
     });
   } catch (error) {
-    return res.status(400).json({ success: false, message: error.message });
+    console.error("Wallet GET / error:", error);
+    return res.status(400).json({ success: false, message: error.message, stack: error.stack });
   }
 });
 

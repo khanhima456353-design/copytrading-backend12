@@ -58,14 +58,7 @@ export default function App() {
         <Route path="/careers" element={<Careers />} />
         <Route path="/imformation" element={<Imformation />} />
         <Route path="/legal/privacy" element={<Privacy />} />
-        <Route
-          path="/trade"
-          element={
-            <ProtectedRoute>
-              <Trading />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/trade" element={<Trading />} />
         <Route
           path="/verification"
           element={

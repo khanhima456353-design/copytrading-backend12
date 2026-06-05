@@ -4077,3 +4077,11 @@ input,select{
     min-height: 260px !important;
   }
 }
+
+@media (max-width: 768px) {
+  .login-prompt-btn {
+    font-size: 14px !important;
+    white-space: nowrap;
+    min-width: 0 !important;
+  }
+}

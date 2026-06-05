@@ -222,7 +222,7 @@ exports.getDashboardStats = async (req, res) => {
 exports.getUserOpenOrders = async (req, res) => {
   try {
     const { id } = req.params;
-    const query = { userId: id, status: { $in: ['open', 'partially_filled'] } };
+    const query = { userId: id, status: { $in: ['pending', 'open', 'partially_filled'] } };
 
     console.log('ADMIN_SIM_USER', id);
     console.log('ADMIN_SIM_QUERY', { collection: 'Order', query });

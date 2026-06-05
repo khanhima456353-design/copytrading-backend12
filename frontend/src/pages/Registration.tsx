@@ -2,9 +2,11 @@ import React, { useState, useEffect, CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { FaCheckCircle, FaEye, FaEyeSlash, FaSpinner } from "react-icons/fa";
+import { Sun, Moon } from "lucide-react";
 import { getAPIBase } from "../api";
 import i18n from "../i18n";
 import logo from "../assets/logo.jpg";
+import { useTheme } from "../components/theme/ThemeContext";
 
 
 /* ─────────────────────────────────────────────────────────────
@@ -174,10 +176,6 @@ const S = {
     backdropFilter: "blur(12px)",
   },
   profBtn: {
-    position: "fixed",
-    top: 16,
-    right: 20,
-    zIndex: 400,
     background: "linear-gradient(135deg,#ff8c32,#e84c4c)",
     color: "var(--text-primary)",
     border: "none",
@@ -721,6 +719,7 @@ const S = {
 ───────────────────────────────────────────────────────────── */
 const Registration: React.FC = () => {
   const navigate = useNavigate();
+  const { theme, toggleTheme } = useTheme();
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [email, setEmail] = useState("");
@@ -929,7 +928,28 @@ const Registration: React.FC = () => {
       {/* ── WELCOME SCREEN ── */}
       {showWelcome && (
         <div style={S.welcome}>
-          <img src={logo} alt="Logo" style={S.welcomeLogo} />
+          <div style={{ position: "fixed", top: 16, right: 20, zIndex: 400 }}>
+            <button
+              onClick={toggleTheme}
+              style={{
+                background: "var(--card-current)",
+                border: "1px solid var(--border-current)",
+                padding: 8,
+                borderRadius: 10,
+                cursor: "pointer",
+                color: "var(--text-current)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </button>
+          </div>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "8px 14px", borderRadius: 10, background: "#ff8c32", border: "1px solid #ff8c32", marginBottom: 28 }}>
+            <img src={logo} alt="SwanCore" style={{ width: 32, height: 32, borderRadius: 4, objectFit: "contain", background: "#0b0e11", padding: 2 }} />
+            <span style={{ color: "var(--text-current)", fontSize: 18, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Inter', 'SF Pro Display', -apple-system, sans-serif" }}>SwanCore</span>
+          </div>
           <div style={{ animation: "fadeUp .6s ease" }}>
             <h1 style={S.welcomeH1}>Welcome to SwanCore! 🎉</h1>
             <p style={S.welcomeSub}>Your account has been created successfully.</p>
@@ -949,13 +969,31 @@ const Registration: React.FC = () => {
       {!showWelcome && (
         <div style={S.page}>
 
-          <button
-            style={S.profBtn}
-            onClick={() => navigate("/")}
-            aria-label="Back to Dashboard"
-          >
-            ← Back to Dashboard
-          </button>
+          <div style={{ position: "fixed", top: 16, right: 20, zIndex: 400, display: "flex", gap: 8 }}>
+            <button
+              onClick={toggleTheme}
+              style={{
+                background: "var(--card-current)",
+                border: "1px solid var(--border-current)",
+                padding: 8,
+                borderRadius: 10,
+                cursor: "pointer",
+                color: "var(--text-current)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </button>
+            <button
+              style={S.profBtn}
+              onClick={() => navigate("/")}
+              aria-label="Back to Dashboard"
+            >
+              ← Back to Dashboard
+            </button>
+          </div>
 
           {/* ── MODAL ── */}
           {modal.type && (
@@ -1050,8 +1088,10 @@ const Registration: React.FC = () => {
             <div style={{ ...S.card, animation: "fadeUp .5s ease" }} className="reg-card">
               {/* brand */}
               <div style={S.brand}>
-                <img src={logo} alt="Logo" style={S.brandLogo} />
-                <span style={S.brandText}>SwanCore</span>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "8px 14px", borderRadius: 10, background: "#ff8c32", border: "1px solid #ff8c32" }}>
+                  <img src={logo} alt="SwanCore" style={{ width: 32, height: 32, borderRadius: 4, objectFit: "contain", background: "#0b0e11", padding: 2 }} />
+                  <span style={{ color: "var(--text-current)", fontSize: 18, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Inter', 'SF Pro Display', -apple-system, sans-serif" }}>SwanCore</span>
+                </div>
               </div>
 
               <h2 style={S.heading}>Hi Trader 👋</h2>

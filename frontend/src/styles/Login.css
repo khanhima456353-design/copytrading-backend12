@@ -288,7 +288,27 @@
 
 .lang-select:hover {
   border-color: var(--primary);
+}
+.lang-select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(255, 140, 50, 0.15);
+}
+
+.login-theme-toggle {
+  background: none;
+  border: 1px solid var(--border-current);
+  padding: 8px;
+  border-radius: 10px;
+  cursor: pointer;
   color: var(--text-current);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+.login-theme-toggle:hover {
+  border-color: var(--primary);
+  color: var(--primary);
 }
 
 /* ---------- CARD ---------- */
@@ -298,21 +318,6 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-}
-
-/* ---------- LOGO ---------- */
-.login-logo-wrap {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 20px;
-}
-
-.login-logo {
-  width: 52px;
-  height: 52px;
-  border-radius: 14px;
-  object-fit: contain;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
 }
 
 /* ---------- TITLE ---------- */

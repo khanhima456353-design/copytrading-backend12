@@ -1,5 +1,4 @@
 import { getSocket, getAxios } from "../api";
-import axios from "axios";
 
 
 // ─── Types ────────────────────────────────────────────────────────────────
@@ -41,10 +40,34 @@ type ServerMarketUpdate         = {
 };
 type ServerMarketUpdateSubscriber = (update: ServerMarketUpdate) => void;
 
+// ─── All-tickers types ─────────────────────────────────────────────────────
+
+export type AllTickerData = {
+  symbol:    string;
+  price:     number;
+  high24h:   number;
+  low24h:    number;
+  volume24h: number;
+  quoteVol:  number;
+  change24h: number;
+  changePct: number;
+  timestamp: number;
+};
+
+type AllTickersSubscriber = (tickers: AllTickerData[]) => void;
+
 // ─── Constants ────────────────────────────────────────────────────────────
 
-const MAX_TRADES         = 100;
-const DEBOUNCE_MS        = 100;
+const QUOTE_ASSETS = ["USDT", "USD", "BTC", "ETH", "BNB"];
+const MAX_TRADES   = 100;
+const DEBOUNCE_MS  = 100;
+
+function binanceSymbolToPair(symbol: string): string | null {
+  for (const q of QUOTE_ASSETS) {
+    if (symbol.endsWith(q)) return `${symbol.slice(0, -q.length)}/${q}`;
+  }
+  return null;
+}
 
 // ─── Module-level state ───────────────────────────────────────────────────
 
@@ -52,6 +75,10 @@ const marketStateByPair:          Record<string, MarketState>                   
 const subscribers:                Record<string, Set<MarketStateSubscriber>>    = {};
 const connectionSubscribers       = new Set<ConnectionSubscriber>();
 const serverMarketUpdateSubscribers = new Set<ServerMarketUpdateSubscriber>();
+
+// All-tickers state (24hr mini ticker for ALL symbols)
+let allTickersData: AllTickerData[] = [];
+const allTickersSubscribers = new Set<AllTickersSubscriber>();
 
 // FIX #4 — store timer IDs so we can reset (not skip) on rapid updates
 const flushTimers: Record<string, ReturnType<typeof setTimeout>> = {};
@@ -320,29 +347,21 @@ async function fetchOrderBook(pair: string): Promise<void> {
 
 async function fetchTickerSummary(pair: string): Promise<void> {
   try {
-    const krakenPair = pair.replace("/", "").replace(/USDT$/, "USD");
-    const res        = await axios.get(`https://api.kraken.com/0/public/Ticker?pair=${krakenPair}`);
-    const result     = res.data?.result || {};
-    const ticker     = result[Object.keys(result)[0]] || {};
+    const api = await getAxios();
+    const res = await api.get(`/api/market/ticker/${encodeURIComponent(pair)}`);
+    const t   = res.data;
+    if (!t?.lastPrice) return;
 
-    const last      = safePrice(ticker.c?.[0] ?? ticker.a?.[0]);
-    const high      = safeNonNegative(ticker.h?.[1] ?? ticker.h?.[0]);
-    const low       = safeNonNegative(ticker.l?.[1] ?? ticker.l?.[0]);
-    const volume    = safeNonNegative(ticker.v?.[1] ?? ticker.v?.[0]);
-    const open      = safeNonNegative(ticker.o);
-    const change    = last !== undefined && open !== undefined ? last - open : undefined;
-    const changePct = open ? (change ?? 0) / open * 100 : undefined;
-
-    const update: MarketStateUpdate = {};
-    if (last      !== undefined) { update.lastPrice = last; update.markPrice = last; }
-    else console.warn(`[marketState][ticker] no valid lastPrice from Kraken for ${pair}`, ticker);
-    if (high !== undefined) update.high24h = (last !== undefined && last > high) ? last : high;
-    if (low       !== undefined) update.low24h     = low;
-    if (volume    !== undefined) update.volume24h  = volume;
-    if (change    !== undefined) update.change24h  = change;
-    if (changePct !== undefined) update.changePct  = changePct;
-    update.lastPriceUpdate = Date.now();
-
+    const update: MarketStateUpdate = {
+      lastPrice:       safePrice(t.lastPrice),
+      markPrice:       safePrice(t.lastPrice),
+      high24h:         safeNonNegative(t.high24h) ?? undefined,
+      low24h:          safeNonNegative(t.low24h) ?? undefined,
+      volume24h:       safeNonNegative(t.volume24h) ?? undefined,
+      change24h:       safeNumber(t.change24h) ?? undefined,
+      changePct:       safeNumber(t.changePct) ?? undefined,
+      lastPriceUpdate: Date.now(),
+    };
     updateMarketState(pair, update);
   } catch { /* no-op */ }
 }
@@ -521,6 +540,45 @@ async function initMarketState(): Promise<void> {
       }
     });
   });
+
+  // All-tickers: 24hr mini ticker for ALL symbols
+  socket.on("allTickers", (tickers: any[]) => {
+    if (!Array.isArray(tickers) || !tickers.length) return;
+    allTickersData = tickers
+      .map(t => ({
+        symbol:    t.symbol || '',
+        price:     Number(t.price) || 0,
+        high24h:   Number(t.high24h) || 0,
+        low24h:    Number(t.low24h) || 0,
+        volume24h: Number(t.volume24h) || 0,
+        quoteVol:  Number(t.quoteVol) || 0,
+        change24h: Number(t.change24h) || 0,
+        changePct: Number(t.changePct) || 0,
+        timestamp: Number(t.timestamp) || Date.now(),
+      }))
+      .filter(t => t.symbol && t.price > 0);
+    // Propagate to individual pair market states so switching pairs is instant
+    for (const t of allTickersData) {
+      const pair = binanceSymbolToPair(t.symbol);
+      if (pair) {
+        updateMarketState(pair, {
+          lastPrice:       t.price,
+          markPrice:       t.price,
+          high24h:         t.high24h,
+          low24h:          t.low24h,
+          volume24h:       t.volume24h,
+          change24h:       t.change24h,
+          changePct:       t.changePct,
+          lastPriceUpdate: t.timestamp,
+        });
+      }
+    }
+    allTickersSubscribers.forEach(cb => {
+      try { cb(allTickersData); } catch (e) {
+        console.error("[marketState] allTickers subscriber error:", e);
+      }
+    });
+  });
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────
@@ -575,4 +633,18 @@ export function subscribeServerMarketUpdate(subscriber: ServerMarketUpdateSubscr
   serverMarketUpdateSubscribers.add(subscriber);
   initMarketState().catch(() => { /* ignore */ });
   return () => { serverMarketUpdateSubscribers.delete(subscriber); };
+}
+
+// ─── All-tickers subscription ─────────────────────────────────────────────
+
+export function subscribeAllTickers(subscriber: AllTickersSubscriber): () => void {
+  allTickersSubscribers.add(subscriber);
+  // Deliver current snapshot synchronously
+  subscriber(allTickersData);
+  initMarketState().catch(() => { /* ignore */ });
+  return () => { allTickersSubscribers.delete(subscriber); };
+}
+
+export function getAllTickers(): AllTickerData[] {
+  return allTickersData;
 }

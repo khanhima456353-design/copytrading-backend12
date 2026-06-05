@@ -53,9 +53,12 @@ const adminRoutes = require("./src/routes/adminRoutes");
 const notificationRoutes = require("./src/routes/notificationRoutes");
 const walletRoutes = require('./routes/walletRoutes');
 const orderRoutes = require('./routes/orderRoutes');
+const orderService = require('./services/orderService');
+const orderMonitor = require('./services/orderMonitor');
 
 // Models (single import for User to avoid duplicate declarations)
 const User = require('./models/User');
+const Wallet = require('./models/Wallet');
 
 // ????????? Middleware ?????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 const allowedOrigins = [
@@ -207,6 +210,28 @@ async function fetchBinanceTrades(pair) {
     }));
   } catch (err) {
     console.error("Binance trades fetch failed:", pair, err.message);
+    return null;
+  }
+}
+
+async function fetchBinanceTicker(pair) {
+  try {
+    const { data } = await axios.get(`${BINANCE_API_BASE}/api/v3/ticker/24hr`, {
+      params: { symbol: binanceSymbolForPair(pair) },
+      timeout: 8000,
+    });
+    return {
+      lastPrice:  Number(data.lastPrice),
+      high24h:    Number(data.highPrice),
+      low24h:     Number(data.lowPrice),
+      volume24h:  Number(data.volume),
+      change24h:  Number(data.priceChange),
+      changePct:  Number(data.priceChangePercent),
+      bidPrice:   Number(data.bidPrice),
+      askPrice:   Number(data.askPrice),
+    };
+  } catch (err) {
+    console.error("Binance ticker fetch failed:", pair, err.message);
     return null;
   }
 }
@@ -534,6 +559,13 @@ app.get("/api/market/deepmarket/:pair", async (req, res) => {
   res.json(candles.map((c) => ({ time: c.time, value: c.close * (1 + Math.sin(c.time / 1000) * 0.02) })));
 });
 
+app.get("/api/market/ticker/:pair", async (req, res) => {
+  const pair  = cleanPair(req.params.pair);
+  const ticker = await fetchBinanceTicker(pair);
+  if (ticker) return res.json(ticker);
+  res.status(503).json({ error: "Ticker unavailable" });
+});
+
 // ????????? Application routes ?????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 app.use("/api/auth",          authRoutes);
 app.use("/api/posts",         postRoutes);
@@ -595,6 +627,8 @@ app.get("/api/profile", authMiddleware, async (req, res) => {
 
 // --- Account summary / positions / orders ---
 const Order = require('./models/Order');
+const Position = require('./models/Position');
+const Balance = require('./models/Balance');
 
 
 
@@ -607,11 +641,11 @@ app.get('/api/account/summary', authMiddleware, async (req, res) => {
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    const availableBalance = user.balance || 0;
-    const lockedBalance = 0;
+    const wallet = await Wallet.findOne({ userId });
+    const availableBalance = wallet ? wallet.availableBalance : (user.balance || 0);
+    const lockedBalance = wallet ? wallet.lockedBalance : 0;
 
     const positions = await Position.find({ userId });
-    // compute unrealized using user-specific simulated price when available and clamp PnL to allowed range
     let totalUnreal = 0;
     positions.forEach((p) => {
       const mark = getPositionMarkPrice(userId, p);
@@ -622,12 +656,10 @@ app.get('/api/account/summary', authMiddleware, async (req, res) => {
 
     const openOrders = await Order.find({ userId, status: { $in: ['open','partially_filled'] } });
 
-    const cashBalance = availableBalance + lockedBalance;
-
     const summary = {
       available: availableBalance,
       locked: lockedBalance,
-      totalBalance: cashBalance,
+      totalBalance: availableBalance + lockedBalance,
       unrealizedPnl: totalUnreal,
       usedMargin: positions.reduce((s, p) => s + (p.margin || 0), 0),
       freeMargin: availableBalance,
@@ -768,7 +800,7 @@ app.post('/api/dev/reset', async (req, res) => {
 
 app.get('/api/trade/history', authMiddleware, async (req, res) => {
   try {
-    const userId = req.user._id;
+    const userId = req.userId;
     const orders = await Order.find({ userId, status: 'closed' }).sort({ closedAt: -1 });
     res.json({ success: true, data: orders });
   } catch (err) {
@@ -777,11 +809,58 @@ app.get('/api/trade/history', authMiddleware, async (req, res) => {
 });
 
 app.post('/api/trade/place', authMiddleware, async (req, res) => {
-  res.redirect(307, '/api/orders/open');
+  try {
+    const { pair, side, type, amount, price, total, slippageTolerance, stopLoss, takeProfit } = req.body;
+    const entryPrice = Number(price || 0);
+    const quantity = Number(amount || 0);
+    const lockedAmount = total != null ? Number(total) : quantity * (price || 0);
+    if (!pair || !side || !type || !quantity || quantity <= 0) {
+      return res.status(400).json({ success: false, message: "pair, side, type, and amount are required" });
+    }
+    const stopPrice = ["stop-limit", "oco"].includes(type) ? entryPrice : undefined;
+    const order = await orderService.openOrder(req.userId, pair, side, type, entryPrice, quantity, lockedAmount, stopPrice, stopLoss, takeProfit);
+
+    // For non-pending orders (market/limit), immediately create position and start simulation
+    if (order.status === "open" && !["stop-limit", "oco"].includes(type)) {
+      const fillPrice = type === "market" ? (cachedMarketPrices[pair] || entryPrice) : entryPrice;
+      const positionSide = side === "sell" ? "short" : "long";
+
+      let pos = await Position.findOne({ userId: req.userId, pair });
+      if (!pos) {
+        pos = await Position.create({
+          userId: req.userId, pair, side: positionSide,
+          size: quantity, entryPrice: fillPrice, margin: lockedAmount,
+        });
+      } else {
+        const newSize = pos.size + quantity;
+        const newEntry = ((pos.entryPrice * pos.size) + (fillPrice * quantity)) / newSize;
+        pos.size = newSize;
+        pos.entryPrice = newEntry;
+        pos.margin = (pos.margin || 0) + lockedAmount;
+        await pos.save();
+      }
+      startPositionSimulation(req.userId, pos);
+    }
+
+    return res.status(201).json({ success: true, data: { order } });
+  } catch (error) {
+    return res.status(400).json({ success: false, message: error.message });
+  }
 });
 
 app.post('/api/trade/cancel', authMiddleware, async (req, res) => {
-  res.redirect(307, '/api/orders/close');
+  try {
+    const { orderId } = req.body;
+    console.log('Cancel request body:', JSON.stringify(req.body));
+    if (!orderId) {
+      return res.status(400).json({ success: false, message: "orderId is required" });
+    }
+    const order = await orderService.cancelOrder(orderId);
+    return res.json({ success: true, data: { order } });
+  } catch (error) {
+    console.error('Cancel error:', error.message, error.stack);
+    return res.status(400).json({ success: false, message: error.message });
+  }
 });
 
 // Auth login (kept for backward-compat)
@@ -869,7 +948,8 @@ marketSimulator.initMarketSimulator({
         });
       }
 
-      const balance = (await User.findById(userId))?.balance || 0;
+      const w = await Wallet.findOne({ userId });
+      const balance = w ? w.availableBalance : ((await User.findById(userId))?.balance || 0);
       const equity  = balance + totalUnreal;
 
       io.to(`user:${userId}`).emit('market_update', {
@@ -880,6 +960,7 @@ marketSimulator.initMarketSimulator({
         positions: positionsWithMarks,
         unrealizedPnl: totalUnreal,
         rawUnrealizedPnl: totalUnrealRaw,
+        available: balance,
         balance,
         equity,
         driftState: state.activeDrift ? { active: true, ...state.activeDrift } : { active: false },
@@ -889,6 +970,34 @@ marketSimulator.initMarketSimulator({
     } catch (err) {
       console.error('onSimulated handler error:', err?.message ?? err);
     }
+  },
+});
+
+orderMonitor.startMonitor({
+  getPrice: (pair) => cachedMarketPrices[pair],
+  closeOrder: async (orderId, closePrice) => {
+    await orderService.closeOrder(orderId, closePrice);
+  },
+  onActivate: async (order, currentPrice) => {
+    let pos = await Position.findOne({ userId: order.userId, pair: order.pair });
+    if (!pos) {
+      pos = await Position.create({
+        userId: order.userId,
+        pair: order.pair,
+        side: order.positionSide,
+        size: order.quantity,
+        entryPrice: currentPrice,
+        margin: order.lockedAmount,
+      });
+    } else {
+      const newSize = pos.size + order.quantity;
+      const newEntry = ((pos.entryPrice * pos.size) + (currentPrice * order.quantity)) / newSize;
+      pos.size = newSize;
+      pos.entryPrice = newEntry;
+      pos.margin = (pos.margin || 0) + order.lockedAmount;
+      await pos.save();
+    }
+    startPositionSimulation(order.userId, pos);
   },
 });
 
@@ -979,7 +1088,11 @@ function getPairFromBinanceSymbol(symbol) {
   return idx >= 0 ? trackedPairs[idx] : null;
 }
 
-// Listen to Binance WebSocket price updates
+// Track last emitted price per pair to throttle spam
+const lastEmittedPrice = {};
+const PRICE_EMIT_THROTTLE_MS = 200;
+
+// Listen to Binance WebSocket price updates (both from @aggTrade and @ticker)
 binanceWS.on('price', (data) => {
   const pair = getPairFromBinanceSymbol(data.pair);
   if (pair) {
@@ -990,13 +1103,76 @@ binanceWS.on('price', (data) => {
     ).catch((err) => {
       console.error('Live candle persistence failed:', err?.message || err);
     });
-    // console.debug(`📈 Binance price: ${pair} = $${data.price.toFixed(2)}`);
+    // Emit immediately for real-time feel, throttled per pair
+    const last = lastEmittedPrice[pair];
+    if (!last || timestampMs - last.time >= PRICE_EMIT_THROTTLE_MS || Math.abs(data.price - last.price) / last.price > 0.0001) {
+      lastEmittedPrice[pair] = { price: data.price, time: timestampMs };
+      io.emit('priceUpdate', { pair, price: data.price, time: timestampMs });
+    }
   }
 });
+
+// Forward allTickers (24hr ticker for ALL symbols) to frontend
+let allTickersReceived = false;
+let allTickersFallbackTimer = null;
+
+binanceWS.on('allTickers', (tickers) => {
+  if (!allTickersReceived) {
+    allTickersReceived = true;
+    console.log(`✓ allTickers: receiving ${tickers.length} symbols from WebSocket`);
+    if (allTickersFallbackTimer) {
+      clearInterval(allTickersFallbackTimer);
+      allTickersFallbackTimer = null;
+    }
+  }
+  io.emit('allTickers', tickers);
+});
+
+// REST fallback: if !ticker@arr never arrives via WS, poll Binance REST API
+setTimeout(() => {
+  if (!allTickersReceived) {
+    console.warn('⚠ allTickers: no WS data after 10s, starting REST fallback');
+    fetchAllTickersRest();
+    allTickersFallbackTimer = setInterval(fetchAllTickersRest, 30_000);
+  }
+}, 10_000);
+
+async function fetchAllTickersRest() {
+  try {
+    const { data } = await axios.get(`${BINANCE_API_BASE}/api/v3/ticker/24hr`, { timeout: 10_000 });
+    if (!Array.isArray(data)) return;
+    const tickers = data
+      .filter(t => t.symbol && t.symbol.endsWith('USDT'))
+      .map(t => ({
+        symbol:    t.symbol,
+        price:     parseFloat(t.lastPrice),
+        high24h:   parseFloat(t.highPrice),
+        low24h:    parseFloat(t.lowPrice),
+        volume24h: parseFloat(t.volume),
+        quoteVol:  parseFloat(t.quoteVolume),
+        change24h: parseFloat(t.priceChange),
+        changePct: parseFloat(t.priceChangePercent),
+        timestamp: Date.now(),
+      }))
+      .filter(t => Number.isFinite(t.price) && t.price > 0);
+    if (tickers.length) {
+      io.emit('allTickers', tickers);
+    }
+  } catch (err) {
+    console.error('allTickers REST fallback failed:', err.message);
+  }
+}
 
 // Monitor heartbeat timeouts and log them
 binanceWS.on('heartbeat-timeout', () => {
   console.warn('⚠ Binance WebSocket heartbeat timeout detected, auto-reconnecting...');
+});
+
+// Handle permanent block (e.g. region restriction HTTP 451)
+binanceWS.on('blocked', () => {
+  console.warn('🚫 Binance WebSocket blocked — switching to CoinGecko REST polling immediately');
+  marketPollDelay = MIN_POLL_DELAY;
+  fetchMarketPricesFallback();
 });
 
 // Start Binance WebSocket
@@ -1098,53 +1274,69 @@ function getPositionMarkPrice(userId, position) {
   return isValidPriceValue(fallback) ? fallback : position.entryPrice;
 }
 
-setInterval(() => {
-  trackedPairs.forEach((pair) => {
-    const price = isValidPriceValue(cachedMarketPrices[pair]) ? cachedMarketPrices[pair] : null;
-    io.emit("priceUpdate", { pair, price: price !== null ? Number(price) : null, time: Date.now() });
-  });
-}, 1_000);
+// priceUpdate is now emitted immediately from the Binance WS price handler (see binanceWS.on('price') above)
+// This interval is no longer needed — allTickers covers all pairs and @aggTrade covers tracked pairs instantly.
 
-// ????????? Orderbook update worker ??????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
+// ????????? Orderbook via Binance WebSocket depth stream ?????????????????????????????????????????????????????????????????????????????????????????????
 global.orderbookCache = {};
 global.tradesCache    = {};
 global.candlesCache   = {};
 
-// UPGRADE 2: Throttled orderbook worker ??? skips if previous tick not done
-let orderbookWorkerBusy = false;
+// Reconnect guard to prevent spamming REST if WS is already working
+let orderbookFallbackActive = false;
+let orderbookFallbackTimer  = null;
 
-async function emitOrderbookUpdates() {
-  if (orderbookWorkerBusy) {
-    console.warn("??? Orderbook worker skipped ??? previous tick still running");
-    return;
+// Primary: Binance WebSocket depth events → Socket.IO
+binanceWS.on('depth', (depthData) => {
+  const { pair, buy, sell, lastUpdateId } = depthData;
+  const pairKey = getPairFromBinanceSymbol(pair) || pair.replace(/(.{4})$/, '/$1');
+  const orderbook = { pair: pairKey, buy, sell };
+  global.orderbookCache[pairKey] = orderbook;
+  io.to(`pair:${pairKey}`).emit("orderbook", orderbook);
+  emitter.emit("orderbook", orderbook);
+  // WebSocket is live — disable REST fallback if it was running
+  if (orderbookFallbackActive) {
+    orderbookFallbackActive = false;
+    if (orderbookFallbackTimer) { clearInterval(orderbookFallbackTimer); orderbookFallbackTimer = null; }
+    console.log("✓ Orderbook: switched from REST fallback to WebSocket");
   }
-  orderbookWorkerBusy = true;
-  try {
+});
+
+// Fallback: REST polling (only activates if WS is blocked or disconnected)
+function startOrderbookFallback() {
+  if (orderbookFallbackActive) return;
+  orderbookFallbackActive = true;
+  console.warn("⚠ Orderbook: activating REST fallback (WS unavailable)");
+  orderbookFallbackTimer = setInterval(async () => {
+    if (!orderbookFallbackActive) return;
     for (const pair of trackedPairs) {
       try {
         const symbol   = pair.replace("/", "");
         const { data } = await axios.get(`${BINANCE_API_BASE}/api/v3/depth?symbol=${symbol}&limit=18`, { timeout: 6_000 });
         if (!data.bids || !data.asks) throw new Error("Invalid orderbook response");
-
         const buy  = data.bids.map(([p, a]) => ({ price: parseFloat(p), amount: parseFloat(a) }));
         const sell = data.asks.map(([p, a]) => ({ price: parseFloat(p), amount: parseFloat(a) }));
         const orderbook = { pair, buy, sell };
-
         global.orderbookCache[pair] = orderbook;
-
-        // UPGRADE 4: emit to room + global fallback
         io.to(`pair:${pair}`).emit("orderbook", orderbook);
         emitter.emit("orderbook", orderbook);
       } catch (err) {
-        console.error(`Orderbook fetch failed for ${pair}:`, err.message);
+        console.error(`Orderbook REST fallback failed for ${pair}:`, err.message);
       }
     }
-  } finally {
-    orderbookWorkerBusy = false;
-  }
+  }, 2_000);
 }
 
-setInterval(emitOrderbookUpdates, 2_000);
+// If WS is blocked (HTTP 451), start REST fallback
+binanceWS.on('blocked', () => { startOrderbookFallback(); });
+
+// If WS disconnects, start REST fallback after a short grace period
+binanceWS.on('close', () => {
+  // Wait 10s before activating REST fallback (WS might reconnect)
+  setTimeout(() => {
+    if (!binanceWS.ws || binanceWS.ws.readyState !== 1) startOrderbookFallback();
+  }, 10_000);
+});
 
 // ????????? News helpers ???????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 const parser = new Parser();
@@ -1279,8 +1471,81 @@ app.get("/api/coins", async (_req, res) => {
   res.json(fallback);
 });
 
+const coinImagesCache = { data: null, expiry: 0 };
+app.get("/api/coin-images", async (_req, res) => {
+  if (coinImagesCache.data && Date.now() < coinImagesCache.expiry) return res.json(coinImagesCache.data);
+  try {
+    const map = {};
+    for (let page = 1; page <= 2; page++) {
+      const { data } = await axios.get("https://api.coingecko.com/api/v3/coins/markets", {
+        params: { vs_currency: "usd", order: "market_cap_desc", per_page: 250, page },
+        timeout: 8_000,
+      });
+      if (Array.isArray(data)) {
+        for (const c of data) {
+          if (c.symbol && c.image) map[c.symbol.toUpperCase()] = c.image;
+        }
+      }
+    }
+    if (Object.keys(map).length) {
+      coinImagesCache.data = map;
+      coinImagesCache.expiry = Date.now() + 300_000;
+      return res.json(map);
+    }
+  } catch (err) {
+    console.error("Coin-images fetch failed:", err.message);
+  }
+  res.json(coinImagesCache.data || {});
+});
+
+const coinIconCache = {};
+app.get("/api/coin-icon/:symbol", async (req, res) => {
+  const sym = req.params.symbol.toUpperCase();
+  const cached = coinIconCache[sym];
+  if (cached && Date.now() < cached.expiry) {
+    if (cached.data) return res.type(cached.type).set("Access-Control-Allow-Origin", "*").set("Cache-Control", "public,max-age=86400").send(cached.data);
+    return res.status(404).end();
+  }
+  // Try Binance CDN (server-side to bypass CloudFront origin check)
+  try {
+    const { data, headers } = await axios.get(`https://bin.bnbstatic.com/static/images/coin/${sym.toLowerCase()}.svg`, {
+      responseType: "arraybuffer", timeout: 5_000, headers: { "User-Agent": "Mozilla/5.0" },
+    });
+    if (data && data.length > 100) {
+      coinIconCache[sym] = { data, type: "image/svg+xml", expiry: Date.now() + 86_400_000 };
+      return res.type("image/svg+xml").set("Access-Control-Allow-Origin", "*").set("Cache-Control", "public,max-age=86400").send(data);
+    }
+  } catch {}
+  // Try CoinGecko individual coin API
+  try {
+    const { data: list } = await axios.get("https://api.coingecko.com/api/v3/coins/list", { timeout: 5_000 });
+    const coin = Array.isArray(list) ? list.find(c => c.symbol && c.symbol.toUpperCase() === sym) : null;
+    if (coin?.id) {
+      const { data: detail } = await axios.get(
+        `https://api.coingecko.com/api/v3/coins/${coin.id}?localization=false&tickers=false&community_data=false&developer_data=false&sparkline=false`,
+        { timeout: 8_000 }
+      );
+      const imgUrl = detail?.image?.large;
+      if (imgUrl) {
+        const { data: imgData } = await axios.get(imgUrl, { responseType: "arraybuffer", timeout: 8_000 });
+        if (imgData && imgData.length > 100) {
+          coinIconCache[sym] = { data: imgData, type: "image/png", expiry: Date.now() + 86_400_000 };
+          return res.type("image/png").set("Access-Control-Allow-Origin", "*").set("Cache-Control", "public,max-age=86400").send(imgData);
+        }
+      }
+    }
+  } catch {}
+  coinIconCache[sym] = { data: null, type: null, expiry: Date.now() + 3_600_000 };
+  res.status(404).end();
+});
+
 // ????????? MongoDB ??????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
-mongoose.connect(process.env.MONGO_URI)
+let mongoUrl = process.env.MONGO_URI || 'mongodb://localhost:27017/trading';
+if (!mongoUrl.includes('retryWrites')) {
+  mongoUrl += (mongoUrl.includes('?') ? '&' : '?') + 'retryWrites=false';
+}
+console.log('Connecting to MongoDB with URL:', mongoUrl);
+mongoose.connect(mongoUrl, { retryWrites: false })
   .then(async () => {
     console.log("??? MongoDB connected");
     if (process.env.NODE_ENV !== "production") await ensureAdminUser();

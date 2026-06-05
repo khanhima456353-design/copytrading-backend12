@@ -8,6 +8,7 @@ const User = require("../../models/User");
 const Otp = require("../../models/Otp");
 const { generateUniqueUserId } = require("../../utils/userIdGenerator");
 const { generateDeviceId } = require("../../utils/otpSecurity");
+const walletService = require("../../services/walletService");
 const EMAIL_RATE_LIMIT = 3;
 const EMAIL_RATE_WINDOW_MS = 60 * 60 * 1000;
 const GENERIC_OTP_ERROR = "Unable to process request. Please try with valid Email ID.";
@@ -164,7 +165,7 @@ router.post("/send-otp", async (req, res) => {
                     attempts: 0,
                 },
                 $inc: { resendCount: 1 },
-            }, { new: true });
+            }, { returnDocument: 'after' });
         }
         await transporter.sendMail({
             from: process.env.EMAIL_USER,

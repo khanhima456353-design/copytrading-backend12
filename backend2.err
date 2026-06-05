@@ -1,0 +1,98 @@
+⚠ allTickers: no WS data after 10s, starting REST fallback
+(node:8096) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+Coin-images fetch failed: Request failed with status code 429
+Coin-images fetch failed: Request failed with status code 429
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+CoinGecko fallback poll failed: Request failed with status code 429
+  ??? CoinGecko rate-limited, backing off to 30000ms
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+CoinGecko fallback poll failed: Request failed with status code 429
+  ??? CoinGecko rate-limited, backing off to 30000ms
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+CoinGecko fallback poll failed: Request failed with status code 429
+  ??? CoinGecko rate-limited, backing off to 30000ms
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+CoinGecko fallback poll failed: Request failed with status code 429
+  ??? CoinGecko rate-limited, backing off to 30000ms
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+CoinGecko fallback poll failed: Request failed with status code 429
+  ??? CoinGecko rate-limited, backing off to 30000ms
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+CoinGecko fallback poll failed: Request failed with status code 429
+  ??? CoinGecko rate-limited, backing off to 60000ms
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+CoinGecko fallback poll failed: Request failed with status code 429
+  ??? CoinGecko rate-limited, backing off to 30000ms
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+CoinGecko fallback poll failed: Request failed with status code 429
+  ??? CoinGecko rate-limited, backing off to 60000ms
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+??? News worker skipped ??? previous tick still running
+CoinGecko fallback poll failed: Request failed with status code 429
+  ??? CoinGecko rate-limited, backing off to 30000ms

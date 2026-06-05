@@ -15,10 +15,10 @@
 
 /* LOGO */
 .logo {
-  color: #fcd535;
-  font-weight: 700;
-  font-size: 20px;
-  letter-spacing: 0.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transform: translateY(-7px);
 }
 
 /* LINKS */
@@ -79,7 +79,7 @@
 }
 
 .nav-btn:hover {
-  background: #1e2329;
+  background: #262b30;
 }
 
 /* PRIMARY BUTTON */
@@ -94,23 +94,9 @@
   background: #e6c200;
 }
 
-.logo-box {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-weight: bold;
-  font-size: 22px;
-  margin-left: -10px;
-  color: #fcd535;
-}
-
-.logo-img {
-  width: 28px;
-  height: 28px;
-}
-
-.logo-text {
-  font-weight: 700;
+.navbar-home {
+  padding: 6px 40px;
+  min-height: 56px;
 }
 
 /* ================= MOBILE ================= */
@@ -124,6 +110,6 @@
   }
 
   .logo {
-    font-size: 18px;
+    transform: translateY(0);
   }
 }

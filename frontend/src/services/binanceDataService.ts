@@ -52,6 +52,7 @@ const BINANCE_REST_BASE  = 'https://api.binance.com/api/v3';
 const BINANCE_WS_BASE    = 'wss://stream.binance.com:9443/ws';
 const REST_TIMEOUT_MS    = 10_000;
 const MAX_CANDLES        = 500;
+const MAX_WS_RECONNECTS  = 3; // Stop retrying after 3 failures (e.g. blocked region)
 
 const INTERVAL_MAP: Record<TimeFrame, string> = {
   '1s':  '1m', // UI '1s' maps to Binance '1m' (Binance doesn't support 1s interval)
@@ -262,12 +263,20 @@ class BinanceDataService {
     } catch (e) {
       console.error('[BinanceDataService] Failed to create WebSocket:', e);
       this.setStatus('error');
-      if (!this.intentionalDisconnect) this._scheduleReconnect();
+      if (!this.intentionalDisconnect && this.reconnectAttempts < MAX_WS_RECONNECTS) {
+        this._scheduleReconnect();
+      }
     }
   }
 
   private _scheduleReconnect(): void {
     if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
+
+    if (this.reconnectAttempts >= MAX_WS_RECONNECTS) {
+      console.error(`[BinanceDataService] Max reconnect attempts (${MAX_WS_RECONNECTS}) reached — giving up`);
+      this.setStatus('error');
+      return;
+    }
 
     const delay = Math.min(this.reconnectDelay, 30_000);
     this.reconnectAttempts++;
