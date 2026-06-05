@@ -2315,7 +2315,6 @@ socket.on('market_update', (data: any) => {
 
   const marketPanel = () => (
     <aside className="trading-right trading-market-panel" style={{ width: isCompactLayout ? 240 : "100%", background: COLORS.bgPanel, borderLeft: isCompactLayout ? `1px solid ${COLORS.border}` : "none", borderTop: isDesktopLayout ? `1px solid ${COLORS.border}` : "none", display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden" }}>
-      {marketPairsPanel()}
       {marketTradesPanel(true)}
     </aside>
   );
@@ -2730,9 +2729,6 @@ socket.on('market_update', (data: any) => {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 12, flexShrink: 0 }}>
             <button className="trading-pairs-toggle" onClick={() => setShowPairSelector(p => !p)} style={{ padding: "3px 8px", height: 26, background: showPairSelector ? COLORS.amber : "transparent", border: `1px solid ${showPairSelector ? COLORS.amber : COLORS.border}`, borderRadius: 4, color: showPairSelector ? "#000" : COLORS.text, cursor: "pointer", fontSize: 10, fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
-              {showPairSelector ? "▲" : "☰"} <span style={{ fontSize: 9, opacity: 0.7 }}>Pairs</span>
-            </button>
-            <button className="trading-pairs-desktop" onClick={() => setShowPairSelector(p => !p)} style={{ padding: "3px 8px", height: 26, background: showPairSelector ? COLORS.amber : "transparent", border: `1px solid ${showPairSelector ? COLORS.amber : COLORS.border}`, borderRadius: 4, color: showPairSelector ? "#000" : COLORS.text, cursor: "pointer", fontSize: 10, fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
               {showPairSelector ? "▲" : "☰"} <span style={{ fontSize: 9, opacity: 0.7 }}>Pairs</span>
             </button>
             <button onClick={() => setShowWallet(p => !p)} style={{ padding: "3px 8px", height: 26, background: showWallet ? COLORS.amber : "transparent", border: `1px solid ${showWallet ? COLORS.amber : COLORS.border}`, borderRadius: 4, color: showWallet ? "#000" : COLORS.text, cursor: "pointer", fontSize: 10, fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
@@ -3451,7 +3447,6 @@ socket.on('market_update', (data: any) => {
 
         .trading-header { flex-wrap: nowrap; gap: 12px; }
         .trading-pairs-toggle { display: none; }
-        .trading-pairs-desktop { display: flex; }
         .trading-body { display: flex !important; align-items: stretch !important; }
         .trading-toolbar,
         .trading-orderbook,
