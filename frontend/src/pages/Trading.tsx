@@ -429,9 +429,10 @@ interface CandleChartProps {
   drawingColor: string; drawingWidth: number;
   lastPrice: number;
   entryPriceLine?: number | null;
+  toolbarCollapsed: boolean;
 }
 
-function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair, rsiData, macdData, showRSI, showMACD, liveStatus, activeTool, drawings, onDrawingsChange, drawingColor, drawingWidth, lastPrice, entryPriceLine }: CandleChartProps) {
+function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair, rsiData, macdData, showRSI, showMACD, liveStatus, activeTool, drawings, onDrawingsChange, drawingColor, drawingWidth, lastPrice, entryPriceLine, toolbarCollapsed }: CandleChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef({ offset: 0, zoom: 1.0, dragging: false, dragStart: 0, dragOffset: 0, mouseX: -1, mouseY: -1 });
@@ -479,6 +480,7 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
     const macdH = showMACD && !showRSI ? Math.floor(H * SUB_WEIGHT) : showMACD ? Math.floor(H * SUB_WEIGHT * 0.5) : 0;
     const PRICE_AXIS_W = 88, TIME_AXIS_H = 28;
     const plotW = W - PRICE_AXIS_W;
+    const overlayOffsetX = toolbarCollapsed ? 44 : 0;
 
     ctx.save(); ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, W, H);
@@ -713,12 +715,12 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
         // Top row: O, H, L
         [0, 1, 2].forEach((i) => {
           ctx.fillStyle = i === 1 ? COLORS.green : i === 2 ? COLORS.red : COLORS.textBright;
-          ctx.fillText(stats[i], 8 + i * 90, 12);
+          ctx.fillText(stats[i], overlayOffsetX + 8 + i * 90, 12);
         });
         // Bottom row: C, V, %
         [3, 4, 5].forEach((i) => {
           ctx.fillStyle = i === 5 ? (Number(chg) >= 0 ? COLORS.green : COLORS.red) : COLORS.textBright;
-          ctx.fillText(stats[i], 8 + (i - 3) * 90, 26);
+          ctx.fillText(stats[i], overlayOffsetX + 8 + (i - 3) * 90, 26);
         });
         // Price tag on right axis
         const priceY = Math.max(mainPlotTop + 6, Math.min(mainPlotBottom - 4, my));
@@ -763,7 +765,7 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
 
     // MA info overlay (fixed top-left)
     const maInfoY = mainPlotTop - 4;
-    let maX = 8;
+    let maX = overlayOffsetX + 8;
     const maInfo: { label: string; value: string; color: string }[] = [];
     if (indicators.sma?.length) { const last = indicators.sma[indicators.sma.length - 1]; maInfo.push({ label: "MA(7)", value: formatPrice(last?.value || 0), color: COLORS.sma }); }
     if (indicators.ema?.length) { const last = indicators.ema[indicators.ema.length - 1]; maInfo.push({ label: "MA(99)", value: formatPrice(last?.value || 0), color: COLORS.ema }); }
@@ -3039,7 +3041,7 @@ export default function Trading() {
           <div className="trading-chart-layout" style={{ display: "flex", height: "100%" }}>
             <div className="trading-chart-stage" style={{ flex: 1, position: "relative", minWidth: 0, marginLeft: toolbarCollapsed ? 0 : 44, transition: "margin-left 0.18s ease" }}>
               {activeChartTab === "original" && (
-                <CandleChart candles={candles} deepMarketData={deepMarketData} indicators={indicators} chartType={chartType} tf={timeframe} pair={symbol} rsiData={rsiData} macdData={macdData} showRSI={showRSI} showMACD={showMACD} liveStatus={liveStatus} activeTool={activeTool} drawings={drawings} onDrawingsChange={setDrawings} drawingColor={drawingColor} drawingWidth={drawingWidth} lastPrice={lastPrice} entryPriceLine={entryPriceOverlay} />
+                <CandleChart candles={candles} deepMarketData={deepMarketData} indicators={indicators} chartType={chartType} tf={timeframe} pair={symbol} rsiData={rsiData} macdData={macdData} showRSI={showRSI} showMACD={showMACD} liveStatus={liveStatus} activeTool={activeTool} drawings={drawings} onDrawingsChange={setDrawings} drawingColor={drawingColor} drawingWidth={drawingWidth} lastPrice={lastPrice} entryPriceLine={entryPriceOverlay} toolbarCollapsed={toolbarCollapsed} />
               )}
               {activeChartTab === "depth" && (
                 <div style={{ height: "100%", display: "flex", flexDirection: "column", padding: 16, gap: 16, background: COLORS.bgPanel, minHeight: 360 }}>
