@@ -3001,12 +3001,13 @@ export default function Trading() {
       <div className="trading-chart-panel trading-dashboard__chart-panel" style={{ flex: 1, position: "relative", overflow: "hidden", minHeight: 0, background: COLORS.bg }}>
         {/* Left toolbar attached to chart (desktop/tablet/mobile) */}
         {activeViewTab === "chart" && (
-          <div className="trading-toolbar trading-dashboard__tools--desktop" style={{ width: toolbarCollapsed ? 36 : 44, background: COLORS.bgPanel, borderRight: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", alignItems: "center", padding: "8px 6px", gap: 6, flexShrink: 0, boxSizing: "border-box", overflowY: "auto", WebkitOverflowScrolling: "touch", position: "absolute", left: 0, top: 0, bottom: 0, zIndex: 30, transition: "width 0.18s ease" }}>
-            <button title={toolbarCollapsed ? "Expand toolbar" : "Collapse toolbar"} onClick={() => setToolbarCollapsed(prev => !prev)} style={{ width: 32, height: 32, flexShrink: 0, background: "transparent", border: "1px solid transparent", borderRadius: 4, color: COLORS.text, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              {toolbarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          <div className="trading-toolbar trading-dashboard__tools--desktop" style={{ width: toolbarCollapsed ? 0 : 44, background: toolbarCollapsed ? "transparent" : COLORS.bgPanel, borderRight: toolbarCollapsed ? "none" : `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", alignItems: "center", padding: toolbarCollapsed ? 0 : "8px 6px", gap: 6, flexShrink: 0, boxSizing: "border-box", overflowY: "auto", WebkitOverflowScrolling: "touch", position: "absolute", left: 0, top: 0, bottom: 0, zIndex: 30, transition: "width 0.18s ease, background 0.18s ease, border 0.18s ease" }}>
+            <button title={toolbarCollapsed ? "Expand toolbar" : "Collapse toolbar"} onClick={() => setToolbarCollapsed(prev => !prev)} style={{ width: 24, height: 24, flexShrink: 0, background: COLORS.bgPanel, border: `1px solid ${COLORS.border}`, borderRadius: 3, color: COLORS.text, fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", position: "absolute", left: toolbarCollapsed ? 4 : "auto", top: 20, margin: toolbarCollapsed ? 0 : "4px 0 0 0" }}>
+              {toolbarCollapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
             </button>
             {!toolbarCollapsed && (
               <>
+                <div style={{ height: 30, flexShrink: 0 }} />
                 {DRAWING_TOOLS.map(tool => (
                   <button key={tool.id} title={tool.label} onClick={() => setActiveTool(tool.id)} style={{ width: 32, height: 32, flexShrink: 0, background: activeTool === tool.id ? COLORS.bgHover : "transparent", border: activeTool === tool.id ? `1px solid ${COLORS.border}` : "1px solid transparent", borderRadius: 4, color: activeTool === tool.id ? COLORS.amber : COLORS.text, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
                     onMouseEnter={e => { if (activeTool !== tool.id) (e.currentTarget as HTMLElement).style.background = COLORS.bgHover; }}
@@ -3030,7 +3031,7 @@ export default function Trading() {
 
         {activeViewTab === "chart" && (
           <div className="trading-chart-layout" style={{ display: "flex", height: "100%" }}>
-            <div className="trading-chart-stage" style={{ flex: 1, position: "relative", minWidth: 0, marginLeft: toolbarCollapsed ? 36 : 44, transition: "margin-left 0.18s ease" }}>
+            <div className="trading-chart-stage" style={{ flex: 1, position: "relative", minWidth: 0, marginLeft: toolbarCollapsed ? 0 : 44, transition: "margin-left 0.18s ease" }}>
               {activeChartTab === "original" && (
                 <CandleChart candles={candles} deepMarketData={deepMarketData} indicators={indicators} chartType={chartType} tf={timeframe} pair={symbol} rsiData={rsiData} macdData={macdData} showRSI={showRSI} showMACD={showMACD} liveStatus={liveStatus} activeTool={activeTool} drawings={drawings} onDrawingsChange={setDrawings} drawingColor={drawingColor} drawingWidth={drawingWidth} lastPrice={lastPrice} entryPriceLine={entryPriceOverlay} />
               )}
