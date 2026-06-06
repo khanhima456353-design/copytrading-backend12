@@ -236,6 +236,26 @@ function CoinIcon({ symbol, size, images }: { symbol: string; size?: number; ima
   );
 }
 
+function orderBookIcon(mode: 'bid' | 'ask' | 'both') {
+  const top = mode === 'bid' ? '#22c55e' : '#ef4444';
+  const topFd = mode === 'bid' ? '#22c55e66' : '#ef444466';
+  const bot = mode === 'ask' ? '#ef4444' : '#22c55e';
+  const botFd = mode === 'ask' ? '#ef444466' : '#22c55e66';
+
+  return (
+    <svg viewBox="0 0 24 20" width="20" height="20" style={{ verticalAlign: 'middle' }}>
+      <rect x="0" y="0" width="5" height="3" rx="0.5" fill={top} />
+      <rect x="7" y="1" width="10" height="1.5" rx="0.5" fill={topFd} />
+      <rect x="0" y="5" width="5" height="3" rx="0.5" fill={top} />
+      <rect x="7" y="6" width="8" height="1.5" rx="0.5" fill={topFd} />
+      <rect x="0" y="11" width="5" height="3" rx="0.5" fill={bot} />
+      <rect x="7" y="12" width="10" height="1.5" rx="0.5" fill={botFd} />
+      <rect x="0" y="16" width="5" height="3" rx="0.5" fill={bot} />
+      <rect x="7" y="17" width="8" height="1.5" rx="0.5" fill={botFd} />
+    </svg>
+  );
+}
+
 const formatTime = (t: number) =>
   new Date(t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
@@ -2250,6 +2270,7 @@ export default function Trading() {
             <button
               key={mode}
               onClick={() => setOrderbookViewMode(mode)}
+              title={mode === "combined" ? "Both" : mode}
               style={{
                 background: orderbookViewMode === mode ? COLORS.bgHover : "transparent",
                 border: `1px solid ${orderbookViewMode === mode ? COLORS.border : "transparent"}`,
@@ -2261,7 +2282,7 @@ export default function Trading() {
                 textTransform: "capitalize",
               }}
             >
-              {mode === "combined" ? "Both" : mode}
+              {mode === "combined" ? orderBookIcon('both') : mode === 'bids' ? orderBookIcon('bid') : orderBookIcon('ask')}
             </button>
           ))}
           {[10, 15, 20].map(limit => (
