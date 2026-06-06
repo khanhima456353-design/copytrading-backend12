@@ -2435,26 +2435,26 @@ export default function Trading() {
           const chg = mover?.change || 0;
           const symbolLabel = pair.split("/")[0];
           return (
-            <div key={pair} onClick={() => switchSymbol(pair)} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", padding: "5px 10px", minHeight: 46, cursor: "pointer", background: pair === symbol ? COLORS.bgHover : "transparent", borderLeft: pair === symbol ? `2px solid ${COLORS.amber}` : "2px solid transparent" }}
+            <div key={pair} onClick={() => switchSymbol(pair)} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", padding: "3px 6px", minHeight: 36, cursor: "pointer", background: pair === symbol ? COLORS.bgHover : "transparent", borderLeft: pair === symbol ? `2px solid ${COLORS.amber}` : "2px solid transparent" }}
               onMouseEnter={e => { if (pair !== symbol) (e.currentTarget as HTMLElement).style.background = COLORS.bgAlt; }}
               onMouseLeave={e => { if (pair !== symbol) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 28, height: 28, borderRadius: 999, background: COLORS.bgAlt, display: "grid", placeItems: "center", overflow: "hidden", flexShrink: 0 }}>
-                  <CoinIcon symbol={symbolLabel} size={20} images={coinImages} />
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <div style={{ width: 22, height: 22, borderRadius: 999, background: COLORS.bgAlt, display: "grid", placeItems: "center", overflow: "hidden", flexShrink: 0 }}>
+                  <CoinIcon symbol={symbolLabel} size={16} images={coinImages} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: pair === symbol ? 700 : 500, color: COLORS.textBright }}>
-                    {symbolLabel}/<span style={{ color: COLORS.textMuted, fontSize: 10 }}>{pair.split("/")[1]}</span>
+                  <div style={{ fontSize: 11, fontWeight: pair === symbol ? 700 : 500, color: COLORS.textBright }}>
+                    {symbolLabel}/<span style={{ color: COLORS.textMuted, fontSize: 9 }}>{pair.split("/")[1]}</span>
                   </div>
-                  {mover && <div style={{ fontSize: 9, color: COLORS.textMuted }}>{formatVol(mover.volume)}</div>}
+                  {mover && <div style={{ fontSize: 8, color: COLORS.textMuted }}>{formatVol(mover.volume)}</div>}
                 </div>
               </div>
-              <div style={{ textAlign: "right", fontFamily: "monospace", fontSize: 11, color: COLORS.textBright }}>
+              <div style={{ textAlign: "right", fontFamily: "monospace", fontSize: 10, color: COLORS.textBright }}>
                 {pair === symbol ? formatPrice(lastPrice) : formatPrice(allTickerPrices[pair.replace("/", "")] || 0)}
               </div>
               <div style={{ textAlign: "right" }}>
-                <span style={{ fontSize: 11, fontFamily: "monospace", background: chg >= 0 ? COLORS.greenDim : COLORS.redDim, color: chg >= 0 ? COLORS.green : COLORS.red, padding: "1px 5px", borderRadius: 3 }}>{chg >= 0 ? "+" : ""}{chg.toFixed(2)}%</span>
+                <span style={{ fontSize: 10, fontFamily: "monospace", background: chg >= 0 ? COLORS.greenDim : COLORS.redDim, color: chg >= 0 ? COLORS.green : COLORS.red, padding: "1px 4px", borderRadius: 3 }}>{chg >= 0 ? "+" : ""}{chg.toFixed(2)}%</span>
               </div>
             </div>
           );
