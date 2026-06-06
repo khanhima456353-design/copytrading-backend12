@@ -10,7 +10,7 @@ import { initializeCandles, resetCandles, updateLatestCandle, getCandles } from 
 import PositionsPanel from "../components/PositionsPanel";
 import { calculateUnrealizedPnL } from "../services/tradingUtils";
 import { TradingBalanceCard } from "../components/TradingBalanceCard";
-import { Wallet, Trash, Magnet, PaintbrushVertical, RulerDimensionLine, Eraser, ChartCandlestick, ChartLine, BarChart3, ChartArea, ChevronLeft, ChevronRight } from "lucide-react";
+import { Wallet, Trash, Magnet, PaintbrushVertical, RulerDimensionLine, Eraser, ChartCandlestick, ChartLine, BarChart3, ChartArea, ChevronLeft, ChevronRight, Search, Star, Menu, ChevronDown, ChevronUp, Check, X, Info } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -2375,7 +2375,7 @@ export default function Trading() {
     <div style={{ borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden" }}>
       <div style={{ padding: "6px 10px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: COLORS.textBright }}>Top Movers</span>
-        <span style={{ fontSize: 11, color: COLORS.text }}>FAQ ▾</span>
+        FAQ <ChevronDown size={10} style={{ color: COLORS.text }} />
       </div>
       <div style={{ display: "flex", gap: 4, padding: "0 10px 6px" }}>
         {["All", "Change", "New High/Low", "Fluctuation", "Volume"].map(tab => (
@@ -2407,7 +2407,7 @@ export default function Trading() {
       {/* Search */}
       <div style={{ padding: "8px 10px", borderBottom: `1px solid ${COLORS.border}` }}>
         <div style={{ display: "flex", alignItems: "center", background: COLORS.bgAlt, border: `1px solid ${COLORS.border}`, borderRadius: 4, padding: "4px 10px", gap: 6 }}>
-          <span style={{ color: COLORS.textMuted, fontSize: 13 }}>🔍</span>
+          <Search size={13} style={{ color: COLORS.textMuted }} />
           <input type="text" placeholder="Search" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, flex: 1 }} />
         </div>
       </div>
@@ -2416,7 +2416,7 @@ export default function Trading() {
       <div style={{ display: "flex", borderBottom: `1px solid ${COLORS.border}`, padding: "0 6px" }}>
         {(["fav", "usdt"] as const).map(tab => (
           <button key={tab} onClick={() => setPairTab(tab)} style={{ flex: 1, padding: "6px 0", background: "transparent", border: "none", cursor: "pointer", fontSize: 11, color: pairTab === tab ? COLORS.amber : COLORS.text, borderBottom: pairTab === tab ? `2px solid ${COLORS.amber}` : "2px solid transparent", fontWeight: pairTab === tab ? 700 : 400 }}>
-            {tab === "fav" ? "★" : tab.toUpperCase()}
+            {tab === "fav" ? <Star size={11} style={{ color: COLORS.amber, fill: COLORS.amber }} /> : tab.toUpperCase()}
           </button>
         ))}
       </div>
@@ -2894,7 +2894,20 @@ export default function Trading() {
   ], [changePct, high24h, low24h, vol24h, vol24hUSDT, isPriceUp]);
 
   return (
-    <div ref={tradingPageRef} className="trading-page trading-dashboard" style={{ display: "flex", flexDirection: "column", height: "auto", background: COLORS.bg, color: COLORS.textBright, fontFamily: "'IBM Plex Sans', 'Helvetica Neue', sans-serif", fontSize: 13, overflowY: "auto", overflowX: "hidden", minHeight: "100dvh", scrollBehavior: "smooth", WebkitOverflowScrolling: "touch", touchAction: "pan-y", overscrollBehaviorY: "auto" }}>
+    <div ref={tradingPageRef} className="trading-page trading-dashboard" style={{ display: "flex", flexDirection: "column", height: "auto", background: COLORS.bg, color: COLORS.textBright, fontFamily: "'IBM Plex Sans', 'Helvetica Neue', sans-serif", fontSize: 13, overflowY: "auto", overflowX: "hidden", minHeight: "100dvh", scrollBehavior: "smooth", WebkitOverflowScrolling: "touch", touchAction: "pan-y", overscrollBehaviorY: "auto", position: "relative" }}>
+
+      {/* ── WALLET + LIVE STATUS (desktop top-right) ── */}
+      {isDesktopLayout && (
+        <div style={{ position: "absolute", top: 8, right: 12, zIndex: 100, display: "flex", alignItems: "center", gap: 8 }}>
+          <button onClick={() => setShowWallet(p => !p)} style={{ padding: "3px 8px", height: 26, background: showWallet ? COLORS.amber : "transparent", border: `1px solid ${showWallet ? COLORS.amber : COLORS.border}`, borderRadius: 4, color: showWallet ? "#000" : COLORS.text, cursor: "pointer", fontSize: 10, fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
+            <Wallet size={12} /> Wallet {showWallet ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: liveStatus === "live" ? COLORS.green : COLORS.red, display: "inline-block", boxShadow: liveStatus === "live" ? `0 0 6px ${COLORS.green}` : "none" }} />
+            <span style={{ fontSize: 11, color: liveStatus === "live" ? COLORS.green : COLORS.red }}>{liveStatus.toUpperCase()}</span>
+          </div>
+        </div>
+      )}
       <div className="trading-rotate-prompt" role="status" aria-live="polite">
         <div className="trading-rotate-prompt__panel">
           <div className="trading-rotate-prompt__icon">↻</div>
@@ -2923,14 +2936,14 @@ export default function Trading() {
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 12, flexShrink: 0 }}>
             {!isDesktopLayout && (
             <button className="trading-pairs-toggle" onClick={() => setShowPairSelector(p => !p)} style={{ padding: "3px 8px", height: 26, background: showPairSelector ? COLORS.amber : "transparent", border: `1px solid ${showPairSelector ? COLORS.amber : COLORS.border}`, borderRadius: 4, color: showPairSelector ? "#000" : COLORS.text, cursor: "pointer", fontSize: 10, fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
-              {showPairSelector ? "▲" : "☰"} <span style={{ fontSize: 9, opacity: 0.7 }}>Pairs</span>
+              {showPairSelector ? <ChevronUp size={12} /> : <Menu size={12} />} <span style={{ fontSize: 9, opacity: 0.7 }}>Pairs</span>
             </button>
             )}
-            <button onClick={() => setShowWallet(p => !p)} style={{ padding: "3px 8px", height: 26, background: showWallet ? COLORS.amber : "transparent", border: `1px solid ${showWallet ? COLORS.amber : COLORS.border}`, borderRadius: 4, color: showWallet ? "#000" : COLORS.text, cursor: "pointer", fontSize: 10, fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
-              <Wallet size={12} /> Wallet {showWallet ? "▲" : "▼"}
-            </button>
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: liveStatus === "live" ? COLORS.green : COLORS.red, display: "inline-block", boxShadow: liveStatus === "live" ? `0 0 6px ${COLORS.green}` : "none" }} />
-            <span style={{ fontSize: 11, color: liveStatus === "live" ? COLORS.green : COLORS.red }}>{liveStatus.toUpperCase()}</span>
+            {!isDesktopLayout && (<button onClick={() => setShowWallet(p => !p)} style={{ padding: "3px 8px", height: 26, background: showWallet ? COLORS.amber : "transparent", border: `1px solid ${showWallet ? COLORS.amber : COLORS.border}`, borderRadius: 4, color: showWallet ? "#000" : COLORS.text, cursor: "pointer", fontSize: 10, fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
+              <Wallet size={12} /> Wallet {showWallet ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+            </button>)}
+            {!isDesktopLayout && (<><span style={{ width: 8, height: 8, borderRadius: "50%", background: liveStatus === "live" ? COLORS.green : COLORS.red, display: "inline-block", boxShadow: liveStatus === "live" ? `0 0 6px ${COLORS.green}` : "none" }} />
+            <span style={{ fontSize: 11, color: liveStatus === "live" ? COLORS.green : COLORS.red }}>{liveStatus.toUpperCase()}</span></>)}
           </div>
         </div>
         {/* Stats bar */}
@@ -3009,7 +3022,7 @@ export default function Trading() {
         <div className="time-dropdown" style={{ position: "relative", marginLeft: 4, zIndex: 1000 }}>
           <button onClick={() => setShowTimeDropdown(!showTimeDropdown)} style={{ padding: "3px 6px", background: "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 3, color: COLORS.text, cursor: "pointer", fontSize: 11, display: "flex", alignItems: "center", gap: 2, zIndex: 1001, position: "relative" }}>
             <span>Time</span>
-            <span style={{ fontSize: 8 }}>{showTimeDropdown ? "▲" : "▼"}</span>
+            {showTimeDropdown ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
           </button>
           {showTimeDropdown && (
             <div style={{ position: "absolute", top: "100%", left: 0, background: COLORS.bgPanel, border: `1px solid ${COLORS.border}`, borderRadius: 4, zIndex: 1002, minWidth: "120px", maxHeight: "200px", overflow: "auto" }}>
@@ -3093,7 +3106,7 @@ export default function Trading() {
               {activeChartTab === "tradingview" && (
                 <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.text }}>
                   <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 48, marginBottom: 12 }}>📈</div>
+                    <BarChart3 size={48} style={{ color: COLORS.textMuted }} />
                     <div>TradingView chart widget</div>
                   </div>
                 </div>
@@ -3220,7 +3233,7 @@ export default function Trading() {
             <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 34 }}>
               <span style={{ fontSize: 11, color: COLORS.textMuted, width: 50 }}>Amount</span>
               <input type="number" value={buyAmountInput} onChange={e => updateBuyAmount(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="0.0000" />
-              <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>BTC ▾</span>
+              <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>BTC <ChevronDown size={10} /></span>
             </div>
             {/* Slider */}
             <div style={{ padding: "2px 0" }}>
@@ -3235,7 +3248,7 @@ export default function Trading() {
             <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 32 }}>
               <span style={{ fontSize: 11, color: COLORS.textMuted, width: 40 }}>Total</span>
               <input type="number" value={buyTotalInput} onChange={e => updateBuyTotal(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="Minimum 5 USDT" />
-              <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT ▾</span>
+              <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT <ChevronDown size={10} /></span>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 10, color: COLORS.textMuted, padding: "0 2px" }}>
               <div>Available {accountSummary.available.toFixed(2)} USDT</div>
@@ -3284,7 +3297,7 @@ export default function Trading() {
             <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 34 }}>
               <span style={{ fontSize: 11, color: COLORS.textMuted, width: 50 }}>Amount</span>
               <input type="number" value={sellAmountInput} onChange={e => updateSellAmount(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="0.0000" />
-              <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>BTC ▾</span>
+              <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>BTC <ChevronDown size={10} /></span>
             </div>
             <div style={{ padding: "2px 0" }}>
               <input type="range" min={0} max={100} value={sellSliderPct} onChange={e => applySellPct(Number(e.target.value))} style={{ width: "100%", accentColor: COLORS.red }} />
@@ -3297,7 +3310,7 @@ export default function Trading() {
             <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 32 }}>
               <span style={{ fontSize: 11, color: COLORS.textMuted, width: 40 }}>Total</span>
               <input type="number" value={sellTotalInput} onChange={e => updateSellTotal(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="0.00" />
-              <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT ▾</span>
+              <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT <ChevronDown size={10} /></span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 10, color: COLORS.textMuted, padding: "0 2px" }}>
               <span>Available {availableBTC.toFixed(6)} BTC</span>
@@ -3567,7 +3580,7 @@ serverPositions.length === 0
       <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 9999, display: "flex", flexDirection: "column", gap: 10, pointerEvents: "none" }}>
         {toasts.map(t => (
           <div key={t.id} style={{ padding: "12px 18px", borderRadius: 6, background: t.type === "success" ? "#0ecb81" : t.type === "error" ? "#f6465d" : COLORS.bgPanel, color: t.type === "info" ? COLORS.textBright : "#000", fontWeight: 600, fontSize: 13, boxShadow: "0 4px 20px rgba(0,0,0,0.4)", border: t.type === "info" ? `1px solid ${COLORS.border}` : "none", animation: "fadeIn 0.2s ease", display: "flex", alignItems: "center", gap: 10, minWidth: 260 }}>
-            <span>{t.type === "success" ? "✓" : t.type === "error" ? "✕" : "ℹ"}</span>
+            <span>{t.type === "success" ? <Check size={14} /> : t.type === "error" ? <X size={14} /> : <Info size={14} />}</span>
             {t.msg}
           </div>
         ))}
