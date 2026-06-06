@@ -776,7 +776,7 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
     }
 
     // MA info overlay (fixed top-left)
-    const maInfoY = mainPlotTop - 4;
+    const maInfoY = viewportWidth < 1024 ? 36 : (mainPlotTop + 8);
     let maX = overlayOffsetX + 8;
     const maInfo: { label: string; value: string; color: string }[] = [];
     if (indicators.sma?.length) { const last = indicators.sma[indicators.sma.length - 1]; maInfo.push({ label: "MA(7)", value: formatPrice(last?.value || 0), color: COLORS.sma }); }
@@ -785,7 +785,7 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
     maInfo.forEach(m => { ctx.fillStyle = m.color; ctx.textAlign = "left"; ctx.fillText(`${m.label}: ${m.value}`, maX, maInfoY); maX += ctx.measureText(`${m.label}: ${m.value}`).width + 16; });
 
     ctx.restore();
-  }, [candles, indicators, chartType, tf, rsiData, macdData, showRSI, showMACD, liveStatus, lastPrice, entryPriceLine, CHART_WEIGHT, VOL_WEIGHT, SUB_WEIGHT, getMainPlotBounds, getPriceRange, drawings, deepMarketData]);
+  }, [candles, indicators, chartType, tf, rsiData, macdData, showRSI, showMACD, liveStatus, lastPrice, entryPriceLine, CHART_WEIGHT, VOL_WEIGHT, SUB_WEIGHT, getMainPlotBounds, getPriceRange, drawings, deepMarketData, viewportWidth]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -1534,6 +1534,8 @@ export default function Trading() {
     if (chartStageRef.current) resizeObserver.observe(chartStageRef.current);
     return () => resizeObserver.disconnect();
   }, []);
+
+  const isDesktop = viewportWidth >= 1024;
 
   const calculateToggleButtonTop = () => {
     return 2;
@@ -3023,14 +3025,14 @@ export default function Trading() {
         {([[<ChartCandlestick size={16} />, "candlestick"], [<ChartLine size={16} />, "line"], [<ChartArea size={16} />, "area"], [<BarChart3 size={16} />, "bar"]] as [React.ReactNode, typeof chartType][]).map(([icon, ct]) => (
           <button key={ct} onClick={() => setChartType(ct)} title={ct} style={{ width: 26, height: 26, background: chartType === ct ? COLORS.bgHover : "transparent", border: chartType === ct ? `1px solid ${COLORS.border}` : "1px solid transparent", borderRadius: 3, color: chartType === ct ? COLORS.amber : COLORS.text, cursor: "pointer", fontSize: 14 }}>{icon}</button>
         ))}
-        <div style={{ width: 1, height: 18, background: COLORS.border, margin: "0 6px" }} />
+        <div style={{ width: 1, height: 18, background: COLORS.border, margin: isDesktop ? "0 8px" : "0 6px" }} />
         {/* View tabs (Original / Trading View / Depth) */}
         {(["original", "tradingview", "depth"] as const).map(tab => (
-          <button key={tab} onClick={() => setActiveChartTab(tab)} style={{ padding: "3px 8px", background: activeChartTab === tab ? COLORS.bgHover : "transparent", border: activeChartTab === tab ? `1px solid ${COLORS.border}` : "1px solid transparent", borderRadius: 3, color: activeChartTab === tab ? COLORS.amber : COLORS.text, cursor: "pointer", fontSize: 11, fontWeight: activeChartTab === tab ? 700 : 400 }}>
+          <button key={tab} onClick={() => setActiveChartTab(tab)} style={{ padding: isDesktop ? "3px 10px" : "3px 8px", marginLeft: tab === "original" ? 0 : (isDesktop ? 6 : 4), background: activeChartTab === tab ? COLORS.bgHover : "transparent", border: activeChartTab === tab ? `1px solid ${COLORS.border}` : "1px solid transparent", borderRadius: 3, color: activeChartTab === tab ? COLORS.amber : COLORS.text, cursor: "pointer", fontSize: 11, fontWeight: activeChartTab === tab ? 700 : 400 }}>
             {tab === "original" ? "Original" : tab === "tradingview" ? "Trading View" : "Depth"}
           </button>
         ))}
-        <div style={{ width: 1, height: 18, background: COLORS.border, margin: "0 6px" }} />
+        <div style={{ width: 1, height: 18, background: COLORS.border, margin: isDesktop ? "0 8px" : "0 6px" }} />
         {/* Indicators */}
         {[
           { k: "SMA", a: showSMA, s: setShowSMA, c: COLORS.sma },
