@@ -3194,7 +3194,7 @@ export default function Trading() {
 
       {/* ── ORDER FORM (between left & right panels) ── */}
       {isChartView && (
-      <div className="trading-order-form trading-dashboard__ticket" style={{ height: isDesktopLayout ? "auto" : 210, minHeight: isDesktopLayout ? 320 : undefined, borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, display: "flex", flexShrink: 0, overflow: isDesktopLayout ? "visible" : "hidden" }}>
+      <div className="trading-order-form trading-dashboard__ticket" style={{ height: "auto", minHeight: isDesktopLayout ? 320 : 210, borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, display: "flex", flexShrink: 0, overflow: "visible" }}>
         {/* Spot/Cross tabs */}
         <div className="trading-order-form__inner" style={{ width: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
           {/* Tab row */}
@@ -3210,13 +3210,13 @@ export default function Trading() {
             <>
               {!isDesktopLayout && (
                 <div style={{ display: "flex", borderBottom: `1px solid ${COLORS.border}`, flexShrink: 0 }}>
-                  <button onClick={() => setOrderSide("buy")} style={{ flex: 1, height: 34, background: orderSide === "buy" ? COLORS.green : "transparent", border: "none", borderRadius: 0, color: orderSide === "buy" ? "#000" : COLORS.text, fontWeight: 700, fontSize: 13, cursor: "pointer", borderRight: `1px solid ${COLORS.border}` }}>BUY / Long</button>
-                  <button onClick={() => setOrderSide("sell")} style={{ flex: 1, height: 34, background: orderSide === "sell" ? COLORS.red : "transparent", border: "none", borderRadius: 0, color: orderSide === "sell" ? "#fff" : COLORS.text, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>SELL / Short</button>
+                  <button onClick={() => setOrderSide("buy")} style={{ flex: 1, height: 34, background: orderSide === "buy" ? COLORS.green : "transparent", border: "none", borderRadius: 0, color: orderSide === "buy" ? "#000" : COLORS.text, fontWeight: 700, fontSize: 13, cursor: "pointer", borderRight: `1px solid ${COLORS.border}` }}>BUY</button>
+                  <button onClick={() => setOrderSide("sell")} style={{ flex: 1, height: 34, background: orderSide === "sell" ? COLORS.red : "transparent", border: "none", borderRadius: 0, color: orderSide === "sell" ? "#fff" : COLORS.text, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>SELL</button>
                 </div>
               )}
               <div className="trading-order-form__columns" style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0 }}>
             {/* Left: Buy form */}
-            <div className="trading-order-form__side trading-order-form__side--buy" style={{ flex: 1, padding: "10px 16px", borderRight: `1px solid ${COLORS.border}`, display: !isDesktopLayout && orderSide !== "buy" ? "none" : "flex", flexDirection: "column", gap: 6 }}>
+            <div className="trading-order-form__side trading-order-form__side--buy" style={{ flex: 1, padding: "10px 16px", borderRight: `1px solid ${COLORS.border}`, display: isDesktopLayout ? "flex" : windowWidth < 768 && orderSide !== "buy" ? "none" : "flex", flexDirection: "column", gap: 6 }}>
             {/* Order type tabs */}
             <div style={{ display: "flex", gap: 12, marginBottom: 2 }}>
               {(["Limit", "Market", "Stop Limit", "OCO"] as const).map(t => (
@@ -3283,7 +3283,7 @@ export default function Trading() {
             )}
           </div>
           {/* Right: Sell form */}
-          <div className="trading-order-form__side trading-order-form__side--sell" style={{ flex: 1, padding: "10px 16px", display: !isDesktopLayout && orderSide !== "sell" ? "none" : "flex", flexDirection: "column", gap: 6 }}>
+          <div className="trading-order-form__side trading-order-form__side--sell" style={{ flex: 1, padding: "10px 16px", display: isDesktopLayout ? "flex" : windowWidth < 768 && orderSide !== "sell" ? "none" : "flex", flexDirection: "column", gap: 6 }}>
             <div style={{ display: "flex", gap: 12, marginBottom: 2 }}>
               {(["Limit", "Market", "Stop Limit", "OCO"] as const).map(t => (
                 <button key={t} onClick={() => handleOrderTypeChange(t.toLowerCase().replace(" ", "-") as any)} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: orderType === t.toLowerCase().replace(" ", "-") ? COLORS.textBright : COLORS.text, borderBottom: orderType === t.toLowerCase().replace(" ", "-") ? `2px solid ${COLORS.amber}` : "2px solid transparent", paddingBottom: 2 }}>{t}</button>
@@ -3445,8 +3445,6 @@ export default function Trading() {
       </div>
       </div>
       )}
-
-      {isCompactLayout && isChartView && orderBookPanel("embedded")}
 
       {/* ── BOTTOM TAB BAR (between left & right panels) ── */}
       <div ref={bottomScrollRef} className="trading-bottom-panel trading-dashboard__activity" style={{ borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, flexShrink: 0 }}>
