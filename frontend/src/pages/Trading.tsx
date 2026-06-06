@@ -439,6 +439,13 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
   const drawingRef = useRef<{ active: boolean; current: DrawingObject | null; brushPoints: { x: number; y: number }[] }>({ active: false, current: null, brushPoints: [] });
   const rafRef = useRef<number | null>(null);
   const [pageVisible, setPageVisible] = useState<boolean>(typeof document !== "undefined" ? !document.hidden : true);
+  const [viewportWidth, setViewportWidth] = useState<number>(typeof window !== "undefined" ? window.innerWidth : 1024);
+
+  useEffect(() => {
+    const handleResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const CHART_WEIGHT = showRSI && showMACD ? 0.52 : (showRSI || showMACD) ? 0.65 : 0.76;
   const VOL_WEIGHT = 0.10;
@@ -446,7 +453,12 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
 
   const getMainPlotBounds = useCallback((height: number) => {
     const mainH = Math.floor(height * CHART_WEIGHT);
-    const mainPlotTop = Math.min(56, Math.max(16, Math.floor(mainH * 0.12)));
+    const isMobile = viewportWidth < 768;
+    const isTablet = viewportWidth >= 768 && viewportWidth < 1024;
+    let topPadding = Math.floor(mainH * 0.12);
+    if (isMobile) topPadding = Math.floor(mainH * 0.18);
+    if (isTablet) topPadding = Math.floor(mainH * 0.15);
+    const mainPlotTop = Math.min(56, Math.max(16, topPadding));
     const mainPlotH = Math.max(48, mainH - mainPlotTop - 6);
     return {
       mainH,
@@ -454,7 +466,7 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
       mainPlotH,
       mainPlotBottom: mainPlotTop + mainPlotH,
     };
-  }, [CHART_WEIGHT]);
+  }, [CHART_WEIGHT, viewportWidth]);
 
   const getPriceRange = useCallback((visible: Candle[]) => {
     let pMin = Infinity, pMax = -Infinity;
