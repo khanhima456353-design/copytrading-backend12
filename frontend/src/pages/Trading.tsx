@@ -3644,12 +3644,19 @@ serverPositions.length === 0
         .trading-chart-stage,
         .trading-chart-stage canvas { touch-action: pan-y; }
         .trading-balance-strip {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          overflow-x: auto !important;
           gap: 8px;
           padding: 8px 16px;
           border-bottom: 1px solid #2a2e35;
-          flex-shrink: 0;
+          align-items: center;
+          min-width: 0;
+        }
+        .trading-balance-strip > div {
+          flex: 1 1 0 !important;
+          min-width: 72px !important;
+          padding: 8px 10px;
         }
         .trading-orderbook--embedded { display: none !important; }
         .trading-rotate-prompt {
@@ -3811,10 +3818,16 @@ serverPositions.length === 0
           }
           .trading-order-form__inner { min-height: 0 !important; overflow: visible !important; }
           .trading-balance-strip {
-            grid-template-columns: repeat(4, minmax(0, 1fr));
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            overflow-x: auto !important;
             gap: 6px;
             padding: 6px 8px;
-            overflow: hidden;
+            align-items: center;
+          }
+          .trading-balance-strip > div {
+            flex: 1 1 0 !important;
+            min-width: 68px !important;
           }
           .trading-balance-strip > div > div { font-size: 10px !important; }
           .trading-balance-strip > div > div:last-child { font-size: 13px !important; }
@@ -3886,16 +3899,20 @@ serverPositions.length === 0
           .trading-order-form__tabs { overflow-x: auto !important; }
           .trading-order-form__tabs button { padding: 0 10px !important; white-space: nowrap; }
           .trading-balance-strip {
-            grid-template-columns: repeat(4, minmax(90px, 1fr));
-            gap: 5px;
-            padding: 5px 8px;
-            overflow-x: auto;
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            overflow-x: auto !important;
+            gap: 3px;
+            padding: 4px 6px;
+            align-items: center;
           }
           .trading-balance-strip > div {
-            min-width: 90px;
+            flex: 0 0 auto !important;
+            min-width: 60px !important;
+            padding: 4px 6px !important;
           }
-          .trading-balance-strip > div > div { font-size: 9px !important; }
-          .trading-balance-strip > div > div:last-child { font-size: 12px !important; font-weight: 700 !important; }
+          .trading-balance-strip > div > div { font-size: 8px !important; line-height: 1.1 !important; }
+          .trading-balance-strip > div > div:last-child { font-size: 11px !important; font-weight: 700 !important; }
           .trading-order-form__side { min-height: 0 !important; }
           .trading-order-actions__button { min-width: 0 !important; height: 38px !important; }
           .trading-orderbook--embedded { height: 320px !important; min-height: 320px !important; }
