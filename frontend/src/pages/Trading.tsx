@@ -3079,7 +3079,7 @@ export default function Trading() {
 
         {activeViewTab === "chart" && (
           <div className="trading-chart-layout" style={{ display: "flex", height: "100%" }}>
-            <div ref={chartStageRef} className="trading-chart-stage" style={{ flex: 1, position: "relative", minWidth: 0, marginLeft: toolbarCollapsed ? 0 : 44, transition: "margin-left 0.18s ease" }}>
+            <div ref={chartStageRef} className="trading-chart-stage" style={{ flex: 1, position: "relative", minWidth: 0, marginLeft: viewportWidth >= 1024 ? (toolbarCollapsed ? 0 : 44) : 0, transition: "margin-left 0.18s ease" }}>
               {activeChartTab === "original" && (
                 <CandleChart candles={candles} deepMarketData={deepMarketData} indicators={indicators} chartType={chartType} tf={timeframe} pair={symbol} rsiData={rsiData} macdData={macdData} showRSI={showRSI} showMACD={showMACD} liveStatus={liveStatus} activeTool={activeTool} drawings={drawings} onDrawingsChange={setDrawings} drawingColor={drawingColor} drawingWidth={drawingWidth} lastPrice={lastPrice} entryPriceLine={entryPriceOverlay} toolbarCollapsed={toolbarCollapsed} />
               )}
