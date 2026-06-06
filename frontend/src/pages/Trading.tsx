@@ -10,7 +10,7 @@ import { initializeCandles, resetCandles, updateLatestCandle, getCandles } from 
 import PositionsPanel from "../components/PositionsPanel";
 import { calculateUnrealizedPnL } from "../services/tradingUtils";
 import { TradingBalanceCard } from "../components/TradingBalanceCard";
-import { Wallet, Trash, Magnet, PaintbrushVertical, RulerDimensionLine, Eraser } from "lucide-react";
+import { Wallet, Trash, Magnet, PaintbrushVertical, RulerDimensionLine, Eraser, ChartCandlestick } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -2971,7 +2971,7 @@ export default function Trading() {
         </div>
         <div style={{ width: 1, height: 18, background: COLORS.border, margin: "0 6px" }} />
         {/* Chart types */}
-        {([["☵", "candlestick"], ["∿", "line"], ["◬", "area"], ["⊟", "bar"]] as [string, typeof chartType][]).map(([icon, ct]) => (
+        {([[<ChartCandlestick size={16} />, "candlestick"], ["∿", "line"], ["◬", "area"], ["⊟", "bar"]] as [React.ReactNode, typeof chartType][]).map(([icon, ct]) => (
           <button key={ct} onClick={() => setChartType(ct)} title={ct} style={{ width: 26, height: 26, background: chartType === ct ? COLORS.bgHover : "transparent", border: chartType === ct ? `1px solid ${COLORS.border}` : "1px solid transparent", borderRadius: 3, color: chartType === ct ? COLORS.amber : COLORS.text, cursor: "pointer", fontSize: 14 }}>{icon}</button>
         ))}
         <div style={{ width: 1, height: 18, background: COLORS.border, margin: "0 6px" }} />
