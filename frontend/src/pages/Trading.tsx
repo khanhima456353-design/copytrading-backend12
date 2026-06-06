@@ -445,7 +445,7 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
 
   const getMainPlotBounds = useCallback((height: number) => {
     const mainH = Math.floor(height * CHART_WEIGHT);
-    const mainPlotTop = Math.min(56, Math.max(34, Math.floor(mainH * 0.22)));
+    const mainPlotTop = Math.min(56, Math.max(16, Math.floor(mainH * 0.12)));
     const mainPlotH = Math.max(48, mainH - mainPlotTop - 6);
     return {
       mainH,
