@@ -138,6 +138,18 @@
   box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
 }
 
+[data-theme="light"] .trading-dashboard .trading-order-form__side {
+  background: var(--dash-panel) !important;
+}
+
+[data-theme="light"] .trading-dashboard .trading-order-form__side > div[style*="border: 1px"] {
+  background: var(--dash-panel-soft) !important;
+}
+
+[data-theme="light"] .trading-dashboard .trading-order-actions {
+  background: var(--dash-panel) !important;
+}
+
 /* ─── Reset & Base ────────────────────────────────────────────────────────── */
 *, *::before, *::after {
   box-sizing: border-box;
