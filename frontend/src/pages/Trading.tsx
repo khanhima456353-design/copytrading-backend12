@@ -106,6 +106,21 @@ function getColors(theme: string) {
   };
 }
 
+// CSS variable strings for inline styles — constant, updates instantly via CSS
+const CV = {
+  bg: "var(--clr-bg)", bgPanel: "var(--clr-panel)", bgAlt: "var(--clr-alt)", bgHover: "var(--clr-hover)",
+  border: "var(--clr-border)", borderLight: "var(--clr-border-light)",
+  text: "var(--clr-text)", textBright: "var(--clr-text-bright)", textMuted: "var(--clr-text-muted)",
+  green: "var(--clr-green)", greenDim: "var(--clr-green-dim)",
+  red: "var(--clr-red)", redDim: "var(--clr-red-dim)",
+  blue: "var(--clr-blue)", blueDim: "var(--clr-blue-dim)",
+  amber: "var(--clr-amber)", cyan: "var(--clr-cyan)",
+  sma: "#f0b90b", ema: "#0ecb81",
+  bbUpper: "#3b82f6", bbMid: "#8b5cf6", bbLow: "#06b6d4",
+  vwap: "#ec4899",
+  grid: "var(--clr-grid)", crosshair: "var(--clr-crosshair)",
+};
+
 const DRAWING_TOOLS: { id: DrawingTool; icon: React.ReactNode; label: string; group: string }[] = [
   { id: "cursor",    icon: "⊹",  label: "Cursor",      group: "select" },
   { id: "crosshair", icon: "⊕",  label: "Crosshair",   group: "select" },
@@ -1493,7 +1508,8 @@ function DepthChart({ buyLevels, sellLevels, depthLimit, baseSymbol, quoteSymbol
 
 export default function Trading() {
   const { theme } = useTheme();
-  const COLORS = useMemo(() => getColors(theme), [theme]);
+  const canvasColors = useMemo(() => getColors(theme), [theme]);
+  const COLORS = CV;
   const saved = loadLayout();
 
   const [symbols, setSymbols] = useState<string[]>([]);
@@ -2269,7 +2285,7 @@ export default function Trading() {
           {header}
           <div className="orderbook__asks">
             {askRows.length > 0 ? askRows.map((ask, index) => renderRow(ask, "sell", index)) : (
-              <div className="orderbook__row" style={{ justifyContent: "center", color: COLORS.textMuted }}>
+              <div className="orderbook__row" style={{ justifyContent: "center", color: CV.textMuted }}>
                 No ask data available
               </div>
             )}
@@ -2277,7 +2293,7 @@ export default function Trading() {
           {/* spread/mid-price removed as requested */}
           <div className="orderbook__bids">
             {bidRows.length > 0 ? bidRows.map((bid, index) => renderRow(bid, "buy", index)) : (
-              <div className="orderbook__row" style={{ justifyContent: "center", color: COLORS.textMuted }}>
+              <div className="orderbook__row" style={{ justifyContent: "center", color: CV.textMuted }}>
                 No bid data available
               </div>
             )}
@@ -2298,7 +2314,7 @@ export default function Trading() {
         {header}
         <div style={{ flex: 1, overflow: "auto" }}>
           {visibleRows.length > 0 ? visibleRows.map((row, index) => renderRow(row, row.side, index)) : (
-            <div className="orderbook__row" style={{ justifyContent: "center", color: COLORS.textMuted }}>
+            <div className="orderbook__row" style={{ justifyContent: "center", color: CV.textMuted }}>
               No orderbook rows available
             </div>
           )}
@@ -2312,9 +2328,9 @@ export default function Trading() {
       className={`trading-orderbook trading-orderbook--${placement}`}
       style={{
         width: placement === "side" ? 260 : "100%",
-        background: COLORS.bgPanel,
-        borderLeft: placement === "side" ? `1px solid ${COLORS.border}` : "none",
-        borderTop: placement === "embedded" ? `1px solid ${COLORS.border}` : "none",
+        background: CV.bgPanel,
+        borderLeft: placement === "side" ? "1px solid var(--clr-border)" : "none",
+        borderTop: placement === "embedded" ? "1px solid var(--clr-border)" : "none",
         display: "flex",
         flexDirection: "column",
         flexShrink: 0,
@@ -2322,9 +2338,9 @@ export default function Trading() {
         minHeight: placement === "side" ? 0 : 320,
       }}
     >
-      <div style={{ padding: "8px 10px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+      <div style={{ padding: "8px 10px", borderBottom: "1px solid var(--clr-border)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontWeight: 700, fontSize: 13, color: COLORS.textBright }}>Order Book</span>
+          <span style={{ fontWeight: 700, fontSize: 13, color: CV.textBright }}>Order Book</span>
         </div>
         <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
           {(["combined", "bids", "asks"] as const).map(mode => (
@@ -2333,9 +2349,9 @@ export default function Trading() {
               onClick={() => setOrderbookViewMode(mode)}
               title={mode === "combined" ? "Both" : mode}
               style={{
-                background: orderbookViewMode === mode ? COLORS.bgHover : "transparent",
-                border: `1px solid ${orderbookViewMode === mode ? COLORS.border : "transparent"}`,
-                color: orderbookViewMode === mode ? COLORS.textBright : COLORS.text,
+                background: orderbookViewMode === mode ? CV.bgHover : "transparent",
+                border: `1px solid ${orderbookViewMode === mode ? CV.border : "transparent"}`,
+                color: orderbookViewMode === mode ? CV.textBright : CV.text,
                 cursor: "pointer",
                 padding: "2px 6px",
                 borderRadius: 3,
@@ -2351,9 +2367,9 @@ export default function Trading() {
               key={limit}
               onClick={() => setDepthLimit(limit)}
               style={{
-                background: depthLimit === limit ? COLORS.bgHover : "transparent",
-                border: `1px solid ${depthLimit === limit ? COLORS.border : "transparent"}`,
-                color: depthLimit === limit ? "#f0b90b" : COLORS.text,
+                background: depthLimit === limit ? CV.bgHover : "transparent",
+                border: `1px solid ${depthLimit === limit ? CV.border : "transparent"}`,
+                color: depthLimit === limit ? "#f0b90b" : CV.text,
                 cursor: "pointer",
                 padding: "2px 5px",
                 borderRadius: 3,
@@ -2382,30 +2398,30 @@ export default function Trading() {
   };
 
   const topMoversSection = () => (
-    <div style={{ borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden" }}>
+    <div style={{ borderTop: "1px solid var(--clr-border)", background: CV.bgPanel, display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden" }}>
       <div style={{ padding: "6px 10px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: COLORS.textBright }}>Top Movers</span>
-        FAQ <ChevronDown size={10} style={{ color: COLORS.text }} />
+        <span style={{ fontSize: 12, fontWeight: 600, color: CV.textBright }}>Top Movers</span>
+        FAQ <ChevronDown size={10} style={{ color: CV.text }} />
       </div>
       <div style={{ display: "flex", gap: 4, padding: "0 10px 6px" }}>
         {["All", "Change", "New High/Low", "Fluctuation", "Volume"].map(tab => (
-          <button key={tab} style={{ fontSize: 10, padding: "2px 6px", background: tab === "All" ? COLORS.bgAlt : "transparent", border: `1px solid ${tab === "All" ? COLORS.border : "transparent"}`, borderRadius: 3, color: COLORS.text, cursor: "pointer", whiteSpace: "nowrap" }}>{tab}</button>
+          <button key={tab} style={{ fontSize: 10, padding: "2px 6px", background: tab === "All" ? CV.bgAlt : "transparent", border: `1px solid ${tab === "All" ? CV.border : "transparent"}`, borderRadius: 3, color: CV.text, cursor: "pointer", whiteSpace: "nowrap" }}>{tab}</button>
         ))}
       </div>
       {marketMovers.slice().sort((a, b) => Math.abs(b.change) - Math.abs(a.change)).slice(0, 3).map(m => (
         <div key={m.pair} onClick={() => switchSymbol(m.pair)} style={{ display: "flex", alignItems: "center", padding: "4px 10px", cursor: "pointer", gap: 8 }}
-          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = COLORS.bgAlt}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = CV.bgAlt}
           onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
         >
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.textBright }}>{m.pair}</div>
-            <div style={{ fontSize: 10, color: COLORS.textMuted }}>{new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: CV.textBright }}>{m.pair}</div>
+            <div style={{ fontSize: 10, color: CV.textMuted }}>{new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
           </div>
           <div style={{ textAlign: "right" }}>
-            <span style={{ fontSize: 11, background: m.change >= 0 ? COLORS.greenDim : COLORS.redDim, color: m.change >= 0 ? COLORS.green : COLORS.red, padding: "2px 6px", borderRadius: 3 }}>
+            <span style={{ fontSize: 11, background: m.change >= 0 ? CV.greenDim : CV.redDim, color: m.change >= 0 ? CV.green : CV.red, padding: "2px 6px", borderRadius: 3 }}>
               {m.change >= 0 ? "+" : ""}{m.change.toFixed(2)}%
             </span>
-            <div style={{ fontSize: 9, color: COLORS.textMuted, marginTop: 1 }}>New 7day High</div>
+            <div style={{ fontSize: 9, color: CV.textMuted, marginTop: 1 }}>New 7day High</div>
           </div>
         </div>
       ))}
@@ -2413,29 +2429,29 @@ export default function Trading() {
   );
 
   const marketPairsPanel = () => (
-    <div style={{ background: COLORS.bgPanel, display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden" }}>
+    <div style={{ background: CV.bgPanel, display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden" }}>
       {/* Search */}
-      <div style={{ padding: "8px 10px", borderBottom: `1px solid ${COLORS.border}` }}>
-        <div style={{ display: "flex", alignItems: "center", background: COLORS.bgAlt, border: `1px solid ${COLORS.border}`, borderRadius: 4, padding: "4px 10px", gap: 6 }}>
-          <Search size={13} style={{ color: COLORS.textMuted }} />
+      <div style={{ padding: "8px 10px", borderBottom: "1px solid var(--clr-border)" }}>
+        <div style={{ display: "flex", alignItems: "center", background: CV.bgAlt, border: "1px solid var(--clr-border)", borderRadius: 4, padding: "4px 10px", gap: 6 }}>
+          <Search size={13} style={{ color: CV.textMuted }} />
           <input type="text" placeholder="Search" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, flex: 1 }} />
         </div>
       </div>
 
       {/* Pair tabs */}
-      <div style={{ display: "flex", borderBottom: `1px solid ${COLORS.border}`, padding: "0 6px" }}>
+      <div style={{ display: "flex", borderBottom: "1px solid var(--clr-border)", padding: "0 6px" }}>
         {(["fav", "usdt"] as const).map(tab => (
-          <button key={tab} onClick={() => setPairTab(tab)} style={{ flex: 1, padding: "6px 0", background: "transparent", border: "none", cursor: "pointer", fontSize: 11, color: pairTab === tab ? "#f0b90b" : COLORS.text, borderBottom: pairTab === tab ? `2px solid ${"#f0b90b"}` : "2px solid transparent", fontWeight: pairTab === tab ? 700 : 400 }}>
+          <button key={tab} onClick={() => setPairTab(tab)} style={{ flex: 1, padding: "6px 0", background: "transparent", border: "none", cursor: "pointer", fontSize: 11, color: pairTab === tab ? "#f0b90b" : CV.text, borderBottom: pairTab === tab ? `2px solid ${"#f0b90b"}` : "2px solid transparent", fontWeight: pairTab === tab ? 700 : 400 }}>
             {tab === "fav" ? <Star size={11} style={{ color: "#f0b90b", fill: "#f0b90b" }} /> : tab.toUpperCase()}
           </button>
         ))}
       </div>
 
       {/* Pair list header */}
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", padding: "4px 10px", fontSize: 10, color: COLORS.textMuted, borderBottom: `1px solid ${COLORS.border}` }}>
-        <button onClick={() => setSortBy("name")} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", textAlign: "left", fontSize: 10 }}>Pair {sortBy === "name" ? "↕" : ""}</button>
-        <button onClick={() => setSortBy("change")} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", textAlign: "right", fontSize: 10 }}>Last Price {sortBy === "change" ? "↕" : ""}</button>
-        <button onClick={() => setSortBy("volume")} style={{ background: "none", border: "none", color: COLORS.textMuted, cursor: "pointer", textAlign: "right", fontSize: 10 }}>24h Chg% {sortBy === "volume" ? "↕" : ""}</button>
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", padding: "4px 10px", fontSize: 10, color: CV.textMuted, borderBottom: "1px solid var(--clr-border)" }}>
+        <button onClick={() => setSortBy("name")} style={{ background: "none", border: "none", color: CV.textMuted, cursor: "pointer", textAlign: "left", fontSize: 10 }}>Pair {sortBy === "name" ? "↕" : ""}</button>
+        <button onClick={() => setSortBy("change")} style={{ background: "none", border: "none", color: CV.textMuted, cursor: "pointer", textAlign: "right", fontSize: 10 }}>Last Price {sortBy === "change" ? "↕" : ""}</button>
+        <button onClick={() => setSortBy("volume")} style={{ background: "none", border: "none", color: CV.textMuted, cursor: "pointer", textAlign: "right", fontSize: 10 }}>24h Chg% {sortBy === "volume" ? "↕" : ""}</button>
       </div>
 
       {/* Pair list */}
@@ -2445,19 +2461,19 @@ export default function Trading() {
           const chg = mover?.change || 0;
           const symbolLabel = pair.split("/")[0];
           return (
-            <div key={pair} onClick={() => switchSymbol(pair)} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", padding: "3px 6px", minHeight: 36, cursor: "pointer", background: pair === symbol ? COLORS.bgHover : "transparent", borderLeft: pair === symbol ? `2px solid ${"#f0b90b"}` : "2px solid transparent" }}
-              onMouseEnter={e => { if (pair !== symbol) (e.currentTarget as HTMLElement).style.background = COLORS.bgAlt; }}
+            <div key={pair} onClick={() => switchSymbol(pair)} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", padding: "3px 6px", minHeight: 36, cursor: "pointer", background: pair === symbol ? CV.bgHover : "transparent", borderLeft: pair === symbol ? `2px solid ${"#f0b90b"}` : "2px solid transparent" }}
+              onMouseEnter={e => { if (pair !== symbol) (e.currentTarget as HTMLElement).style.background = CV.bgAlt; }}
               onMouseLeave={e => { if (pair !== symbol) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <div style={{ width: 22, height: 22, borderRadius: 999, background: COLORS.bgAlt, display: "grid", placeItems: "center", overflow: "hidden", flexShrink: 0 }}>
+                <div style={{ width: 22, height: 22, borderRadius: 999, background: CV.bgAlt, display: "grid", placeItems: "center", overflow: "hidden", flexShrink: 0 }}>
                   <CoinIcon symbol={symbolLabel} size={16} images={coinImages} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: pair === symbol ? 700 : 500, color: COLORS.textBright }}>
-                    {symbolLabel}/<span style={{ color: COLORS.textMuted, fontSize: 9 }}>{pair.split("/")[1]}</span>
+                  <div style={{ fontSize: 11, fontWeight: pair === symbol ? 700 : 500, color: CV.textBright }}>
+                    {symbolLabel}/<span style={{ color: CV.textMuted, fontSize: 9 }}>{pair.split("/")[1]}</span>
                   </div>
-                  {mover && <div style={{ fontSize: 8, color: COLORS.textMuted }}>{formatVol(mover.volume)}</div>}
+                  {mover && <div style={{ fontSize: 8, color: CV.textMuted }}>{formatVol(mover.volume)}</div>}
                 </div>
               </div>
               <div style={{ textAlign: "right", fontFamily: "monospace", fontSize: 10, color: COLORS.textBright }}>
