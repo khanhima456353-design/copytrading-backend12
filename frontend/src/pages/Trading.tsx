@@ -10,7 +10,7 @@ import { initializeCandles, resetCandles, updateLatestCandle, getCandles } from 
 import PositionsPanel from "../components/PositionsPanel";
 import { calculateUnrealizedPnL } from "../services/tradingUtils";
 import { TradingBalanceCard } from "../components/TradingBalanceCard";
-import { Wallet } from "lucide-react";
+import { Wallet, Trash, Magnet, PaintbrushVertical, RulerDimensionLine, Eraser } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -87,7 +87,7 @@ const COLORS = {
   grid: "rgba(42,46,53,0.6)", crosshair: "rgba(132,142,156,0.5)",
 };
 
-const DRAWING_TOOLS: { id: DrawingTool; icon: string; label: string; group: string }[] = [
+const DRAWING_TOOLS: { id: DrawingTool; icon: React.ReactNode; label: string; group: string }[] = [
   { id: "cursor",    icon: "⊹",  label: "Cursor",      group: "select" },
   { id: "crosshair", icon: "⊕",  label: "Crosshair",   group: "select" },
   { id: "trendline", icon: "╱",  label: "Trend Line",  group: "lines" },
@@ -97,10 +97,10 @@ const DRAWING_TOOLS: { id: DrawingTool; icon: string; label: string; group: stri
   { id: "fib",       icon: "∿",  label: "Fibonacci",   group: "shapes" },
   { id: "pitchfork", icon: "⑂",  label: "Pitchfork",   group: "shapes" },
   { id: "text",      icon: "T",  label: "Text",        group: "annotate" },
-  { id: "brush",     icon: "✏",  label: "Brush",       group: "annotate" },
-  { id: "eraser",    icon: "⌫",  label: "Eraser",      group: "annotate" },
-  { id: "measure",   icon: "⟺",  label: "Measure",     group: "measure" },
-  { id: "magnet",    icon: "⊛",  label: "Magnet",      group: "measure" },
+  { id: "brush",     icon: <PaintbrushVertical size={16} />,  label: "Brush",       group: "annotate" },
+  { id: "eraser",    icon: <Eraser size={16} />,  label: "Eraser",      group: "annotate" },
+  { id: "measure",   icon: <RulerDimensionLine size={16} />,  label: "Measure",     group: "measure" },
+  { id: "magnet",    icon: <Magnet size={16} />,  label: "Magnet",      group: "measure" },
 ];
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -3016,7 +3016,9 @@ export default function Trading() {
                 <div style={{ width: 18, height: w, background: drawingWidth === w ? COLORS.amber : COLORS.text, borderRadius: 1 }} />
               </button>
             ))}
-            <button title="Clear all drawings" onClick={() => setDrawings([])} style={{ width: 32, height: 32, flexShrink: 0, background: "transparent", border: "1px solid transparent", borderRadius: 4, color: COLORS.red, fontSize: 13, cursor: "pointer", marginTop: 4 }}>✕</button>
+            <button title="Clear all drawings" onClick={() => setDrawings([])} style={{ width: 32, height: 32, flexShrink: 0, background: "transparent", border: "1px solid transparent", borderRadius: 4, color: COLORS.red, cursor: "pointer", marginTop: 4, display: "grid", placeItems: "center" }}>
+              <Trash size={16} />
+            </button>
           </div>
         )}
 
