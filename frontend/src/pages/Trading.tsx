@@ -706,13 +706,19 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
         const c = visible[ci];
         const isGreen = c.close >= c.open;
         const chg = ((c.close - c.open) / c.open * 100).toFixed(2);
-        // Header stats bar (like Binance)
-        ctx.fillStyle = "rgba(22,26,30,0.95)"; ctx.fillRect(0, 0, plotW, 28);
+        // Header stats bar (like Binance) - two rows
+        ctx.fillStyle = "rgba(22,26,30,0.95)"; ctx.fillRect(0, 0, plotW, 32);
         const stats = [`O: ${formatPrice(c.open)}`, `H: ${formatPrice(c.high)}`, `L: ${formatPrice(c.low)}`, `C: ${formatPrice(c.close)}`, `V: ${formatVol(c.volume)}`, `${Number(chg) >= 0 ? "+" : ""}${chg}%`];
-        ctx.font = "11px monospace"; ctx.textAlign = "left";
-        stats.forEach((s, i) => {
-          ctx.fillStyle = i === 5 ? (Number(chg) >= 0 ? COLORS.green : COLORS.red) : (i === 1 ? COLORS.green : i === 2 ? COLORS.red : COLORS.textBright);
-          ctx.fillText(s, 8 + i * 130, 18);
+        ctx.font = "9px monospace"; ctx.textAlign = "left";
+        // Top row: O, H, L
+        [0, 1, 2].forEach((i) => {
+          ctx.fillStyle = i === 1 ? COLORS.green : i === 2 ? COLORS.red : COLORS.textBright;
+          ctx.fillText(stats[i], 8 + i * 90, 12);
+        });
+        // Bottom row: C, V, %
+        [3, 4, 5].forEach((i) => {
+          ctx.fillStyle = i === 5 ? (Number(chg) >= 0 ? COLORS.green : COLORS.red) : COLORS.textBright;
+          ctx.fillText(stats[i], 8 + (i - 3) * 90, 26);
         });
         // Price tag on right axis
         const priceY = Math.max(mainPlotTop + 6, Math.min(mainPlotBottom - 4, my));
@@ -755,14 +761,14 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
       ctx.fillText(formatPrice(priceForLast), plotW + PRICE_AXIS_W / 2, lastY + 4);
     }
 
-    // MA info overlay (top-left like Binance)
-    const maInfoY = Math.max(6, Math.min(my >= 0 && my <= 28 ? 30 : 8, mainPlotTop - 18));
+    // MA info overlay (fixed top-left)
+    const maInfoY = mainPlotTop - 4;
     let maX = 8;
     const maInfo: { label: string; value: string; color: string }[] = [];
     if (indicators.sma?.length) { const last = indicators.sma[indicators.sma.length - 1]; maInfo.push({ label: "MA(7)", value: formatPrice(last?.value || 0), color: COLORS.sma }); }
     if (indicators.ema?.length) { const last = indicators.ema[indicators.ema.length - 1]; maInfo.push({ label: "MA(99)", value: formatPrice(last?.value || 0), color: COLORS.ema }); }
-    ctx.font = "11px monospace";
-    maInfo.forEach(m => { ctx.fillStyle = m.color; ctx.textAlign = "left"; ctx.fillText(`${m.label}: ${m.value}`, maX, maInfoY + 15); maX += ctx.measureText(`${m.label}: ${m.value}`).width + 16; });
+    ctx.font = "10px monospace";
+    maInfo.forEach(m => { ctx.fillStyle = m.color; ctx.textAlign = "left"; ctx.fillText(`${m.label}: ${m.value}`, maX, maInfoY); maX += ctx.measureText(`${m.label}: ${m.value}`).width + 16; });
 
     ctx.restore();
   }, [candles, indicators, chartType, tf, rsiData, macdData, showRSI, showMACD, liveStatus, lastPrice, entryPriceLine, CHART_WEIGHT, VOL_WEIGHT, SUB_WEIGHT, getMainPlotBounds, getPriceRange, drawings, deepMarketData]);
