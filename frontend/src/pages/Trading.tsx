@@ -1662,21 +1662,7 @@ export default function Trading() {
     const unsubscribeMarket = subscribeMarketState(symbol, (state) => {
       if (!mounted) return;
       console.log("[Trading] subscribeMarketState callback", { symbol, statePair: state.pair, lastPrice: state.lastPrice, markPrice: state.markPrice, orderbookBids: state.orderbook.bids.length, orderbookAsks: state.orderbook.asks.length });
-      setMarketState(prev => {
-        // Only update if values actually changed
-        if (prev && prev.lastPrice === state.lastPrice && 
-            prev.markPrice === state.markPrice &&
-            prev.orderbook.bids === state.orderbook.bids &&
-            prev.orderbook.asks === state.orderbook.asks &&
-            prev.volume24h === state.volume24h &&
-            prev.high24h === state.high24h &&
-            prev.low24h === state.low24h &&
-            prev.change24h === state.change24h &&
-            prev.changePct === state.changePct) {
-          return prev;
-        }
-        return state;
-      });
+      setMarketState(state);
     });
 
     return () => {
@@ -2994,7 +2980,7 @@ export default function Trading() {
       <div className="trading-main-tabs" style={{ display: "flex", alignItems: "center", height: 38, borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, padding: "0 12px", gap: 0, flexShrink: 0 }}>
         {([
           { id: "chart", label: "Chart" },
-          { id: "trades", label: "Trades" },
+          { id: "trades", label: isDesktopLayout ? "Trades" : "Market Trades" },
           { id: "info", label: "Info" },
           { id: "tradingdata", label: "Trading Data" },
         ] as const).map(tab => (

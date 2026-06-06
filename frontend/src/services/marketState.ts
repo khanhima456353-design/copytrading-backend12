@@ -366,8 +366,18 @@ async function fetchTickerSummary(pair: string): Promise<void> {
   } catch { /* no-op */ }
 }
 
+async function fetchRecentTrades(pair: string): Promise<void> {
+  try {
+    const api = await getAxios();
+    const res = await api.get(`/api/market/trades/${encodeURIComponent(pair)}`);
+    const raw = res.data;
+    if (!Array.isArray(raw) || raw.length === 0) return;
+    updateMarketState(pair, { trades: raw as Trade[] });
+  } catch { /* no-op */ }
+}
+
 async function requestMarketSnapshot(pair: string): Promise<void> {
-  await Promise.all([fetchOrderBook(pair), fetchTickerSummary(pair)]);
+  await Promise.all([fetchOrderBook(pair), fetchTickerSummary(pair), fetchRecentTrades(pair)]);
 }
 
 // ─── Socket init ──────────────────────────────────────────────────────────
