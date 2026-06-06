@@ -3638,7 +3638,8 @@ serverPositions.length === 0
         .trading-left-panel,
         .trading-main { display: flex !important; }
         .trading-left-panel { flex: 0 0 340px !important; min-width: 340px !important; max-width: 340px !important; order: 0 !important; }
-        .trading-toolbar { flex: 0 0 44px !important; width: 44px !important; min-width: 44px !important; flex-direction: column !important; align-items: center !important; justify-content: flex-start !important; padding-top: 8px !important; gap: 2px !important; order: 0 !important; }
+        .trading-toolbar { flex: 0 0 44px !important; width: 44px !important; min-width: 44px !important; flex-direction: column !important; align-items: center !important; justify-content: flex-start !important; padding-top: 8px !important; gap: 2px !important; order: 0 !important; scrollbar-width: none !important; -ms-overflow-style: none !important; }
+        .trading-toolbar::-webkit-scrollbar { width: 0 !important; height: 0 !important; }
         .trading-main { flex: 1 1 auto !important; min-width: 0 !important; order: 1 !important; }
         .trading-right { flex: 0 0 340px !important; min-width: 340px !important; max-width: 340px !important; order: 2 !important; }
         .trading-chart-stage,
