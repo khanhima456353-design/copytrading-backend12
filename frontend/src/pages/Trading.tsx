@@ -2998,9 +2998,31 @@ export default function Trading() {
 
       {/* ── CHART / CONTENT AREA (between left & right panels) ── */}
       <div className="trading-chart-panel trading-dashboard__chart-panel" style={{ flex: 1, position: "relative", overflow: "hidden", minHeight: 0, background: COLORS.bg }}>
+        {/* Left toolbar attached to chart (desktop/tablet/mobile) */}
+        {activeViewTab === "chart" && (
+          <div className="trading-toolbar trading-dashboard__tools--desktop" style={{ width: 44, background: COLORS.bgPanel, borderRight: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", alignItems: "center", padding: "8px 6px", gap: 6, flexShrink: 0, boxSizing: "border-box", overflowY: "auto", WebkitOverflowScrolling: "touch", position: "absolute", left: 0, top: 0, bottom: 0, zIndex: 30 }}>
+            {DRAWING_TOOLS.map(tool => (
+              <button key={tool.id} title={tool.label} onClick={() => setActiveTool(tool.id)} style={{ width: 32, height: 32, flexShrink: 0, background: activeTool === tool.id ? COLORS.bgHover : "transparent", border: activeTool === tool.id ? `1px solid ${COLORS.border}` : "1px solid transparent", borderRadius: 4, color: activeTool === tool.id ? COLORS.amber : COLORS.text, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
+                onMouseEnter={e => { if (activeTool !== tool.id) (e.currentTarget as HTMLElement).style.background = COLORS.bgHover; }}
+                onMouseLeave={e => { if (activeTool !== tool.id) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+              >{tool.icon}</button>
+            ))}
+            <div style={{ width: 24, height: 1, background: COLORS.border, margin: "4px 0" }} />
+            <div title="Drawing color" style={{ position: "relative" }}>
+              <input type="color" value={drawingColor} onChange={e => setDrawingColor(e.target.value)} style={{ width: 28, height: 28, border: `2px solid ${COLORS.border}`, borderRadius: 4, cursor: "pointer", padding: 2, background: "none" }} />
+            </div>
+            {[1, 2, 3].map(w => (
+              <button key={w} title={`Line ${w}px`} onClick={() => setDrawingWidth(w)} style={{ width: 32, height: 20, flexShrink: 0, background: drawingWidth === w ? COLORS.bgHover : "transparent", border: drawingWidth === w ? `1px solid ${COLORS.amber}` : `1px solid transparent`, borderRadius: 3, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ width: 18, height: w, background: drawingWidth === w ? COLORS.amber : COLORS.text, borderRadius: 1 }} />
+              </button>
+            ))}
+            <button title="Clear all drawings" onClick={() => setDrawings([])} style={{ width: 32, height: 32, flexShrink: 0, background: "transparent", border: "1px solid transparent", borderRadius: 4, color: COLORS.red, fontSize: 13, cursor: "pointer", marginTop: 4 }}>✕</button>
+          </div>
+        )}
+
         {activeViewTab === "chart" && (
           <div className="trading-chart-layout" style={{ display: "flex", height: "100%" }}>
-            <div className="trading-chart-stage" style={{ flex: 1, position: "relative", minWidth: 0 }}>
+            <div className="trading-chart-stage" style={{ flex: 1, position: "relative", minWidth: 0, marginLeft: 44 }}>
               {activeChartTab === "original" && (
                 <CandleChart candles={candles} deepMarketData={deepMarketData} indicators={indicators} chartType={chartType} tf={timeframe} pair={symbol} rsiData={rsiData} macdData={macdData} showRSI={showRSI} showMACD={showMACD} liveStatus={liveStatus} activeTool={activeTool} drawings={drawings} onDrawingsChange={setDrawings} drawingColor={drawingColor} drawingWidth={drawingWidth} lastPrice={lastPrice} entryPriceLine={entryPriceOverlay} />
               )}
@@ -3461,27 +3483,7 @@ serverPositions.length === 0
       {/* ── MAIN BODY ── */}
       <div className="trading-body trading-dashboard__body" style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0 }}>
 
-        {/* ── Drawing Toolbar (mobile/tablet) ── */}
-        {!isDesktopLayout && isChartView && (
-          <div className="trading-toolbar trading-dashboard__tools" style={{ width: 44, background: COLORS.bgPanel, borderRight: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 8, gap: 2, flexShrink: 0 }}>
-            {DRAWING_TOOLS.map(tool => (
-              <button key={tool.id} title={tool.label} onClick={() => setActiveTool(tool.id)} style={{ width: 32, height: 32, background: activeTool === tool.id ? COLORS.bgHover : "transparent", border: activeTool === tool.id ? `1px solid ${COLORS.border}` : "1px solid transparent", borderRadius: 4, color: activeTool === tool.id ? COLORS.amber : COLORS.text, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
-                onMouseEnter={e => { if (activeTool !== tool.id) (e.currentTarget as HTMLElement).style.background = COLORS.bgHover; }}
-                onMouseLeave={e => { if (activeTool !== tool.id) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-              >{tool.icon}</button>
-            ))}
-            <div style={{ width: 24, height: 1, background: COLORS.border, margin: "4px 0" }} />
-            <div title="Drawing color" style={{ position: "relative" }}>
-              <input type="color" value={drawingColor} onChange={e => setDrawingColor(e.target.value)} style={{ width: 28, height: 28, border: `2px solid ${COLORS.border}`, borderRadius: 4, cursor: "pointer", padding: 2, background: "none" }} />
-            </div>
-            {[1, 2, 3].map(w => (
-              <button key={w} title={`Line ${w}px`} onClick={() => setDrawingWidth(w)} style={{ width: 32, height: 20, background: drawingWidth === w ? COLORS.bgHover : "transparent", border: drawingWidth === w ? `1px solid ${COLORS.amber}` : `1px solid transparent`, borderRadius: 3, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <div style={{ width: 18, height: w, background: drawingWidth === w ? COLORS.amber : COLORS.text, borderRadius: 1 }} />
-              </button>
-            ))}
-            <button title="Clear all drawings" onClick={() => setDrawings([])} style={{ width: 32, height: 32, background: "transparent", border: "1px solid transparent", borderRadius: 4, color: COLORS.red, fontSize: 13, cursor: "pointer", marginTop: 4 }}>✕</button>
-          </div>
-        )}
+        
 
         {/* ── CENTER: (empty) ── */}
         <div className="trading-main trading-dashboard__main" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden" }}>
@@ -3770,7 +3772,6 @@ serverPositions.length === 0
             overflow: visible !important;
             align-items: stretch !important;
           }
-          .trading-toolbar,
           .trading-orderbook--side { display: none !important; }
           .trading-main {
             flex: 0 0 auto !important;
