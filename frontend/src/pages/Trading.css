@@ -113,6 +113,29 @@
   --dash-red: #dc2626;
   --dash-amber: #d97706;
   --dash-cyan: #2563eb;
+  background: var(--dash-bg) !important;
+}
+
+[data-theme="light"] .trading-dashboard__header {
+  background: var(--dash-panel) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="light"] .trading-dashboard__header > div:first-child {
+  background: transparent !important;
+}
+
+[data-theme="light"] .depth-chart__canvas {
+  background: var(--clr-panel) !important;
+  border-color: var(--clr-border) !important;
+}
+
+[data-theme="light"] .balance-card,
+[data-theme="light"] .trade-card,
+[data-theme="light"] .market-card {
+  background: var(--clr-panel) !important;
+  border-color: var(--clr-border) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
 }
 
 /* ─── Reset & Base ────────────────────────────────────────────────────────── */
