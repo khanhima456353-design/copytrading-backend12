@@ -492,7 +492,7 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
     const macdH = showMACD && !showRSI ? Math.floor(H * SUB_WEIGHT) : showMACD ? Math.floor(H * SUB_WEIGHT * 0.5) : 0;
     const PRICE_AXIS_W = 88, TIME_AXIS_H = 28;
     const plotW = W - PRICE_AXIS_W;
-    const overlayOffsetX = toolbarCollapsed ? 44 : 0;
+    const overlayOffsetX = viewportWidth < 1024 ? 36 : (toolbarCollapsed ? 44 : 0);
 
     ctx.save(); ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, W, H);
