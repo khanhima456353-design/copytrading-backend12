@@ -820,7 +820,7 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
     maInfo.forEach(m => { ctx.fillStyle = m.color; ctx.textAlign = "left"; ctx.fillText(`${m.label}: ${m.value}`, maX, maInfoY); maX += ctx.measureText(`${m.label}: ${m.value}`).width + 16; });
 
     ctx.restore();
-  }, [candles, indicators, chartType, tf, rsiData, macdData, showRSI, showMACD, liveStatus, lastPrice, entryPriceLine, CHART_WEIGHT, VOL_WEIGHT, SUB_WEIGHT, getMainPlotBounds, getPriceRange, drawings, deepMarketData, viewportWidth]);
+  }, [candles, indicators, chartType, tf, rsiData, macdData, showRSI, showMACD, liveStatus, lastPrice, entryPriceLine, CHART_WEIGHT, VOL_WEIGHT, SUB_WEIGHT, getMainPlotBounds, getPriceRange, drawings, deepMarketData, viewportWidth, COLORS]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -1177,8 +1177,7 @@ type DepthHoverState = {
 };
 
 function DepthChart({ buyLevels, sellLevels, depthLimit, baseSymbol, quoteSymbol }: DepthChartProps) {
-  const { theme } = useTheme();
-  const COLORS = useMemo(() => getColors(theme), [theme]);
+  const COLORS = CV;
   const [hoverPoint, setHoverPoint] = useState<DepthHoverState | null>(null);
   const [zoom, setZoom] = useState(1);
   const [priceStepIndex, setPriceStepIndex] = useState(2);
