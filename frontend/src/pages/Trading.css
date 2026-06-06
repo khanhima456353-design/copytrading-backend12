@@ -3864,7 +3864,8 @@ input,select{
 }
 
 .trading-dashboard .trading-chart-layout,
-.trading-dashboard .trading-chart-stage {
+.trading-dashboard .trading-chart-stage,
+.trading-dashboard .trading-trades-layout {
   min-height: 100% !important;
 }
 

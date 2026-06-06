@@ -114,7 +114,7 @@ const CV = {
   green: "var(--clr-green)", greenDim: "var(--clr-green-dim)",
   red: "var(--clr-red)", redDim: "var(--clr-red-dim)",
   blue: "var(--clr-blue)", blueDim: "var(--clr-blue-dim)",
-  amber: "var(--clr-amber)", cyan: "var(--clr-cyan)",
+  amber: "var(--clr-amber)", amberDim: "var(--clr-amber-dim)", cyan: "var(--clr-cyan)",
   sma: "#f0b90b", ema: "#0ecb81",
   bbUpper: "#3b82f6", bbMid: "#8b5cf6", bbLow: "#06b6d4",
   vwap: "#ec4899",
@@ -2311,7 +2311,7 @@ export default function Trading() {
       <>
         {orderbookSummary}
         {header}
-        <div style={{ flex: 1, overflow: "auto" }}>
+      <div style={{ flex: 1, overflow: "auto", background: COLORS.bgPanel }}>
           {visibleRows.length > 0 ? visibleRows.map((row, index) => renderRow(row, row.side, index)) : (
             <div className="orderbook__row" style={{ justifyContent: "center", color: CV.textMuted }}>
               No orderbook rows available
@@ -2464,7 +2464,7 @@ export default function Trading() {
               onMouseEnter={e => { if (pair !== symbol) (e.currentTarget as HTMLElement).style.background = CV.bgAlt; }}
               onMouseLeave={e => { if (pair !== symbol) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: -6 }}>
                 <div style={{ width: 22, height: 22, borderRadius: 999, background: CV.bgAlt, display: "grid", placeItems: "center", overflow: "hidden", flexShrink: 0 }}>
                   <CoinIcon symbol={symbolLabel} size={16} images={coinImages} />
                 </div>
@@ -2489,7 +2489,7 @@ export default function Trading() {
   );
 
   const marketTradesPanel = (showMovers: boolean) => (
-    <div style={{ borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel }}>
+    <div style={{ borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, display: "flex", flexDirection: "column", height: "100%" }}>
       <div style={{ display: "flex", borderBottom: `1px solid ${COLORS.border}` }}>
         {(["market", "mytrades"] as const).map(tab => (
           <button key={tab} onClick={() => setRightTab(tab)} style={{ flex: 1, padding: "6px 0", background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: rightTab === tab ? COLORS.textBright : COLORS.text, borderBottom: rightTab === tab ? `2px solid ${"#f0b90b"}` : "2px solid transparent", fontWeight: rightTab === tab ? 600 : 400 }}>
@@ -2500,7 +2500,7 @@ export default function Trading() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", padding: "4px 10px", fontSize: 10, color: COLORS.textMuted }}>
         <span>Price ({quoteSymbol})</span><span style={{ textAlign: "right" }}>Amount ({baseSymbol})</span><span style={{ textAlign: "right" }}>Time</span>
       </div>
-      <div style={{ maxHeight: 180, overflow: "auto" }}>
+      <div style={{ flex: 1, overflowY: "auto", minHeight: 0, background: COLORS.bgPanel }}>
         {(rightTab === "market" ? trades : tradeHistory).slice(0, 15).map((t, i) => {
           const side = "side" in t ? t.side : (t as TradeHistoryItem).side;
           const price = t.price;
@@ -2983,7 +2983,7 @@ export default function Trading() {
       </div>
 
       {/* ── 3-PANEL BODY (desktop: flex row; compact: normal flow) ── */}
-      <div style={{ display: isDesktopLayout ? "flex" : "block", flex: isDesktopLayout ? 1 : undefined, overflow: isDesktopLayout ? "hidden" : undefined, minHeight: isDesktopLayout ? 0 : undefined }}>
+      <div style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0, flexDirection: isDesktopLayout ? "row" : "column", background: COLORS.bgPanel }}>
 
         {/* ── LEFT PANEL: Order Book + Market Trades + Top Movers (desktop only) ── */}
         {isDesktopLayout && isChartView && (
@@ -3001,7 +3001,7 @@ export default function Trading() {
         )}
 
         {/* ── CENTER COLUMN (scrollable on desktop) ── */}
-        <div style={{ flex: isDesktopLayout ? 1 : undefined, overflowY: isDesktopLayout ? "auto" : undefined, display: "flex", flexDirection: "column", minHeight: isDesktopLayout ? 0 : undefined }}>
+        <div style={{ flex: 1, overflowY: isDesktopLayout ? "auto" : undefined, display: "flex", flexDirection: "column", minHeight: isDesktopLayout ? 0 : undefined, background: COLORS.bgPanel }}>
 
       {/* ── COLLAPSIBLE PAIRS SELECTOR (mobile/tablet) ── */}
       <div className="trading-pairs-dropdown" style={{ maxHeight: showPairSelector && isCompactLayout ? 400 : 0, overflow: "hidden", transition: "max-height 0.35s ease", borderBottom: showPairSelector && isCompactLayout ? `1px solid ${COLORS.border}` : "none", background: COLORS.bgPanel }}>
@@ -3140,22 +3140,8 @@ export default function Trading() {
           </div>
         )}
         {activeViewTab === "trades" && (
-          <div style={{ height: "100%", display: "flex", flexDirection: "column", background: COLORS.bgPanel, overflow: "hidden" }}>
-            <div style={{ padding: "10px 12px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontWeight: 700, fontSize: 13, color: COLORS.textBright }}>Trades</span>
-              </div>
-            </div>
-            <div style={{ flex: 1, overflow: "auto", padding: "10px 12px" }}>
-              {trades.slice(0, 50).map((t, i) => (
-                <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 8, fontSize: 11, fontFamily: "monospace", color: t.side === "buy" ? COLORS.green : COLORS.red }}>
-                  <span>{formatTime(t.time)}</span>
-                  <span>{t.side.toUpperCase()}</span>
-                  <span style={{ textAlign: "right" }}>{t.price.toFixed(2)}</span>
-                  <span style={{ textAlign: "right" }}>{t.amount.toFixed(5)}</span>
-                </div>
-              ))}
-            </div>
+          <div className="trading-trades-layout" style={{ display: "flex", flexDirection: "column", background: COLORS.bgPanel, overflow: "hidden", height: "100%" }}>
+            {marketTradesPanel(false)}
           </div>
         )}
         {activeViewTab === "info" && (
@@ -3275,7 +3261,7 @@ export default function Trading() {
               <input type="number" value={buyTotalInput} onChange={e => updateBuyTotal(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="Minimum 5 USDT" />
               <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT <ChevronDown size={10} /></span>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 10, color: COLORS.textMuted, padding: "0 2px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2, fontSize: 12, color: COLORS.textMuted, padding: "0 2px" }}>
               <div>Available {accountSummary.available.toFixed(2)} USDT</div>
               <div>Reserved {reservedUSDT.toFixed(2)} USDT</div>
               <div style={{ gridColumn: "1 / span 2", color: COLORS.textBright }}>Free to trade {freeToTrade.toFixed(2)} USDT</div>
@@ -3294,13 +3280,13 @@ export default function Trading() {
               <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT</span>
             </div>
             {/* Slippage */}
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: -12 }}>
               <input type="checkbox" id="slip-buy" checked={slippageTol} onChange={e => setSlippageTol(e.target.checked)} style={{ accentColor: "#f0b90b", width: 13, height: 13 }} />
               <label htmlFor="slip-buy" style={{ fontSize: 11, color: COLORS.text, cursor: "pointer" }}>Slippage Tolerance (1%)</label>
             </div>
             {/* Market warning */}
             {marketWarning && (
-              <div style={{ fontSize: 10, color: "#f0b90b", background: COLORS.blueDim, padding: "4px 8px", borderRadius: 3, border: `1px solid ${"#f0b90b"}` }}>{marketWarning}</div>
+              <div style={{ fontSize: 13, color: COLORS.amber, background: COLORS.amberDim, padding: "6px 10px", borderRadius: 3, border: `1px solid ${COLORS.amber}`, textAlign: "center", width: "100%", marginTop: -6 }}>{marketWarning}</div>
             )}
             {/* Error message */}
             {buyError && buyAmount > 0 && (
@@ -3337,7 +3323,7 @@ export default function Trading() {
               <input type="number" value={sellTotalInput} onChange={e => updateSellTotal(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="0.00" />
               <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT <ChevronDown size={10} /></span>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 10, color: COLORS.textMuted, padding: "0 2px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 12, color: COLORS.textMuted, padding: "0 2px" }}>
               <span>Available {availableBTC.toFixed(6)} BTC</span>
               <span>Minimum Order: 5 USDT</span>
             </div>
@@ -3373,18 +3359,18 @@ export default function Trading() {
                 <button className="login-prompt-btn" onClick={() => navigate("/login")} style={{ flex: 1, height: 44, background: COLORS.green, border: "none", borderRadius: 8, color: "#000", fontWeight: 700, fontSize: 15, cursor: "pointer" }}>Log in</button>
                 <button className="login-prompt-btn" onClick={() => navigate("/login")} style={{ flex: 1, height: 44, background: COLORS.red, border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer" }}>Log in</button>
               </div>
-              <div style={{ display: "flex", gap: 4 }}>
-                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
-                  <div style={{ fontSize: 10, color: COLORS.textMuted }}>Available USDT</div>
-                  <div style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace" }}>$0.00</div>
-                  <div style={{ fontSize: 10, color: COLORS.textMuted }}>Estimated Max Buy</div>
-                  <div style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace" }}>0.00000000 BTC</div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1 }}>
+                  <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: "nowrap" }}>Available USDT</span>
+                  <span style={{ fontSize: 13, color: COLORS.textBright, fontFamily: "monospace", whiteSpace: "nowrap" }}>$0.00</span>
+                  <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: "nowrap" }}>Est. Max Buy</span>
+                  <span style={{ fontSize: 13, color: COLORS.textBright, fontFamily: "monospace", whiteSpace: "nowrap" }}>0.00000000 BTC</span>
                 </div>
-                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
-                  <div style={{ fontSize: 10, color: COLORS.textMuted }}>Available BTC</div>
-                  <div style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace" }}>0.000000 BTC</div>
-                  <div style={{ fontSize: 10, color: COLORS.textMuted }}>Estimated Max Sell</div>
-                  <div style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace" }}>$0.00</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1 }}>
+                  <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: "nowrap" }}>Available BTC</span>
+                  <span style={{ fontSize: 13, color: COLORS.textBright, fontFamily: "monospace", whiteSpace: "nowrap" }}>0.000000 BTC</span>
+                  <span style={{ fontSize: 11, color: COLORS.textMuted, whiteSpace: "nowrap" }}>Est. Max Sell</span>
+                  <span style={{ fontSize: 13, color: COLORS.textBright, fontFamily: "monospace", whiteSpace: "nowrap" }}>$0.00</span>
                 </div>
               </div>
                 </>
@@ -3412,11 +3398,11 @@ export default function Trading() {
             </div>
           ) : (
           <>
-          <div className="trading-order-actions__balance" style={{ flex: 1, display: !isDesktopLayout && orderSide !== "buy" ? "none" : "flex", flexDirection: "column", gap: 4 }}>
-            <div style={{ fontSize: 10, color: COLORS.textMuted }}>Available USDT</div>
-            <div style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace" }}>${availableBalance.toFixed(2)}</div>
-            <div style={{ fontSize: 10, color: COLORS.textMuted }}>Estimated Max Buy</div>
-            <div style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace" }}>{estimatedMaxBuyBTC} BTC</div>
+          <div className="trading-order-actions__balance" style={{ flex: 1, display: !isDesktopLayout && orderSide !== "buy" ? "none" : "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 10, color: COLORS.textMuted, whiteSpace: "nowrap" }}>Available USDT</span>
+            <span style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace", whiteSpace: "nowrap" }}>${availableBalance.toFixed(2)}</span>
+            <span style={{ fontSize: 10, color: COLORS.textMuted, whiteSpace: "nowrap" }}>Estimated Max Buy</span>
+            <span style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace", whiteSpace: "nowrap" }}>{estimatedMaxBuyBTC} BTC</span>
           </div>
           <button
             className="trading-order-actions__button"
@@ -3576,7 +3562,7 @@ serverPositions.length === 0
       </div>
 
       {/* ── MAIN BODY ── */}
-      <div className="trading-body trading-dashboard__body" style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0 }}>
+      <div className="trading-body trading-dashboard__body" style={{ display: "flex", overflow: "hidden", minHeight: 0, flex: isDesktopLayout ? 1 : "0 0 auto", background: COLORS.bgPanel }}>
 
         
 
@@ -3584,8 +3570,6 @@ serverPositions.length === 0
         <div className="trading-main trading-dashboard__main" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden" }}>
         </div>
 
-        {/* COMPACT: Market Trades + Pairs */}
-        {isCompactLayout && marketPanel()}
       </div>
       </div>
 
