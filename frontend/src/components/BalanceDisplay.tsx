@@ -139,11 +139,11 @@ function SpotBalanceView({
         <div style={styles.smallGrid}>
           <div style={styles.metricCard}>
             <span style={styles.metricLabel}>Available</span>
-            <strong style={{ color: "#0ecb81" }}>{formatCurrency(wallet.availableBalance)}</strong>
+            <strong style={{ color: "var(--clr-green)" }}>{formatCurrency(wallet.availableBalance)}</strong>
           </div>
           <div style={styles.metricCard}>
             <span style={styles.metricLabel}>Locked</span>
-            <strong style={{ color: "#f0b90b" }}>{formatCurrency(wallet.lockedBalance)}</strong>
+            <strong style={{ color: "var(--clr-amber)" }}>{formatCurrency(wallet.lockedBalance)}</strong>
           </div>
         </div>
 
@@ -160,11 +160,11 @@ function SpotBalanceView({
       </div>
       <div style={{ ...styles.balanceCard, background: "rgba(14, 203, 129, 0.08)" }}>
         <div style={styles.balanceLabel}>Available</div>
-        <div style={{ ...styles.balanceValue, color: "#0ecb81" }}>{formatCurrency(wallet.availableBalance)}</div>
+        <div style={{ ...styles.balanceValue, color: "var(--clr-green)" }}>{formatCurrency(wallet.availableBalance)}</div>
       </div>
       <div style={{ ...styles.balanceCard, background: "rgba(240, 185, 11, 0.08)" }}>
         <div style={styles.balanceLabel}>Locked</div>
-        <div style={{ ...styles.balanceValue, color: "#f0b90b" }}>{formatCurrency(wallet.lockedBalance)}</div>
+        <div style={{ ...styles.balanceValue, color: "var(--clr-amber)" }}>{formatCurrency(wallet.lockedBalance)}</div>
       </div>
     </div>
   );
@@ -215,7 +215,7 @@ function CrossMarginView({
       </div>
       <div style={styles.balanceCard}>
         <div style={styles.balanceLabel}>Used Margin</div>
-        <div style={{ ...styles.balanceValue, color: "#f6465d" }}>{formatCurrency(wallet.usedMargin)}</div>
+        <div style={{ ...styles.balanceValue, color: "var(--clr-red)" }}>{formatCurrency(wallet.usedMargin)}</div>
       </div>
       <div style={styles.balanceCard}>
         <div style={styles.balanceLabel}>Free Collateral</div>
@@ -305,11 +305,11 @@ function IsolatedMarginView({
 
 const styles = {
   container: (compact: boolean) => ({
-    background: "rgba(255,255,255,0.03)",
-    border: "1px solid rgba(255,255,255,0.08)",
+    background: "var(--clr-surface-overlay-alt)",
+    border: "1px solid var(--clr-border-overlay)",
     borderRadius: "18px",
     padding: compact ? "14px" : "20px",
-    color: "#eaecef",
+    color: "var(--clr-text-bright)",
     fontSize: "14px",
     minWidth: 0,
   }),
@@ -318,7 +318,7 @@ const styles = {
     display: "flex",
     gap: "8px",
     marginBottom: "16px",
-    borderBottom: "1px solid #2a2e35",
+    borderBottom: "1px solid var(--clr-border)",
     paddingBottom: "12px"
   },
 
@@ -326,8 +326,8 @@ const styles = {
     padding: "6px 14px",
     border: "none",
     borderRadius: "6px",
-    background: active ? "#3498db" : "transparent",
-    color: active ? "#ffffff" : "#848e9c",
+    background: active ? "var(--clr-blue)" : "transparent",
+    color: active ? "#ffffff" : "var(--clr-text)",
     cursor: "pointer",
     fontSize: "13px",
     fontWeight: "600",
@@ -342,8 +342,8 @@ const styles = {
   },
 
   balanceCard: {
-    background: "rgba(255,255,255,0.04)",
-    border: "1px solid rgba(255,255,255,0.08)",
+    background: "var(--clr-surface-overlay)",
+    border: "1px solid var(--clr-border-overlay)",
     borderRadius: "16px",
     padding: "14px",
     textAlign: "center" as const,
@@ -352,14 +352,14 @@ const styles = {
 
   balanceLabel: {
     fontSize: "12px",
-    color: "#848e9c",
+    color: "var(--clr-text)",
     marginBottom: "6px"
   },
 
   balanceValue: {
     fontSize: "16px",
     fontWeight: "700",
-    color: "#0ecb81"
+    color: "var(--clr-green)"
   },
 
   statusBadge: {
@@ -386,8 +386,8 @@ const styles = {
   } as React.CSSProperties,
 
   metricCard: {
-    background: "rgba(255,255,255,0.04)",
-    border: "1px solid rgba(255,255,255,0.08)",
+    background: "var(--clr-surface-overlay)",
+    border: "1px solid var(--clr-border-overlay)",
     borderRadius: "14px",
     padding: "12px",
   } as React.CSSProperties,
@@ -395,12 +395,12 @@ const styles = {
   metricLabel: {
     display: "block",
     fontSize: "11px",
-    color: "#94a3b8",
+    color: "var(--clr-text-muted)",
     marginBottom: "6px",
   } as React.CSSProperties,
 
   miniNote: {
-    color: "#94a3b8",
+    color: "var(--clr-text-muted)",
     fontSize: "12px",
     lineHeight: 1.5,
     marginTop: "6px",
@@ -411,9 +411,9 @@ const styles = {
     flexDirection: "column" as const,
     gap: "10px",
     padding: "14px",
-    background: "rgba(255,255,255,0.04)",
+    background: "var(--clr-surface-overlay)",
     borderRadius: "14px",
-    border: "1px solid rgba(255,255,255,0.08)",
+    border: "1px solid var(--clr-border-overlay)",
   } as React.CSSProperties,
 
   compactView: {
@@ -427,7 +427,7 @@ const styles = {
     justifyContent: "space-between",
     alignItems: "center",
     fontSize: "13px",
-    color: "#dfe7f8",
+    color: "var(--clr-text-bright)",
   },
 
   portfolioTotal: {
@@ -436,15 +436,15 @@ const styles = {
     alignItems: "center",
     marginTop: "16px",
     paddingTop: "16px",
-    borderTop: "1px solid #2a2e35",
+    borderTop: "1px solid var(--clr-border)",
     fontSize: "12px",
-    color: "#848e9c"
+    color: "var(--clr-text)"
   },
 
   portfolioValue: {
     fontSize: "16px",
     fontWeight: "700",
-    color: "#0ecb81"
+    color: "var(--clr-green)"
   },
 
   positionsTable: {
@@ -457,48 +457,48 @@ const styles = {
     display: "grid",
     gridTemplateColumns: "1fr 1fr 1fr 1fr",
     padding: "10px 12px",
-    background: "#161a1e",
-    border: "1px solid #2a2e35",
+    background: "var(--clr-panel)",
+    border: "1px solid var(--clr-border)",
     borderRadius: "6px 6px 0 0",
     fontSize: "12px",
     fontWeight: "600",
-    color: "#848e9c"
+    color: "var(--clr-text)"
   },
 
   tableRow: {
     display: "grid",
     gridTemplateColumns: "1fr 1fr 1fr 1fr",
     padding: "10px 12px",
-    background: "#161a1e",
-    borderLeft: "1px solid #2a2e35",
-    borderRight: "1px solid #2a2e35",
-    borderBottom: "1px solid #2a2e35",
+    background: "var(--clr-panel)",
+    borderLeft: "1px solid var(--clr-border)",
+    borderRight: "1px solid var(--clr-border)",
+    borderBottom: "1px solid var(--clr-border)",
     fontSize: "13px"
   },
 
   positionCount: {
     fontSize: "13px",
-    color: "#848e9c"
+    color: "var(--clr-text)"
   },
 
   emptyState: {
     textAlign: "center" as const,
     padding: "24px",
-    color: "#848e9c"
+    color: "var(--clr-text)"
   },
 
   errorBox: {
     padding: "12px",
-    background: "#f6465d20",
-    border: "1px solid #f6465d",
+    background: "var(--clr-red-dim)",
+    border: "1px solid var(--clr-red)",
     borderRadius: "6px",
-    color: "#f6465d",
+    color: "var(--clr-red)",
     fontSize: "13px"
   },
 
   skeleton: {
     height: "100px",
-    background: "linear-gradient(90deg, #161a1e 25%, #1f2530 50%, #161a1e 75%)",
+    background: "linear-gradient(90deg, var(--clr-panel) 25%, var(--clr-hover) 50%, var(--clr-panel) 75%)",
     backgroundSize: "200% 100%",
     animation: "loading 1.5s infinite",
     borderRadius: "6px"

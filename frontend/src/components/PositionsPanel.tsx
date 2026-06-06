@@ -14,16 +14,6 @@ type Position = {
   status?: string;
 };
 
-const COLORS = {
-  bgPanel: "#161a1e",
-  border: "#2a2e35",
-  text: "#848e9c",
-  textBright: "#eaecef",
-  green: "#0ecb81",
-  red: "#f6465d",
-  amber: "#f0b90b",
-};
-
 function formatPrice(p: number) {
   if (!p || isNaN(p)) return "—";
   const a = Math.abs(p);
@@ -145,51 +135,51 @@ export default function PositionsPanel({ serverPositions }: PositionsPanelProps)
     setSummary((prev) => ({ ...prev, totalEquity, usedMargin, freeMargin: totalEquity - usedMargin }));
   }, [throttledTick]);
 
-  const marginRatio = summary.totalEquity > 0 ? (summary.usedMargin / summary.totalEquity) * 100 : 0;
-  const meterColor = marginRatio >= 85 ? COLORS.red : marginRatio >= 60 ? COLORS.amber : COLORS.green;
+const marginRatio = summary.totalEquity > 0 ? (summary.usedMargin / summary.totalEquity) * 100 : 0;
+const meterColor = marginRatio >= 85 ? "var(--clr-red)" : marginRatio >= 60 ? "var(--clr-amber)" : "var(--clr-green)";
 
   return (
-    <div style={{ background: COLORS.bgPanel, border: `1px solid ${COLORS.border}`, padding: 10, fontSize: 12, color: COLORS.text }}>
+    <div style={{ background: "var(--clr-panel)", border: "1px solid var(--clr-border)", padding: 10, fontSize: 12, color: "var(--clr-text)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <div>
-          <div style={{ fontSize: 11, color: COLORS.text }}>Total Equity</div>
-          <div style={{ fontWeight: 700, fontSize: 16, color: COLORS.textBright }}>${(summary.totalEquity || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+          <div style={{ fontSize: 11, color: "var(--clr-text)" }}>Total Equity</div>
+          <div style={{ fontWeight: 700, fontSize: 16, color: "var(--clr-text-bright)" }}>${(summary.totalEquity || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
         </div>
         <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: 11, color: COLORS.text }}>Used Margin</div>
-          <div style={{ fontWeight: 700, fontSize: 16, color: COLORS.textBright }}>${(summary.usedMargin || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+          <div style={{ fontSize: 11, color: "var(--clr-text)" }}>Used Margin</div>
+          <div style={{ fontWeight: 700, fontSize: 16, color: "var(--clr-text-bright)" }}>${(summary.usedMargin || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
         </div>
       </div>
 
       <div style={{ marginBottom: 10 }}>
-        <div style={{ fontSize: 11, color: COLORS.text, marginBottom: 6 }}>Margin Ratio</div>
-        <div style={{ height: 10, width: "100%", background: "rgba(255,255,255,0.04)", borderRadius: 6, overflow: "hidden", border: `1px solid ${COLORS.border}` }}>
+        <div style={{ fontSize: 11, color: "var(--clr-text)", marginBottom: 6 }}>Margin Ratio</div>
+        <div style={{ height: 10, width: "100%", background: "var(--clr-surface-overlay)", borderRadius: 6, overflow: "hidden", border: "1px solid var(--clr-border)" }}>
           <div style={{ width: `${Math.min(100, Math.max(0, marginRatio))}%`, height: "100%", background: meterColor, transition: "width 200ms linear" }} />
         </div>
-        <div style={{ fontSize: 11, color: COLORS.text, marginTop: 6 }}>{marginRatio.toFixed(2)}% — <span style={{ color: meterColor }}>{marginRatio >= 85 ? "High Risk" : marginRatio >= 60 ? "Watch" : "Healthy"}</span></div>
+        <div style={{ fontSize: 11, color: "var(--clr-text)", marginTop: 6 }}>{marginRatio.toFixed(2)}% — <span style={{ color: meterColor }}>{marginRatio >= 85 ? "High Risk" : marginRatio >= 60 ? "Watch" : "Healthy"}</span></div>
       </div>
 
-      <div style={{ maxHeight: 260, overflow: "auto", borderTop: `1px solid ${COLORS.border}`, paddingTop: 8 }}>
-        {positions.length === 0 && <div style={{ color: COLORS.text, textAlign: "center", padding: 20 }}>No open positions</div>}
+      <div style={{ maxHeight: 260, overflow: "auto", borderTop: "1px solid var(--clr-border)", paddingTop: 8 }}>
+        {positions.length === 0 && <div style={{ color: "var(--clr-text)", textAlign: "center", padding: 20 }}>No open positions</div>}
         {positions
           .filter((p: any) => p.id && p.pair && p.side && p.size !== undefined && p.entryPrice !== undefined)
           .map((p: any) => (
-          <div key={p.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, padding: "8px 6px", borderBottom: `1px solid ${COLORS.border}` }}>
+          <div key={p.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, padding: "8px 6px", borderBottom: "1px solid var(--clr-border)" }}>
             <div>
-              <div style={{ fontSize: 11, color: COLORS.text }}>{p.pair}</div>
-              <div style={{ fontWeight: 700, color: COLORS.textBright }}>{p.side?.toUpperCase()} {p.size}</div>
+              <div style={{ fontSize: 11, color: "var(--clr-text)" }}>{p.pair}</div>
+              <div style={{ fontWeight: 700, color: "var(--clr-text-bright)" }}>{p.side?.toUpperCase()} {p.size}</div>
             </div>
             <div>
-              <div style={{ fontSize: 11, color: COLORS.text }}>Entry</div>
-              <div style={{ fontWeight: 700, color: COLORS.textBright }}>{formatPrice(p.entryPrice)}</div>
-              <div style={{ fontSize: 11, color: COLORS.text }}>Mark</div>
-              <div style={{ fontWeight: 700, color: COLORS.textBright }}>{formatPrice(p.markPrice)}</div>
+              <div style={{ fontSize: 11, color: "var(--clr-text)" }}>Entry</div>
+              <div style={{ fontWeight: 700, color: "var(--clr-text-bright)" }}>{formatPrice(p.entryPrice)}</div>
+              <div style={{ fontSize: 11, color: "var(--clr-text)" }}>Mark</div>
+              <div style={{ fontWeight: 700, color: "var(--clr-text-bright)" }}>{formatPrice(p.markPrice)}</div>
             </div>
             <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 11, color: COLORS.text }}>Unrealized PnL</div>
-              <div style={{ fontWeight: 700, color: (p.unrealizedPnL || 0) >= 0 ? COLORS.green : COLORS.red }}>${(p.unrealizedPnL || 0).toFixed(2)}</div>
-              <div style={{ fontSize: 11, color: COLORS.text }}>ROE</div>
-              <div style={{ fontWeight: 700, color: (p.roePct || 0) >= 0 ? COLORS.green : COLORS.red }}>{(p.roePct || 0).toFixed(2)}%</div>
+              <div style={{ fontSize: 11, color: "var(--clr-text)" }}>Unrealized PnL</div>
+              <div style={{ fontWeight: 700, color: (p.unrealizedPnL || 0) >= 0 ? "var(--clr-green)" : "var(--clr-red)" }}>${(p.unrealizedPnL || 0).toFixed(2)}</div>
+              <div style={{ fontSize: 11, color: "var(--clr-text)" }}>ROE</div>
+              <div style={{ fontWeight: 700, color: (p.roePct || 0) >= 0 ? "var(--clr-green)" : "var(--clr-red)" }}>{(p.roePct || 0).toFixed(2)}%</div>
             </div>
           </div>
         ))}

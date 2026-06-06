@@ -36,6 +36,10 @@
   --clr-grid:          rgba(42, 46, 53, 0.6);
   --clr-crosshair:     rgba(132, 142, 156, 0.5);
 
+  --clr-surface-overlay:     rgba(255, 255, 255, 0.04);
+  --clr-surface-overlay-alt: rgba(255, 255, 255, 0.03);
+  --clr-border-overlay:      rgba(255, 255, 255, 0.08);
+
   /* Sizing */
   --header-h:          52px;
   --toolbar-w:         44px;
@@ -73,6 +77,42 @@
   --z-tooltip: 50;
   --z-modal:   100;
   --z-toast:   200;
+}
+
+/* ─── Light Theme ──────────────────────────────────────────────────────────── */
+[data-theme="light"] {
+  --clr-bg:            #f5f6f8;
+  --clr-panel:         #ffffff;
+  --clr-alt:           #f0f2f5;
+  --clr-hover:         #e8eaed;
+  --clr-border:        #d0d5dd;
+  --clr-border-light:  #e2e5ea;
+
+  --clr-text:          #64748b;
+  --clr-text-bright:   #0f172a;
+  --clr-text-muted:    #94a3b8;
+
+  --clr-grid:          rgba(0, 0, 0, 0.08);
+  --clr-crosshair:     rgba(0, 0, 0, 0.12);
+
+  --clr-surface-overlay:     rgba(0, 0, 0, 0.04);
+  --clr-surface-overlay-alt: rgba(0, 0, 0, 0.03);
+  --clr-border-overlay:      rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .trading-dashboard {
+  --dash-bg: #f5f6f8;
+  --dash-panel: #ffffff;
+  --dash-panel-soft: #f0f2f5;
+  --dash-elevated: #e8eaed;
+  --dash-border: rgba(0, 0, 0, 0.10);
+  --dash-border-strong: rgba(0, 0, 0, 0.18);
+  --dash-text: #0f172a;
+  --dash-muted: #64748b;
+  --dash-green: #16a34a;
+  --dash-red: #dc2626;
+  --dash-amber: #d97706;
+  --dash-cyan: #2563eb;
 }
 
 /* ─── Reset & Base ────────────────────────────────────────────────────────── */

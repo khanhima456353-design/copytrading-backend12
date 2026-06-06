@@ -10,6 +10,7 @@ import { initializeCandles, resetCandles, updateLatestCandle, getCandles } from 
 import PositionsPanel from "../components/PositionsPanel";
 import { calculateUnrealizedPnL } from "../services/tradingUtils";
 import { TradingBalanceCard } from "../components/TradingBalanceCard";
+import { useTheme } from "../components/theme/ThemeContext";
 import { Wallet, Trash, Magnet, PaintbrushVertical, RulerDimensionLine, Eraser, ChartCandlestick, ChartLine, BarChart3, ChartArea, ChevronLeft, ChevronRight, Search, Star, Menu, ChevronDown, ChevronUp, Check, X, Info } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -63,6 +64,13 @@ const TF_SECONDS: Record<string, number> = {
   "1w": 604800,
 };
 
+function alpha(hex: string, a: number) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
 function normalizeTimeframe(value: string | undefined) {
   if (!value || typeof value !== "string") return "1d";
   return value.toLowerCase().trim();
@@ -70,22 +78,33 @@ function normalizeTimeframe(value: string | undefined) {
 
 // ─── Trading Constants ────────────────────────────────────────────────────────
 
-const FEE_RATE = 0.001; // 0.1% trading fee
-const MIN_ORDER_TOTAL = 5; // Minimum order total in USDT
+const FEE_RATE = 0.001;
+const MIN_ORDER_TOTAL = 5;
 
-const COLORS = {
-  bg: "#0b0e11", bgPanel: "#161a1e", bgAlt: "#1a1e24", bgHover: "#1f2530",
-  border: "#2a2e35", borderLight: "#222730",
-  text: "#848e9c", textBright: "#eaecef", textMuted: "#474d57",
-  green: "#0ecb81", greenDim: "rgba(14,203,129,0.12)",
-  red: "#f6465d", redDim: "rgba(246,70,93,0.12)",
-  blue: "#f0b90b", blueDim: "rgba(240,185,11,0.12)",
-  amber: "#f0b90b", cyan: "#3bc8e8",
-  sma: "#f0b90b", ema: "#0ecb81",
-  bbUpper: "#3b82f6", bbMid: "#8b5cf6", bbLow: "#06b6d4",
-  vwap: "#ec4899",
-  grid: "rgba(42,46,53,0.6)", crosshair: "rgba(132,142,156,0.5)",
-};
+function getColors(theme: string) {
+  const dark = {
+    bg: "#0b0e11", bgPanel: "#161a1e", bgAlt: "#1a1e24", bgHover: "#1f2530",
+    border: "#2a2e35", borderLight: "#222730",
+    text: "#848e9c", textBright: "#eaecef", textMuted: "#474d57",
+    grid: "rgba(42,46,53,0.6)", crosshair: "rgba(132,142,156,0.5)",
+  };
+  const light = {
+    bg: "#f5f6f8", bgPanel: "#ffffff", bgAlt: "#f0f2f5", bgHover: "#e8eaed",
+    border: "#d0d5dd", borderLight: "#e2e5ea",
+    text: "#64748b", textBright: "#0f172a", textMuted: "#94a3b8",
+    grid: "rgba(0,0,0,0.08)", crosshair: "rgba(0,0,0,0.12)",
+  };
+  return {
+    ...(theme === "light" ? light : dark),
+    green: "#0ecb81", greenDim: "rgba(14,203,129,0.12)",
+    red: "#f6465d", redDim: "rgba(246,70,93,0.12)",
+    blue: "#f0b90b", blueDim: "rgba(240,185,11,0.12)",
+    amber: "#f0b90b", cyan: "#3bc8e8",
+    sma: "#f0b90b", ema: "#0ecb81",
+    bbUpper: "#3b82f6", bbMid: "#8b5cf6", bbLow: "#06b6d4",
+    vwap: "#ec4899",
+  };
+}
 
 const DRAWING_TOOLS: { id: DrawingTool; icon: React.ReactNode; label: string; group: string }[] = [
   { id: "cursor",    icon: "⊹",  label: "Cursor",      group: "select" },
@@ -212,7 +231,7 @@ function CoinIcon({ symbol, size, images }: { symbol: string; size?: number; ima
           } else {
             el.style.display = "none";
             const span = document.createElement("span");
-            span.style.cssText = `font-size:${s * 0.55}px;font-weight:700;color:${COLORS.amber}`;
+span.style.cssText = `font-size:${s * 0.55}px;font-weight:700;color:#f0b90b`;
             span.textContent = symbol.slice(0, 3);
             el.parentElement?.appendChild(span);
           }
@@ -228,7 +247,7 @@ function CoinIcon({ symbol, size, images }: { symbol: string; size?: number; ima
       onError={(e) => {
         (e.target as HTMLImageElement).style.display = "none";
         const span = document.createElement("span");
-        span.style.cssText = `font-size:${s * 0.55}px;font-weight:700;color:${COLORS.amber}`;
+        span.style.cssText = `font-size:${s * 0.55}px;font-weight:700;color:${"#f0b90b"}`;
         span.textContent = symbol.slice(0, 3);
         e.currentTarget.parentElement?.appendChild(span);
       }}
@@ -237,10 +256,10 @@ function CoinIcon({ symbol, size, images }: { symbol: string; size?: number; ima
 }
 
 function orderBookIcon(mode: 'bid' | 'ask' | 'both') {
-  const top = mode === 'bid' ? '#22c55e' : '#ef4444';
-  const topFd = mode === 'bid' ? '#22c55e66' : '#ef444466';
-  const bot = mode === 'ask' ? '#ef4444' : '#22c55e';
-  const botFd = mode === 'ask' ? '#ef444466' : '#22c55e66';
+  const top = mode === 'bid' ? 'var(--clr-green)' : 'var(--clr-red)';
+  const topFd = mode === 'bid' ? 'var(--clr-green-dim)' : 'var(--clr-red-dim)';
+  const bot = mode === 'ask' ? 'var(--clr-red)' : 'var(--clr-green)';
+  const botFd = mode === 'ask' ? 'var(--clr-red-dim)' : 'var(--clr-green-dim)';
 
   return (
     <svg viewBox="0 0 24 20" width="20" height="20" style={{ verticalAlign: 'middle' }}>
@@ -433,6 +452,8 @@ interface CandleChartProps {
 }
 
 function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair, rsiData, macdData, showRSI, showMACD, liveStatus, activeTool, drawings, onDrawingsChange, drawingColor, drawingWidth, lastPrice, entryPriceLine, toolbarCollapsed }: CandleChartProps) {
+  const { theme } = useTheme();
+  const COLORS = useMemo(() => getColors(theme), [theme]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef({ offset: 0, zoom: 1.0, dragging: false, dragStart: 0, dragOffset: 0, mouseX: -1, mouseY: -1 });
@@ -544,7 +565,7 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
       ctx.beginPath();
       vbb.forEach((b, i) => { const ci = visible.findIndex(c => c.time === b.time); if (ci < 0) return; i === 0 ? ctx.moveTo(toX(ci), toY(b.upper, mainPlotTop, mainPlotH)) : ctx.lineTo(toX(ci), toY(b.upper, mainPlotTop, mainPlotH)); });
       [...vbb].reverse().forEach(b => { const ci = visible.findIndex(c => c.time === b.time); if (ci < 0) return; ctx.lineTo(toX(ci), toY(b.lower, mainPlotTop, mainPlotH)); });
-      ctx.fillStyle = "rgba(59,130,246,0.04)"; ctx.fill();
+      ctx.fillStyle = alpha(COLORS.bbUpper, 0.04); ctx.fill();
       const drawBBLine = (key: "upper" | "middle" | "lower", color: string, dash: number[] = []) => {
         ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 1; if (dash.length) ctx.setLineDash(dash);
         vbb.forEach((b, i) => { const ci = visible.findIndex(c => c.time === b.time); if (ci < 0) return; const x = toX(ci), y = toY(b[key], mainPlotTop, mainPlotH); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
@@ -638,7 +659,7 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
     // RSI
     if (showRSI && rsiData?.length) {
       const rsiTop = mainH + volH, rsiPlotH = rsiH - TIME_AXIS_H;
-      ctx.fillStyle = "rgba(22,26,30,0.7)"; ctx.fillRect(0, rsiTop, W, rsiH);
+      ctx.fillStyle = alpha(COLORS.bgPanel, 0.7); ctx.fillRect(0, rsiTop, W, rsiH);
       ctx.strokeStyle = COLORS.border; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.moveTo(0, rsiTop); ctx.lineTo(W, rsiTop); ctx.stroke();
       ctx.fillStyle = COLORS.textMuted; ctx.font = "10px monospace"; ctx.textAlign = "left"; ctx.fillText("RSI(14)", 6, rsiTop + 14);
       const visRSI = rsiData.filter(p => p.time >= visible[0].time && p.time <= visible[visible.length - 1].time);
@@ -652,13 +673,13 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
       ctx.beginPath(); ctx.strokeStyle = COLORS.amber; ctx.lineWidth = 1.5;
       visRSI.forEach((p, i) => { const ci = visible.findIndex(c => c.time === p.time); if (ci < 0) return; const x = toX(ci), y = rsiToY(p.value); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
       ctx.stroke();
-      if (visRSI.length) { const last = visRSI[visRSI.length - 1]; ctx.fillStyle = last.value > 70 ? COLORS.red : last.value < 30 ? COLORS.green : COLORS.amber; ctx.font = "bold 10px monospace"; ctx.textAlign = "left"; ctx.fillText(last.value.toFixed(1), 50, rsiTop + 14); }
+      if (visRSI.length) { const last = visRSI[visRSI.length - 1]; ctx.fillStyle = last.value > 70 ? COLORS.red : last.value < 30 ? COLORS.green : "#f0b90b"; ctx.font = "bold 10px monospace"; ctx.textAlign = "left"; ctx.fillText(last.value.toFixed(1), 50, rsiTop + 14); }
     }
 
     // MACD
     if (showMACD && macdData) {
       const macdTop = mainH + volH + (showRSI ? rsiH : 0), macdPlotH = macdH - TIME_AXIS_H;
-      ctx.fillStyle = "rgba(22,26,30,0.7)"; ctx.fillRect(0, macdTop, W, macdH);
+      ctx.fillStyle = alpha(COLORS.bgPanel, 0.7); ctx.fillRect(0, macdTop, W, macdH);
       ctx.strokeStyle = COLORS.border; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.moveTo(0, macdTop); ctx.lineTo(W, macdTop); ctx.stroke();
       ctx.fillStyle = COLORS.textMuted; ctx.font = "10px monospace"; ctx.textAlign = "left"; ctx.fillText("MACD(12,26,9)", 6, macdTop + 14);
       const visHist = (macdData.histogram || []).filter((p: any) => p.time >= visible[0].time && p.time <= visible[visible.length - 1].time);
@@ -721,7 +742,7 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
         const isGreen = c.close >= c.open;
         const chg = ((c.close - c.open) / c.open * 100).toFixed(2);
         // Header stats bar (like Binance) - two rows
-        ctx.fillStyle = "rgba(22,26,30,0.95)"; ctx.fillRect(0, 0, plotW, 32);
+        ctx.fillStyle = alpha(COLORS.bgPanel, 0.95); ctx.fillRect(0, 0, plotW, 32);
         const stats = [`O: ${formatPrice(c.open)}`, `H: ${formatPrice(c.high)}`, `L: ${formatPrice(c.low)}`, `C: ${formatPrice(c.close)}`, `V: ${formatVol(c.volume)}`, `${Number(chg) >= 0 ? "+" : ""}${chg}%`];
         ctx.font = "9px monospace"; ctx.textAlign = "left";
         // Top row: O, H, L
@@ -737,7 +758,7 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
         // Price tag on right axis
         const priceY = Math.max(mainPlotTop + 6, Math.min(mainPlotBottom - 4, my));
         const priceAtY = pMin + (pMax - pMin) * (1 - (priceY - mainPlotTop) / mainPlotH);
-        ctx.fillStyle = "#2a2e35"; ctx.fillRect(plotW, priceY - 9, PRICE_AXIS_W, 18);
+        ctx.fillStyle = COLORS.border; ctx.fillRect(plotW, priceY - 9, PRICE_AXIS_W, 18);
         ctx.strokeStyle = COLORS.text; ctx.lineWidth = 0.5; ctx.strokeRect(plotW, priceY - 9, PRICE_AXIS_W, 18);
         ctx.fillStyle = COLORS.textBright; ctx.font = "bold 10px monospace"; ctx.textAlign = "center";
         ctx.fillText(formatPrice(priceAtY), plotW + PRICE_AXIS_W / 2, priceY + 4);
@@ -749,9 +770,8 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
       const entryY = Math.max(mainPlotTop + 2, Math.min(mainPlotBottom - 2, toY(entryPriceLine as number, mainPlotTop, mainPlotH)));
       ctx.strokeStyle = COLORS.amber;
       ctx.lineWidth = 1;
-      ctx.setLineDash([6, 4]);
-      ctx.beginPath(); ctx.moveTo(0, entryY); ctx.lineTo(plotW, entryY); ctx.stroke();
       ctx.setLineDash([]);
+      ctx.strokeRect(plotW, entryY - 9, PRICE_AXIS_W, 18);
       ctx.fillStyle = COLORS.amber;
       ctx.font = "10px monospace";
       ctx.textAlign = "left";
@@ -771,7 +791,7 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
       ctx.setLineDash([]);
       ctx.fillStyle = isGreen ? COLORS.green : COLORS.red;
       ctx.fillRect(plotW, lastY - 10, PRICE_AXIS_W, 20);
-      ctx.fillStyle = "#000"; ctx.font = "bold 11px monospace"; ctx.textAlign = "center";
+      ctx.fillStyle = COLORS.bgPanel; ctx.font = "bold 11px monospace"; ctx.textAlign = "center";
       ctx.fillText(formatPrice(priceForLast), plotW + PRICE_AXIS_W / 2, lastY + 4);
     }
 
@@ -1142,6 +1162,8 @@ type DepthHoverState = {
 };
 
 function DepthChart({ buyLevels, sellLevels, depthLimit, baseSymbol, quoteSymbol }: DepthChartProps) {
+  const { theme } = useTheme();
+  const COLORS = useMemo(() => getColors(theme), [theme]);
   const [hoverPoint, setHoverPoint] = useState<DepthHoverState | null>(null);
   const [zoom, setZoom] = useState(1);
   const [priceStepIndex, setPriceStepIndex] = useState(2);
@@ -1415,12 +1437,12 @@ function DepthChart({ buyLevels, sellLevels, depthLimit, baseSymbol, quoteSymbol
           >
             <defs>
               <linearGradient id="depthBidGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#02c076" stopOpacity="0.16" />
-                <stop offset="100%" stopColor="#02c076" stopOpacity="0" />
+                <stop offset="0%" stopColor={COLORS.green} stopOpacity="0.16" />
+                <stop offset="100%" stopColor={COLORS.green} stopOpacity="0" />
               </linearGradient>
               <linearGradient id="depthAskGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#e44b55" stopOpacity="0.16" />
-                <stop offset="100%" stopColor="#e44b55" stopOpacity="0" />
+                <stop offset="0%" stopColor={COLORS.red} stopOpacity="0.16" />
+                <stop offset="100%" stopColor={COLORS.red} stopOpacity="0" />
               </linearGradient>
               <clipPath id="depthClip">
                 <rect x={padding.left} y={padding.top} width={chartWidth} height={chartHeight} />
@@ -1428,7 +1450,7 @@ function DepthChart({ buyLevels, sellLevels, depthLimit, baseSymbol, quoteSymbol
             </defs>
             <rect x="0" y="0" width={width} height={height} fill="transparent" />
             <g clipPath="url(#depthClip)">
-              <rect x={bestBidX} y={padding.top} width={Math.max(bestAskX - bestBidX, 2)} height={baselineY - padding.top} fill="rgba(255,255,255,0.06)" />
+              <rect x={bestBidX} y={padding.top} width={Math.max(bestAskX - bestBidX, 2)} height={baselineY - padding.top} fill="var(--clr-surface-overlay)" />
               {tickPrices.map((price) => (
                 <g key={price}>
                   <line x1={normalizeX(price)} y1={padding.top} x2={normalizeX(price)} y2={baselineY} stroke={COLORS.border} strokeWidth="0.5" />
@@ -1436,26 +1458,26 @@ function DepthChart({ buyLevels, sellLevels, depthLimit, baseSymbol, quoteSymbol
               ))}
               <path d={buyPath} fill="url(#depthBidGrad)" />
               <path d={sellPath} fill="url(#depthAskGrad)" />
-              <path d={buyLinePath} fill="none" stroke="#26a69a" strokeWidth="2.4" strokeLinecap="round" />
-              <path d={sellLinePath} fill="none" stroke="#ef5350" strokeWidth="2.4" strokeLinecap="round" />
-              <line x1={bestBidX} y1={padding.top} x2={bestBidX} y2={baselineY} stroke="#26a69a" strokeWidth="1" strokeDasharray="3 4" />
-              <line x1={bestAskX} y1={padding.top} x2={bestAskX} y2={baselineY} stroke="#ef5350" strokeWidth="1" strokeDasharray="3 4" />
-              <line x1={midX} y1={padding.top} x2={midX} y2={baselineY} stroke="rgba(255,255,255,0.24)" strokeWidth="1" strokeDasharray="4 4" />
+              <path d={buyLinePath} fill="none" stroke={COLORS.green} strokeWidth="2.4" strokeLinecap="round" />
+              <path d={sellLinePath} fill="none" stroke={COLORS.red} strokeWidth="2.4" strokeLinecap="round" />
+              <line x1={bestBidX} y1={padding.top} x2={bestBidX} y2={baselineY} stroke={COLORS.green} strokeWidth="1" strokeDasharray="3 4" />
+              <line x1={bestAskX} y1={padding.top} x2={bestAskX} y2={baselineY} stroke={COLORS.red} strokeWidth="1" strokeDasharray="3 4" />
+              <line x1={midX} y1={padding.top} x2={midX} y2={baselineY} stroke="var(--clr-border)" strokeWidth="1" strokeDasharray="4 4" />
               {hoverPoint && (
                 <>
-                  <line x1={hoverPoint.x} y1={padding.top} x2={hoverPoint.x} y2={baselineY} stroke="rgba(255,255,255,0.18)" strokeWidth="1" strokeDasharray="2 4" />
-                  <line x1={padding.left} y1={hoverPoint.y} x2={width - padding.right} y2={hoverPoint.y} stroke="rgba(255,255,255,0.12)" strokeWidth="1" strokeDasharray="2 4" />
-                  <circle cx={hoverPoint.snapX} cy={hoverPoint.snapY} r={4} fill={hoverPoint.side === "buy" ? "#02c076" : "#e44b55"} />
+                  <line x1={hoverPoint.x} y1={padding.top} x2={hoverPoint.x} y2={baselineY} stroke="var(--clr-border-overlay)" strokeWidth="1" strokeDasharray="2 4" />
+                  <line x1={padding.left} y1={hoverPoint.y} x2={width - padding.right} y2={hoverPoint.y} stroke="var(--clr-border-overlay)" strokeWidth="1" strokeDasharray="2 4" />
+                  <circle cx={hoverPoint.snapX} cy={hoverPoint.snapY} r={4} fill={hoverPoint.side === "buy" ? COLORS.green : COLORS.red} />
                 </>
               )}
             </g>
             <text x={padding.left} y={padding.top - 8} fill={COLORS.textMuted} fontSize="10">
               Depth volume
             </text>
-            <text x={bestBidX} y={baselineY - 12} fill="#26a69a" fontSize="10" textAnchor="middle" fontWeight="700">
+            <text x={bestBidX} y={baselineY - 12} fill={COLORS.green} fontSize="10" textAnchor="middle" fontWeight="700">
               Bid {formatPrice(bestBid)}
             </text>
-            <text x={bestAskX} y={baselineY - 12} fill="#ef5350" fontSize="10" textAnchor="middle" fontWeight="700">
+            <text x={bestAskX} y={baselineY - 12} fill={COLORS.red} fontSize="10" textAnchor="middle" fontWeight="700">
               Ask {formatPrice(bestAsk)}
             </text>
           </svg>
@@ -1470,6 +1492,8 @@ function DepthChart({ buyLevels, sellLevels, depthLimit, baseSymbol, quoteSymbol
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function Trading() {
+  const { theme } = useTheme();
+  const COLORS = useMemo(() => getColors(theme), [theme]);
   const saved = loadLayout();
 
   const [symbols, setSymbols] = useState<string[]>([]);
@@ -2329,7 +2353,7 @@ export default function Trading() {
               style={{
                 background: depthLimit === limit ? COLORS.bgHover : "transparent",
                 border: `1px solid ${depthLimit === limit ? COLORS.border : "transparent"}`,
-                color: depthLimit === limit ? COLORS.amber : COLORS.text,
+                color: depthLimit === limit ? "#f0b90b" : COLORS.text,
                 cursor: "pointer",
                 padding: "2px 5px",
                 borderRadius: 3,
@@ -2401,8 +2425,8 @@ export default function Trading() {
       {/* Pair tabs */}
       <div style={{ display: "flex", borderBottom: `1px solid ${COLORS.border}`, padding: "0 6px" }}>
         {(["fav", "usdt"] as const).map(tab => (
-          <button key={tab} onClick={() => setPairTab(tab)} style={{ flex: 1, padding: "6px 0", background: "transparent", border: "none", cursor: "pointer", fontSize: 11, color: pairTab === tab ? COLORS.amber : COLORS.text, borderBottom: pairTab === tab ? `2px solid ${COLORS.amber}` : "2px solid transparent", fontWeight: pairTab === tab ? 700 : 400 }}>
-            {tab === "fav" ? <Star size={11} style={{ color: COLORS.amber, fill: COLORS.amber }} /> : tab.toUpperCase()}
+          <button key={tab} onClick={() => setPairTab(tab)} style={{ flex: 1, padding: "6px 0", background: "transparent", border: "none", cursor: "pointer", fontSize: 11, color: pairTab === tab ? "#f0b90b" : COLORS.text, borderBottom: pairTab === tab ? `2px solid ${"#f0b90b"}` : "2px solid transparent", fontWeight: pairTab === tab ? 700 : 400 }}>
+            {tab === "fav" ? <Star size={11} style={{ color: "#f0b90b", fill: "#f0b90b" }} /> : tab.toUpperCase()}
           </button>
         ))}
       </div>
@@ -2421,7 +2445,7 @@ export default function Trading() {
           const chg = mover?.change || 0;
           const symbolLabel = pair.split("/")[0];
           return (
-            <div key={pair} onClick={() => switchSymbol(pair)} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", padding: "3px 6px", minHeight: 36, cursor: "pointer", background: pair === symbol ? COLORS.bgHover : "transparent", borderLeft: pair === symbol ? `2px solid ${COLORS.amber}` : "2px solid transparent" }}
+            <div key={pair} onClick={() => switchSymbol(pair)} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", padding: "3px 6px", minHeight: 36, cursor: "pointer", background: pair === symbol ? COLORS.bgHover : "transparent", borderLeft: pair === symbol ? `2px solid ${"#f0b90b"}` : "2px solid transparent" }}
               onMouseEnter={e => { if (pair !== symbol) (e.currentTarget as HTMLElement).style.background = COLORS.bgAlt; }}
               onMouseLeave={e => { if (pair !== symbol) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
             >
@@ -2453,7 +2477,7 @@ export default function Trading() {
     <div style={{ borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel }}>
       <div style={{ display: "flex", borderBottom: `1px solid ${COLORS.border}` }}>
         {(["market", "mytrades"] as const).map(tab => (
-          <button key={tab} onClick={() => setRightTab(tab)} style={{ flex: 1, padding: "6px 0", background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: rightTab === tab ? COLORS.textBright : COLORS.text, borderBottom: rightTab === tab ? `2px solid ${COLORS.amber}` : "2px solid transparent", fontWeight: rightTab === tab ? 600 : 400 }}>
+          <button key={tab} onClick={() => setRightTab(tab)} style={{ flex: 1, padding: "6px 0", background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: rightTab === tab ? COLORS.textBright : COLORS.text, borderBottom: rightTab === tab ? `2px solid ${"#f0b90b"}` : "2px solid transparent", fontWeight: rightTab === tab ? 600 : 400 }}>
             {tab === "market" ? "Market Trades" : "My Trades"}
           </button>
         ))}
@@ -2676,7 +2700,7 @@ export default function Trading() {
     { label: "Price", value: orderType === "market" ? `~${formatPrice(lastPrice)} USDT (Market)` : `${formatPrice(Number(priceInput))} USDT` },
     { label: "Amount", value: `${pendingOrderSide === "buy" ? buyAmountInput || "0" : sellAmountInput || "0"} BTC` },
     { label: "Total", value: `~$${pendingOrderSide === "buy" ? (buyTotal || 0).toFixed(2) : (sellTotal || 0).toFixed(2)} USDT` },
-    { label: "Est. Fee (0.1%)", value: `~$${pendingOrderSide === "buy" ? buyFee.toFixed(4) : sellFee.toFixed(4)} USDT`, color: COLORS.amber },
+    { label: "Est. Fee (0.1%)", value: `~$${pendingOrderSide === "buy" ? buyFee.toFixed(4) : sellFee.toFixed(4)} USDT`, color: "#f0b90b" },
   ], [symbol, orderType, pendingOrderSide, lastPrice, priceInput, buyAmountInput, sellAmountInput, buyTotal, sellTotal, buyFee, sellFee]);
 
   const initChartCandles = useCallback((nextCandles: Candle[]) => {
@@ -2885,7 +2909,7 @@ export default function Trading() {
       {/* ── WALLET + LIVE STATUS (desktop top-right) ── */}
       {isDesktopLayout && (
         <div style={{ position: "absolute", top: 8, right: 12, zIndex: 100, display: "flex", alignItems: "center", gap: 8 }}>
-          <button onClick={() => setShowWallet(p => !p)} style={{ padding: "3px 8px", height: 26, background: showWallet ? COLORS.amber : "transparent", border: `1px solid ${showWallet ? COLORS.amber : COLORS.border}`, borderRadius: 4, color: showWallet ? "#000" : COLORS.text, cursor: "pointer", fontSize: 10, fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
+          <button onClick={() => setShowWallet(p => !p)} style={{ padding: "3px 8px", height: 26, background: showWallet ? "#f0b90b" : "transparent", border: `1px solid ${showWallet ? "#f0b90b" : COLORS.border}`, borderRadius: 4, color: showWallet ? "#000" : COLORS.text, cursor: "pointer", fontSize: 10, fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
             <Wallet size={12} /> Wallet {showWallet ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
           </button>
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -2921,11 +2945,11 @@ export default function Trading() {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 12, flexShrink: 0 }}>
             {!isDesktopLayout && (
-            <button className="trading-pairs-toggle" onClick={() => setShowPairSelector(p => !p)} style={{ padding: "3px 8px", height: 26, background: showPairSelector ? COLORS.amber : "transparent", border: `1px solid ${showPairSelector ? COLORS.amber : COLORS.border}`, borderRadius: 4, color: showPairSelector ? "#000" : COLORS.text, cursor: "pointer", fontSize: 10, fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
+            <button className="trading-pairs-toggle" onClick={() => setShowPairSelector(p => !p)} style={{ padding: "3px 8px", height: 26, background: showPairSelector ? "#f0b90b" : "transparent", border: `1px solid ${showPairSelector ? "#f0b90b" : COLORS.border}`, borderRadius: 4, color: showPairSelector ? "#000" : COLORS.text, cursor: "pointer", fontSize: 10, fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
               {showPairSelector ? <ChevronUp size={12} /> : <Menu size={12} />} <span style={{ fontSize: 9, opacity: 0.7 }}>Pairs</span>
             </button>
             )}
-            {!isDesktopLayout && (<button onClick={() => setShowWallet(p => !p)} style={{ padding: "3px 8px", height: 26, background: showWallet ? COLORS.amber : "transparent", border: `1px solid ${showWallet ? COLORS.amber : COLORS.border}`, borderRadius: 4, color: showWallet ? "#000" : COLORS.text, cursor: "pointer", fontSize: 10, fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
+            {!isDesktopLayout && (<button onClick={() => setShowWallet(p => !p)} style={{ padding: "3px 8px", height: 26, background: showWallet ? "#f0b90b" : "transparent", border: `1px solid ${showWallet ? "#f0b90b" : COLORS.border}`, borderRadius: 4, color: showWallet ? "#000" : COLORS.text, cursor: "pointer", fontSize: 10, fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
               <Wallet size={12} /> Wallet {showWallet ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
             </button>)}
             {!isDesktopLayout && (<><span style={{ width: 8, height: 8, borderRadius: "50%", background: liveStatus === "live" ? COLORS.green : COLORS.red, display: "inline-block", boxShadow: liveStatus === "live" ? `0 0 6px ${COLORS.green}` : "none" }} />
@@ -2984,12 +3008,12 @@ export default function Trading() {
           { id: "info", label: "Info" },
           { id: "tradingdata", label: "Trading Data" },
         ] as const).map(tab => (
-          <button key={tab.id} onClick={() => setActiveViewTab(tab.id)} style={{ padding: "0 16px", height: "100%", background: "transparent", border: "none", cursor: "pointer", fontSize: 13, color: activeViewTab === tab.id ? COLORS.textBright : COLORS.text, borderBottom: activeViewTab === tab.id ? `2px solid ${COLORS.amber}` : "2px solid transparent", fontWeight: activeViewTab === tab.id ? 600 : 400 }}>{tab.label}</button>
+          <button key={tab.id} onClick={() => setActiveViewTab(tab.id)} style={{ padding: "0 16px", height: "100%", background: "transparent", border: "none", cursor: "pointer", fontSize: 13, color: activeViewTab === tab.id ? COLORS.textBright : COLORS.text, borderBottom: activeViewTab === tab.id ? `2px solid ${"#f0b90b"}` : "2px solid transparent", fontWeight: activeViewTab === tab.id ? 600 : 400 }}>{tab.label}</button>
         ))}
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", borderRadius: 10, background: COLORS.bgAlt, border: `1px solid ${COLORS.border}` }}>
           <img src={logo} alt="SwanCore logo" style={{ width: 32, height: 32, borderRadius: 4, objectFit: "contain", imageRendering: "auto", background: COLORS.bg, padding: 2 }} />
           <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.1 }}>
-            <span style={{ color: COLORS.amber, fontSize: 14, fontWeight: 800 }}>SwanCore</span>
+            <span style={{ color: "#f0b90b", fontSize: 14, fontWeight: 800 }}>SwanCore</span>
             <span style={{ color: COLORS.textMuted, fontSize: 10 }}>Simplified Trading</span>
           </div>
         </div>
@@ -3001,7 +3025,7 @@ export default function Trading() {
         {/* Pinned Timeframes */}
         <div style={{ display: "flex", gap: 1 }}>
           {["1m", "15m", "1h", "4h", "1d", "1w"].map(tf => (
-            <button key={tf} onClick={() => setTimeframe(normalizeTimeframe(tf))} style={{ padding: "3px 6px", background: timeframe === tf ? COLORS.bgHover : "transparent", border: timeframe === tf ? `1px solid ${COLORS.border}` : "1px solid transparent", borderRadius: 3, color: timeframe === tf ? COLORS.amber : COLORS.text, cursor: "pointer", fontSize: 11, fontWeight: timeframe === tf ? 700 : 400, minWidth: "32px", textAlign: "center" }}>{tf}</button>
+            <button key={tf} onClick={() => setTimeframe(normalizeTimeframe(tf))} style={{ padding: "3px 6px", background: timeframe === tf ? COLORS.bgHover : "transparent", border: timeframe === tf ? `1px solid ${COLORS.border}` : "1px solid transparent", borderRadius: 3, color: timeframe === tf ? "#f0b90b" : COLORS.text, cursor: "pointer", fontSize: 11, fontWeight: timeframe === tf ? 700 : 400, minWidth: "32px", textAlign: "center" }}>{tf}</button>
           ))}
         </div>
         {/* Time dropdown */}
@@ -3014,7 +3038,7 @@ export default function Trading() {
             <div style={{ position: "absolute", top: "100%", left: 0, background: COLORS.bgPanel, border: `1px solid ${COLORS.border}`, borderRadius: 4, zIndex: 1002, minWidth: "120px", maxHeight: "200px", overflow: "auto" }}>
               <div style={{ padding: "4px 8px", fontSize: 10, color: COLORS.textMuted, fontWeight: 700, borderBottom: `1px solid ${COLORS.borderLight}` }}>Available</div>
               {["3m", "5m", "30m", "2h", "6h", "8h", "12h"].map(tf => (
-                <button key={tf} onClick={() => { setTimeframe(normalizeTimeframe(tf)); setShowTimeDropdown(false); }} style={{ width: "100%", padding: "6px 8px", background: timeframe === tf ? COLORS.bgHover : "transparent", border: "none", color: timeframe === tf ? COLORS.amber : COLORS.text, cursor: "pointer", fontSize: 11, textAlign: "left", display: "block" }}>{tf}</button>
+                <button key={tf} onClick={() => { setTimeframe(normalizeTimeframe(tf)); setShowTimeDropdown(false); }} style={{ width: "100%", padding: "6px 8px", background: timeframe === tf ? COLORS.bgHover : "transparent", border: "none", color: timeframe === tf ? "#f0b90b" : COLORS.text, cursor: "pointer", fontSize: 11, textAlign: "left", display: "block" }}>{tf}</button>
               ))}
             </div>
           )}
@@ -3022,12 +3046,12 @@ export default function Trading() {
         <div style={{ width: 1, height: 18, background: COLORS.border, margin: "0 6px" }} />
         {/* Chart types */}
         {([[<ChartCandlestick size={16} />, "candlestick"], [<ChartLine size={16} />, "line"], [<ChartArea size={16} />, "area"], [<BarChart3 size={16} />, "bar"]] as [React.ReactNode, typeof chartType][]).map(([icon, ct]) => (
-          <button key={ct} onClick={() => setChartType(ct)} title={ct} style={{ width: 26, height: 26, background: chartType === ct ? COLORS.bgHover : "transparent", border: chartType === ct ? `1px solid ${COLORS.border}` : "1px solid transparent", borderRadius: 3, color: chartType === ct ? COLORS.amber : COLORS.text, cursor: "pointer", fontSize: 14 }}>{icon}</button>
+          <button key={ct} onClick={() => setChartType(ct)} title={ct} style={{ width: 26, height: 26, background: chartType === ct ? COLORS.bgHover : "transparent", border: chartType === ct ? `1px solid ${COLORS.border}` : "1px solid transparent", borderRadius: 3, color: chartType === ct ? "#f0b90b" : COLORS.text, cursor: "pointer", fontSize: 14 }}>{icon}</button>
         ))}
         <div style={{ width: 1, height: 18, background: COLORS.border, margin: isDesktop ? "0 8px" : "0 6px" }} />
         {/* View tabs (Original / Trading View / Depth) */}
         {(["original", "tradingview", "depth"] as const).map(tab => (
-          <button key={tab} onClick={() => setActiveChartTab(tab)} style={{ padding: isDesktop ? "3px 10px" : "3px 8px", marginLeft: tab === "original" ? 0 : (isDesktop ? 6 : 4), background: activeChartTab === tab ? COLORS.bgHover : "transparent", border: activeChartTab === tab ? `1px solid ${COLORS.border}` : "1px solid transparent", borderRadius: 3, color: activeChartTab === tab ? COLORS.amber : COLORS.text, cursor: "pointer", fontSize: 11, fontWeight: activeChartTab === tab ? 700 : 400 }}>
+          <button key={tab} onClick={() => setActiveChartTab(tab)} style={{ padding: isDesktop ? "3px 10px" : "3px 8px", marginLeft: tab === "original" ? 0 : (isDesktop ? 6 : 4), background: activeChartTab === tab ? COLORS.bgHover : "transparent", border: activeChartTab === tab ? `1px solid ${COLORS.border}` : "1px solid transparent", borderRadius: 3, color: activeChartTab === tab ? "#f0b90b" : COLORS.text, cursor: "pointer", fontSize: 11, fontWeight: activeChartTab === tab ? 700 : 400 }}>
             {tab === "original" ? "Original" : tab === "tradingview" ? "Trading View" : "Depth"}
           </button>
         ))}
@@ -3038,7 +3062,7 @@ export default function Trading() {
           { k: "EMA", a: showEMA, s: setShowEMA, c: COLORS.ema },
           { k: "BB",  a: showBollinger, s: setShowBollinger, c: COLORS.bbUpper },
           { k: "VWAP",a: showVWAP, s: setShowVWAP, c: COLORS.vwap },
-          { k: "RSI", a: showRSI, s: setShowRSI, c: COLORS.amber },
+          { k: "RSI", a: showRSI, s: setShowRSI, c: "#f0b90b" },
           { k: "MACD",a: showMACD, s: setShowMACD, c: "#8b5cf6" },
         ].map(ind => (
           <button key={ind.k} onClick={() => ind.s((p: boolean) => !p)} style={{ padding: "2px 7px", borderRadius: 3, border: `1px solid ${ind.a ? ind.c : COLORS.border}`, background: ind.a ? `${ind.c}22` : "transparent", color: ind.a ? ind.c : COLORS.text, cursor: "pointer", fontSize: 10, fontWeight: ind.a ? 700 : 400 }}>{ind.k}</button>
@@ -3058,7 +3082,7 @@ export default function Trading() {
               <>
                 <div style={{ height: 30, flexShrink: 0 }} />
                 {DRAWING_TOOLS.map(tool => (
-                  <button key={tool.id} title={tool.label} onClick={() => setActiveTool(tool.id)} style={{ width: 32, height: 32, flexShrink: 0, background: activeTool === tool.id ? COLORS.bgHover : "transparent", border: activeTool === tool.id ? `1px solid ${COLORS.border}` : "1px solid transparent", borderRadius: 4, color: activeTool === tool.id ? COLORS.amber : COLORS.text, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
+                  <button key={tool.id} title={tool.label} onClick={() => setActiveTool(tool.id)} style={{ width: 32, height: 32, flexShrink: 0, background: activeTool === tool.id ? COLORS.bgHover : "transparent", border: activeTool === tool.id ? `1px solid ${COLORS.border}` : "1px solid transparent", borderRadius: 4, color: activeTool === tool.id ? "#f0b90b" : COLORS.text, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
                     onMouseEnter={e => { if (activeTool !== tool.id) (e.currentTarget as HTMLElement).style.background = COLORS.bgHover; }}
                     onMouseLeave={e => { if (activeTool !== tool.id) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
                   >{tool.icon}</button>
@@ -3066,8 +3090,8 @@ export default function Trading() {
                 <div style={{ width: 24, height: 1, background: COLORS.border, margin: "4px 0" }} />
                 <input type="color" value={drawingColor} onChange={e => setDrawingColor(e.target.value)} style={{ width: 28, height: 28, border: `2px solid ${COLORS.border}`, borderRadius: 4, cursor: "pointer", padding: 2, background: "none" }} />
                 {[1, 2, 3].map(w => (
-                  <button key={w} title={`Line ${w}px`} onClick={() => setDrawingWidth(w)} style={{ width: 32, height: 20, flexShrink: 0, background: drawingWidth === w ? COLORS.bgHover : "transparent", border: drawingWidth === w ? `1px solid ${COLORS.amber}` : `1px solid transparent`, borderRadius: 3, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <div style={{ width: 18, height: w, background: drawingWidth === w ? COLORS.amber : COLORS.text, borderRadius: 1 }} />
+                  <button key={w} title={`Line ${w}px`} onClick={() => setDrawingWidth(w)} style={{ width: 32, height: 20, flexShrink: 0, background: drawingWidth === w ? COLORS.bgHover : "transparent", border: drawingWidth === w ? `1px solid ${"#f0b90b"}` : `1px solid transparent`, borderRadius: 3, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <div style={{ width: 18, height: w, background: drawingWidth === w ? "#f0b90b" : COLORS.text, borderRadius: 1 }} />
                   </button>
                 ))}
                 <button title="Clear all drawings" onClick={() => setDrawings([])} style={{ width: 32, height: 32, flexShrink: 0, background: "transparent", border: "1px solid transparent", borderRadius: 4, color: COLORS.red, cursor: "pointer", marginTop: 4, display: "grid", placeItems: "center" }}>
@@ -3186,7 +3210,7 @@ export default function Trading() {
           {/* Tab row */}
           <div className="trading-order-form__tabs" style={{ display: "flex", alignItems: "center", height: 36, borderBottom: `1px solid ${COLORS.border}`, padding: "0 12px", gap: 0, flexShrink: 0 }}>
             {(["Spot", "Cross", "Isolated", "Grid"] as const).map(t => (
-              <button key={t} onClick={() => setActiveTab(t.toLowerCase() as any)} style={{ padding: "0 14px", height: "100%", background: "transparent", border: "none", cursor: "pointer", fontSize: 13, color: activeTab === t.toLowerCase() ? COLORS.textBright : COLORS.text, borderBottom: activeTab === t.toLowerCase() ? `2px solid ${COLORS.amber}` : "2px solid transparent", fontWeight: activeTab === t.toLowerCase() ? 600 : 400 }}>{t}</button>
+              <button key={t} onClick={() => setActiveTab(t.toLowerCase() as any)} style={{ padding: "0 14px", height: "100%", background: "transparent", border: "none", cursor: "pointer", fontSize: 13, color: activeTab === t.toLowerCase() ? COLORS.textBright : COLORS.text, borderBottom: activeTab === t.toLowerCase() ? `2px solid ${"#f0b90b"}` : "2px solid transparent", fontWeight: activeTab === t.toLowerCase() ? 600 : 400 }}>{t}</button>
             ))}
           </div>
           {activeTab === "grid" ? (
@@ -3206,7 +3230,7 @@ export default function Trading() {
             {/* Order type tabs */}
             <div style={{ display: "flex", gap: 12, marginBottom: 2 }}>
               {(["Limit", "Market", "Stop Limit", "OCO"] as const).map(t => (
-                <button key={t} onClick={() => handleOrderTypeChange(t.toLowerCase().replace(" ", "-") as any)} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: orderType === t.toLowerCase().replace(" ", "-") ? COLORS.textBright : COLORS.text, borderBottom: orderType === t.toLowerCase().replace(" ", "-") ? `2px solid ${COLORS.amber}` : "2px solid transparent", paddingBottom: 2 }}>{t}</button>
+                <button key={t} onClick={() => handleOrderTypeChange(t.toLowerCase().replace(" ", "-") as any)} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: orderType === t.toLowerCase().replace(" ", "-") ? COLORS.textBright : COLORS.text, borderBottom: orderType === t.toLowerCase().replace(" ", "-") ? `2px solid ${"#f0b90b"}` : "2px solid transparent", paddingBottom: 2 }}>{t}</button>
               ))}
             </div>
             {/* Price input */}
@@ -3256,12 +3280,12 @@ export default function Trading() {
             </div>
             {/* Slippage */}
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <input type="checkbox" id="slip-buy" checked={slippageTol} onChange={e => setSlippageTol(e.target.checked)} style={{ accentColor: COLORS.amber, width: 13, height: 13 }} />
+              <input type="checkbox" id="slip-buy" checked={slippageTol} onChange={e => setSlippageTol(e.target.checked)} style={{ accentColor: "#f0b90b", width: 13, height: 13 }} />
               <label htmlFor="slip-buy" style={{ fontSize: 11, color: COLORS.text, cursor: "pointer" }}>Slippage Tolerance (1%)</label>
             </div>
             {/* Market warning */}
             {marketWarning && (
-              <div style={{ fontSize: 10, color: COLORS.amber, background: COLORS.blueDim, padding: "4px 8px", borderRadius: 3, border: `1px solid ${COLORS.amber}` }}>{marketWarning}</div>
+              <div style={{ fontSize: 10, color: "#f0b90b", background: COLORS.blueDim, padding: "4px 8px", borderRadius: 3, border: `1px solid ${"#f0b90b"}` }}>{marketWarning}</div>
             )}
             {/* Error message */}
             {buyError && buyAmount > 0 && (
@@ -3272,7 +3296,7 @@ export default function Trading() {
           <div className="trading-order-form__side trading-order-form__side--sell" style={{ flex: 1, padding: "10px 16px", display: isDesktopLayout ? "flex" : windowWidth < 768 && orderSide !== "sell" ? "none" : "flex", flexDirection: "column", gap: 6 }}>
             <div style={{ display: "flex", gap: 12, marginBottom: 2 }}>
               {(["Limit", "Market", "Stop Limit", "OCO"] as const).map(t => (
-                <button key={t} onClick={() => handleOrderTypeChange(t.toLowerCase().replace(" ", "-") as any)} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: orderType === t.toLowerCase().replace(" ", "-") ? COLORS.textBright : COLORS.text, borderBottom: orderType === t.toLowerCase().replace(" ", "-") ? `2px solid ${COLORS.amber}` : "2px solid transparent", paddingBottom: 2 }}>{t}</button>
+                <button key={t} onClick={() => handleOrderTypeChange(t.toLowerCase().replace(" ", "-") as any)} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: orderType === t.toLowerCase().replace(" ", "-") ? COLORS.textBright : COLORS.text, borderBottom: orderType === t.toLowerCase().replace(" ", "-") ? `2px solid ${"#f0b90b"}` : "2px solid transparent", paddingBottom: 2 }}>{t}</button>
               ))}
             </div>
             <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 34 }}>
@@ -3315,7 +3339,7 @@ export default function Trading() {
               <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT</span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <input type="checkbox" id="slip-sell" checked={slippageTol} onChange={e => setSlippageTol(e.target.checked)} style={{ accentColor: COLORS.amber, width: 13, height: 13 }} />
+              <input type="checkbox" id="slip-sell" checked={slippageTol} onChange={e => setSlippageTol(e.target.checked)} style={{ accentColor: "#f0b90b", width: 13, height: 13 }} />
               <label htmlFor="slip-sell" style={{ fontSize: 11, color: COLORS.text, cursor: "pointer" }}>Slippage Tolerance (1%)</label>
             </div>
             {/* Sell error */}
@@ -3436,7 +3460,7 @@ export default function Trading() {
       <div ref={bottomScrollRef} className="trading-bottom-panel trading-dashboard__activity" style={{ borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", height: 36, padding: "0 12px", gap: 0, borderBottom: `1px solid ${COLORS.border}` }}>
           {[["openorders", `Open Orders(${activeOrders.length})`], ["positions", `Positions(${serverPositions.length})`], ["orderhistory", "Order History"], ["tradehistory", "Trade History"], ["holdings", "Holdings"], ["bots", "Bots"]].map(([key, label]) => (
-            <button key={key} onClick={() => setBottomTab(key as any)} style={{ padding: "0 14px", height: "100%", background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: bottomTab === key ? COLORS.textBright : COLORS.text, borderBottom: bottomTab === key ? `2px solid ${COLORS.amber}` : "2px solid transparent", whiteSpace: "nowrap" }}>{label}</button>
+            <button key={key} onClick={() => setBottomTab(key as any)} style={{ padding: "0 14px", height: "100%", background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: bottomTab === key ? COLORS.textBright : COLORS.text, borderBottom: bottomTab === key ? `2px solid ${"#f0b90b"}` : "2px solid transparent", whiteSpace: "nowrap" }}>{label}</button>
           ))}
         </div>
         <div style={{ maxHeight: 120, overflow: "auto" }}>
@@ -3591,7 +3615,7 @@ serverPositions.length === 0
                 </div>
               ))}
               {orderType === "market" && (
-                <div style={{ background: COLORS.blueDim, border: `1px solid ${COLORS.amber}`, borderRadius: 4, padding: "8px 12px", fontSize: 11, color: COLORS.amber }}>
+                <div style={{ background: COLORS.blueDim, border: `1px solid ${"#f0b90b"}`, borderRadius: 4, padding: "8px 12px", fontSize: 11, color: "#f0b90b" }}>
                   ⚠ Market orders execute at the best available price. Final price may differ slightly.
                 </div>
               )}
@@ -3636,7 +3660,7 @@ serverPositions.length === 0
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 {["Withdraw", "Deposit", "Convert"].map(a => (
-                  <button key={a} style={{ padding: "6px 14px", borderRadius: 4, background: a === "Deposit" ? COLORS.amber : "transparent", border: `1px solid ${a === "Deposit" ? COLORS.amber : COLORS.border}`, color: a === "Deposit" ? "#000" : COLORS.textBright, cursor: "pointer", fontWeight: a === "Deposit" ? 700 : 400, fontSize: 12 }}>{a}</button>
+                  <button key={a} style={{ padding: "6px 14px", borderRadius: 4, background: a === "Deposit" ? "#f0b90b" : "transparent", border: `1px solid ${a === "Deposit" ? "#f0b90b" : COLORS.border}`, color: a === "Deposit" ? "#000" : COLORS.textBright, cursor: "pointer", fontWeight: a === "Deposit" ? 700 : 400, fontSize: 12 }}>{a}</button>
                 ))}
               </div>
             </div>
@@ -3682,9 +3706,9 @@ serverPositions.length === 0
         input[type=range] { height: 3px; }
         ::-webkit-scrollbar { width: 3px; height: 3px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #2a2e35; border-radius: 2px; }
-        ::-webkit-scrollbar-thumb:hover { background: #3a3e45; }
-        input:focus { outline: none; border-color: #f0b90b !important; }
+        ::-webkit-scrollbar-thumb { background: var(--clr-border); border-radius: 2px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--clr-hover); }
+        input:focus { outline: none; border-color: var(--clr-amber) !important; }
 
         .trading-header { flex-wrap: nowrap; gap: 12px; }
         .trading-body { display: flex !important; align-items: stretch !important; }
@@ -3724,7 +3748,7 @@ serverPositions.length === 0
           align-items: center;
           justify-content: center;
           padding: 24px;
-          background: rgba(11, 14, 17, 0.88);
+          background: color-mix(in srgb, var(--clr-bg) 88%, transparent);
           backdrop-filter: blur(8px);
         }
         .trading-rotate-prompt__panel {
@@ -3733,9 +3757,9 @@ serverPositions.length === 0
           gap: 14px;
           max-width: 360px;
           padding: 18px;
-          border: 1px solid #2a2e35;
+          border: 1px solid var(--clr-border);
           border-radius: 8px;
-          background: #161a1e;
+          background: var(--clr-bg);
           box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
         }
         .trading-rotate-prompt__icon {
@@ -3744,19 +3768,19 @@ serverPositions.length === 0
           border-radius: 50%;
           display: grid;
           place-items: center;
-          background: rgba(240, 185, 11, 0.12);
-          color: #f0b90b;
+          background: var(--clr-amber-dim);
+          color: var(--clr-amber);
           font-size: 24px;
           flex: 0 0 auto;
         }
         .trading-rotate-prompt__title {
-          color: #eaecef;
+          color: var(--clr-text-bright);
           font-size: 15px;
           font-weight: 800;
           margin-bottom: 4px;
         }
         .trading-rotate-prompt__text {
-          color: #848e9c;
+          color: var(--clr-text);
           font-size: 12px;
           line-height: 1.4;
         }
@@ -3862,7 +3886,7 @@ serverPositions.length === 0
             height: clamp(260px, 38dvh, 420px) !important;
             min-height: 260px !important;
             width: 100% !important;
-            border-bottom: 1px solid #2a2e35;
+          border-bottom: 1px solid var(--clr-border);
             touch-action: pan-y !important;
           }
           .trading-chart-stage canvas {

@@ -48,11 +48,11 @@ export function TradingBalanceCard() {
 
 const styles = {
   card: {
-    background: "#161a1e",
-    border: "1px solid #2a2e35",
+    background: "var(--clr-panel)",
+    border: "1px solid var(--clr-border)",
     borderRadius: "12px",
     padding: "16px",
-    color: "#eaecef",
+    color: "var(--clr-text-bright)",
     marginBottom: "16px"
   } as React.CSSProperties,
 
@@ -67,22 +67,22 @@ const styles = {
     margin: "0",
     fontSize: "16px",
     fontWeight: "700",
-    color: "#eaecef"
+    color: "var(--clr-text-bright)"
   } as React.CSSProperties,
 
   refreshButton: {
     width: "32px",
     height: "32px",
     borderRadius: "6px",
-    border: "1px solid #2a2e35",
+    border: "1px solid var(--clr-border)",
     background: "transparent",
-    color: "#848e9c",
+    color: "var(--clr-text)",
     cursor: "pointer",
     fontSize: "16px",
     transition: "all 0.2s",
     ":hover": {
-      background: "#1f2530",
-      color: "#eaecef"
+      background: "var(--clr-hover)",
+      color: "var(--clr-text-bright)"
     },
     ":disabled": {
       opacity: "0.5",
