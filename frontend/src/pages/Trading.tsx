@@ -1513,6 +1513,34 @@ export default function Trading() {
   const [showBollinger, setShowBollinger] = useState(saved.showBollinger !== undefined ? saved.showBollinger : false);
   const [showMACD, setShowMACD] = useState(false);
   const [showVWAP, setShowVWAP] = useState(false);
+  const [chartStageHeight, setChartStageHeight] = useState(400);
+  const [viewportWidth, setViewportWidth] = useState<number>(typeof window !== "undefined" ? window.innerWidth : 1024);
+  const chartStageRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  useEffect(() => {
+    const updateChartHeight = () => {
+      if (chartStageRef.current) {
+        setChartStageHeight(chartStageRef.current.clientHeight);
+      }
+    };
+    updateChartHeight();
+    const resizeObserver = new ResizeObserver(updateChartHeight);
+    if (chartStageRef.current) resizeObserver.observe(chartStageRef.current);
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  const calculateToggleButtonTop = () => {
+    return 2;
+  };
+
+  const toggleButtonTop = calculateToggleButtonTop();
+
   const [chartType, setChartType] = useState<"candlestick" | "line" | "area" | "bar">("candlestick");
   const [activeChartTab, setActiveChartTab] = useState<"original" | "tradingview" | "depth">("original");
   const [activeViewTab, setActiveViewTab] = useState<"chart" | "orderbook" | "trades" | "info" | "tradingdata">("chart");
@@ -3022,7 +3050,7 @@ export default function Trading() {
         {/* Left toolbar attached to chart (desktop/tablet/mobile) */}
         {activeViewTab === "chart" && (
           <div className="trading-toolbar trading-dashboard__tools--desktop" style={{ width: toolbarCollapsed ? 0 : 44, background: toolbarCollapsed ? "transparent" : COLORS.bgPanel, borderRight: toolbarCollapsed ? "none" : `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", alignItems: "center", padding: toolbarCollapsed ? 0 : "8px 6px", gap: 6, flexShrink: 0, boxSizing: "border-box", overflowY: "auto", WebkitOverflowScrolling: "touch", position: "absolute", left: 0, top: 0, bottom: 0, zIndex: 30, transition: "width 0.18s ease, background 0.18s ease, border 0.18s ease" }}>
-            <button title={toolbarCollapsed ? "Expand toolbar" : "Collapse toolbar"} onClick={() => setToolbarCollapsed(prev => !prev)} style={{ width: 24, height: 24, flexShrink: 0, background: COLORS.bgPanel, border: `1px solid ${COLORS.border}`, borderRadius: 3, color: COLORS.text, fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", position: "absolute", left: toolbarCollapsed ? 4 : "auto", top: 20, margin: toolbarCollapsed ? 0 : "4px 0 0 0" }}>
+            <button title={toolbarCollapsed ? "Expand toolbar" : "Collapse toolbar"} onClick={() => setToolbarCollapsed(prev => !prev)} style={{ width: 24, height: 24, flexShrink: 0, background: COLORS.bgPanel, border: `1px solid ${COLORS.border}`, borderRadius: 3, color: COLORS.text, fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", position: "absolute", left: toolbarCollapsed ? 4 : "auto", top: toggleButtonTop, margin: toolbarCollapsed ? 0 : "4px 0 0 0" }}>
               {toolbarCollapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
             </button>
             {!toolbarCollapsed && (
@@ -3051,7 +3079,7 @@ export default function Trading() {
 
         {activeViewTab === "chart" && (
           <div className="trading-chart-layout" style={{ display: "flex", height: "100%" }}>
-            <div className="trading-chart-stage" style={{ flex: 1, position: "relative", minWidth: 0, marginLeft: toolbarCollapsed ? 0 : 44, transition: "margin-left 0.18s ease" }}>
+            <div ref={chartStageRef} className="trading-chart-stage" style={{ flex: 1, position: "relative", minWidth: 0, marginLeft: toolbarCollapsed ? 0 : 44, transition: "margin-left 0.18s ease" }}>
               {activeChartTab === "original" && (
                 <CandleChart candles={candles} deepMarketData={deepMarketData} indicators={indicators} chartType={chartType} tf={timeframe} pair={symbol} rsiData={rsiData} macdData={macdData} showRSI={showRSI} showMACD={showMACD} liveStatus={liveStatus} activeTool={activeTool} drawings={drawings} onDrawingsChange={setDrawings} drawingColor={drawingColor} drawingWidth={drawingWidth} lastPrice={lastPrice} entryPriceLine={entryPriceOverlay} toolbarCollapsed={toolbarCollapsed} />
               )}
