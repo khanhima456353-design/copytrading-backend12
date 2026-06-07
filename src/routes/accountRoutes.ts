@@ -71,6 +71,13 @@ router.get("/open-orders", authMiddleware, async (req: AuthRequest, res: Respons
   try {
     if (!req.userId) return res.status(401).json({ message: "Unauthorized" });
 
+    const user = await User.findById(req.userId).select("_id");
+    if (!user) {
+      // User was deleted — clean up orphaned orders and return empty
+      await Order.deleteMany({ userId: req.userId });
+      return res.json([]);
+    }
+
     const orders = await Order.find({
       userId: req.userId,
       status: "open",

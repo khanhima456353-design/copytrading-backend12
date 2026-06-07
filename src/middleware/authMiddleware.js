@@ -3,7 +3,7 @@ const User = require("../../models/User");
 
 const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
 
-const authMiddleware = (req, res, next) => {
+const authMiddleware = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
@@ -18,6 +18,15 @@ const authMiddleware = (req, res, next) => {
     const decoded = jwt.verify(token, JWT_SECRET);
 
     req.userId = decoded.userId || decoded.id;
+
+    // Verify the user still exists in the database
+    const user = await User.findById(req.userId).select("_id");
+    if (!user) {
+      return res.status(401).json({
+        message: "User not found - account may have been deleted"
+      });
+    }
+
     next();
   } catch (error) {
     return res.status(401).json({

@@ -1810,7 +1810,13 @@ export default function Trading() {
       }));
     } catch (err) {
       console.error('Error refreshing account data:', err);
-      // ignore; keep existing fallback
+      // If 401 (user deleted or session expired), clear demo data
+      const axiosErr = err as any;
+      if (axiosErr?.response?.status === 401) {
+        setUserOrders([]);
+        setServerPositions([]);
+        setTradeHistory([]);
+      }
     }
   }, []);
 

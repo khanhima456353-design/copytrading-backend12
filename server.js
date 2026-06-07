@@ -732,6 +732,11 @@ app.post('/api/trade/close-position', authMiddleware, async (req, res) => {
 app.get('/api/account/open-orders', authMiddleware, async (req, res) => {
   try {
     const userId = req.userId; if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+    const user = await User.findById(userId).select('_id');
+    if (!user) {
+      await Order.deleteMany({ userId });
+      return res.json([]);
+    }
     const orders = await Order.find({ userId, status: { $in: ['open','partially_filled'] } }).sort({ createdAt: -1 });
     res.json(orders);
   } catch (err) { res.status(500).json({ message: 'Server error', error: err.message }); }
