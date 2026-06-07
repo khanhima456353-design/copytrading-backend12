@@ -1113,7 +1113,7 @@ body {
   transition: background 0.15s;
 }
 .lm-nav-item:hover {
-  background: var(--surface-strong);
+  color: var(--primary);
 }
 
 .lm-nav-auth {
@@ -1133,7 +1133,7 @@ body {
   cursor: pointer;
 }
 .lm-btn-ghost:hover {
-  background: var(--surface-strong);
+  color: var(--primary);
 }
 
 .lm-btn-primary {
