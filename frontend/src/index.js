@@ -25,6 +25,7 @@ function AppLayout() {
     location.pathname !== "/" &&
     location.pathname !== "/register" &&
     location.pathname !== "/login" &&
+    location.pathname !== "/news" &&
     !(isTradingPage && isAuthenticated);
 
   return (

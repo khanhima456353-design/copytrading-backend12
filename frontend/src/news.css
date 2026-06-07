@@ -128,10 +128,13 @@ body {
 
 /* LOGO */
 .avatar {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  object-fit: cover;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  object-fit: contain;
+  image-rendering: auto;
+  background: #0b0e11;
+  padding: 3px;
 }
 
 /* TEXT */

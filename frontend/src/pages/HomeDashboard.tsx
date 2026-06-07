@@ -80,7 +80,6 @@ const NAV_ITEMS: { id: Screen; label: string; icon: React.ReactNode }[] = [
 
 const ALL_MARKETS: MarketRow[] = [
   ...MARKETS,
-  { symbol: "SOL",  pair: "SOL / USDT",  volume: "Vol $5.6B", price: "$178.40", change: -1.20, sparkUp: false },
 ];
 
 const MARKET_COIN_COLORS: Record<string, { bg: string; color: string }> = {
@@ -409,9 +408,7 @@ export default function HomeDashboard() {
             const filtered = activeMarketTab === "All" ? mkts : activeMarketTab === "Gainers" ? mkts.filter((m: MarketRow) => m.change > 0) : mkts.filter((m: MarketRow) => m.change < 0);
             return filtered.map((m: MarketRow) => (
             <button key={m.pair} className="hd-mkt-row" onClick={() => navigate("/markets")}>
-              <div className="hd-coin-dot" style={{ background: MARKET_COIN_COLORS[m.symbol]?.bg ?? "#ffffff11", color: MARKET_COIN_COLORS[m.symbol]?.color ?? "#fff" }}>
-                {m.symbol}
-              </div>
+              <img src={COIN_IMAGES[m.pair.split(" / ")[0]]} alt={m.pair.split(" / ")[0]} style={{ width: 20, height: 20, objectFit: "contain", borderRadius: "50%" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="hd-mkt-name">{m.pair}</div>
                 <div className="hd-mkt-vol">{m.volume}</div>

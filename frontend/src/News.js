@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import "./news.css";
 import { getSocket } from "./api";
+import swancoreLogo from "./assets/logo.jpg";
 
 function News() {
   const [news, setNews] = useState([]);
@@ -52,7 +53,7 @@ function News() {
             <div className="outside-header">
               <div className="header-left">
                 <img
-                  src="https://cdn-icons-png.flaticon.com/512/5968/5968260.png"
+                  src={swancoreLogo}
                   className="avatar"
                   alt="source"
                 />
