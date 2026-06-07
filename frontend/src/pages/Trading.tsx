@@ -1642,7 +1642,7 @@ export default function Trading() {
     }
   };
   const [rightTab, setRightTab] = useState<"market" | "mytrades">("market");
-  const [bottomTab, setBottomTab] = useState<"openorders" | "positions" | "orderhistory" | "tradehistory" | "holdings" | "bots">("openorders");
+  const [bottomTab, setBottomTab] = useState<"openorders" | "positions" | "orderhistory" | "holdings" | "bots">("openorders");
   const [pairTab, setPairTab] = useState<"usdt" | "fav">("usdt");
   const [activeTool, setActiveTool] = useState<DrawingTool>("cursor");
   const [drawings, setDrawings] = useState<DrawingObject[]>([]);
@@ -3466,7 +3466,7 @@ export default function Trading() {
       {/* ── BOTTOM TAB BAR (between left & right panels) ── */}
       <div ref={bottomScrollRef} className="trading-bottom-panel trading-dashboard__activity" style={{ borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", height: 36, padding: "0 12px", gap: 0, borderBottom: `1px solid ${COLORS.border}` }}>
-          {[["openorders", `Open Orders(${activeOrders.length})`], ["positions", `Positions(${serverPositions.length})`], ["orderhistory", "Order History"], ["tradehistory", "Trade History"], ["holdings", "Holdings"], ["bots", "Bots"]].map(([key, label]) => (
+          {[["openorders", `Open Orders(${activeOrders.length})`], ["positions", `Positions(${serverPositions.length})`], ["orderhistory", "Order History"], ["holdings", "Holdings"], ["bots", "Bots"]].map(([key, label]) => (
             <button key={key} onClick={() => setBottomTab(key as any)} style={{ padding: "0 14px", height: "100%", background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: bottomTab === key ? COLORS.textBright : COLORS.text, borderBottom: bottomTab === key ? `2px solid ${"#f0b90b"}` : "2px solid transparent", whiteSpace: "nowrap" }}>{label}</button>
           ))}
         </div>
@@ -3518,41 +3518,23 @@ serverPositions.length === 0
                   </div>
                 ))
             )}
-            {bottomTab === "tradehistory" && (
-              tradeHistory.length === 0
-                ? <div style={{ padding: 20, textAlign: "center", color: COLORS.textMuted, fontSize: 12 }}>No trade history</div>
-                : <>
-                  <div style={{ display: "grid", gridTemplateColumns: "1.5fr 0.8fr 0.6fr 1fr 1fr 1fr", padding: "8px 14px", fontSize: 10, fontFamily: "monospace", color: COLORS.textMuted, borderBottom: `1px solid ${COLORS.border}` }}>
-                    <span>Date</span><span>Pair</span><span>Side</span><span>Entry</span><span>Close</span><span style={{ textAlign: "right" }}>PnL</span>
-                  </div>
-                  {tradeHistory.slice(0, 50).map((t: any, i: number) => (
-                    <div key={i} style={{ display: "grid", gridTemplateColumns: "1.5fr 0.8fr 0.6fr 1fr 1fr 1fr", padding: "6px 14px", fontSize: 11, fontFamily: "monospace", borderBottom: `1px solid ${COLORS.border}` }}>
-                      <span style={{ color: COLORS.textMuted }}>{new Date(t.time * 1000).toLocaleString()}</span>
-                      <span style={{ color: COLORS.textBright }}>{t.pair}</span>
-                      <span style={{ color: t.side === "buy" ? COLORS.green : COLORS.red }}>{t.side?.toUpperCase()}</span>
-                      <span style={{ color: COLORS.text }}>{Number(t.entryPrice || 0).toFixed(2)}</span>
-                      <span style={{ color: COLORS.text }}>{Number(t.price || 0).toFixed(2)}</span>
-                      <span style={{ textAlign: "right", color: (t.pnl ?? 0) >= 0 ? COLORS.green : COLORS.red }}>{(t.pnl ?? 0) >= 0 ? "+" : ""}{Number(t.pnl ?? 0).toFixed(2)}</span>
-                    </div>
-                  ))}
-                </>
-            )}
             {bottomTab === "orderhistory" && (
               tradeHistory.length === 0
                 ? <div style={{ padding: 20, textAlign: "center", color: COLORS.textMuted, fontSize: 12 }}>No order history</div>
                 : <>
-                  <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 0.7fr 0.7fr 1fr 1fr 1fr", padding: "8px 14px", fontSize: 10, fontFamily: "monospace", color: COLORS.textMuted, borderBottom: `1px solid ${COLORS.border}` }}>
-                    <span>Date</span><span>Pair</span><span>Side</span><span>Type</span><span>Price</span><span>Qty</span><span style={{ textAlign: "right" }}>PnL</span>
+                  <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 0.5fr 0.5fr 0.8fr 0.8fr 0.7fr 0.8fr", padding: "8px 14px", fontSize: 10, fontFamily: "monospace", color: COLORS.textMuted, borderBottom: `1px solid ${COLORS.border}` }}>
+                    <span>Date</span><span>Pair</span><span>Side</span><span>Type</span><span>Entry</span><span>Close</span><span>Qty</span><span style={{ textAlign: "right" }}>PnL</span>
                   </div>
-                  {tradeHistory.slice(0, 50).map((t, i) => (
-                    <div key={i} style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 0.7fr 0.7fr 1fr 1fr 1fr", padding: "6px 14px", fontSize: 11, fontFamily: "monospace", borderBottom: `1px solid ${COLORS.border}` }}>
+                  {tradeHistory.slice(0, 50).map((t: any, i: number) => (
+                    <div key={i} style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 0.5fr 0.5fr 0.8fr 0.8fr 0.7fr 0.8fr", padding: "6px 14px", fontSize: 11, fontFamily: "monospace", borderBottom: `1px solid ${COLORS.border}` }}>
                       <span style={{ color: COLORS.textMuted }}>{new Date(t.time * 1000).toLocaleString()}</span>
                       <span style={{ color: COLORS.textBright }}>{t.pair}</span>
-                      <span style={{ color: t.side === "buy" ? COLORS.green : COLORS.red }}>{t.side.toUpperCase()}</span>
+                      <span style={{ color: t.side === "buy" ? COLORS.green : COLORS.red }}>{t.side?.toUpperCase()}</span>
                       <span style={{ color: COLORS.textMuted }}>{t.type?.toUpperCase() ?? "MARKET"}</span>
-                      <span style={{ color: COLORS.text }}>{t.price.toFixed(2)}</span>
+                      <span style={{ color: COLORS.text }}>{Number(t.entryPrice || 0).toFixed(2)}</span>
+                      <span style={{ color: COLORS.text }}>{Number(t.price || 0).toFixed(2)}</span>
                       <span style={{ color: COLORS.text }}>{t.quantity.toFixed(6)}</span>
-                      <span style={{ textAlign: "right", color: (t.profit ?? 0) >= 0 ? COLORS.green : COLORS.red }}>{(t.profit ?? 0) >= 0 ? "+" : ""}{(t.profit ?? 0).toFixed(2)}</span>
+                      <span style={{ textAlign: "right", color: (t.pnl ?? t.profit ?? 0) >= 0 ? COLORS.green : COLORS.red }}>{(t.pnl ?? t.profit ?? 0) >= 0 ? "+" : ""}{(t.pnl ?? t.profit ?? 0).toFixed(2)}</span>
                     </div>
                   ))}
                 </>
