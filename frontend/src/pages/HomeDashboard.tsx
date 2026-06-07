@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import authService from "../services/authService";
 import { useMobileMenu } from "../components/theme/MobileMenuContext";
-import { BookCheck, AlertTriangle, XCircle, Megaphone, Bell } from "lucide-react";
+import { BookCheck, AlertTriangle, XCircle, Megaphone, Bell, ShieldCheck, ShieldAlert, LockKeyhole, LogOut, Globe, BriefcaseBusiness, Store, House, ShieldUser } from "lucide-react";
 
 type Screen = "home" | "portfolio" | "markets" | "account";
 
@@ -63,11 +63,11 @@ const COIN_COLORS: Record<string, { bg: string; color: string }> = {
   "SOL":  { bg: "#14F19522", color: "#14F195" },
 };
 
-const NAV_ITEMS: { id: Screen; label: string; icon: string }[] = [
-  { id: "home",      label: "Home",      icon: "⬡" },
-  { id: "portfolio", label: "Portfolio", icon: "◈" },
-  { id: "markets",   label: "Markets",   icon: "⌗" },
-  { id: "account",   label: "Account",   icon: "◉" },
+const NAV_ITEMS: { id: Screen; label: string; icon: React.ReactNode }[] = [
+  { id: "home", label: "Home", icon: <House size={18} /> },
+  { id: "portfolio", label: "Portfolio", icon: <BriefcaseBusiness size={18} /> },
+  { id: "markets", label: "Markets", icon: <Store size={18} /> },
+  { id: "account", label: "Account", icon: <ShieldUser size={18} /> },
 ];
 
 const ALL_MARKETS: MarketRow[] = [
@@ -450,7 +450,7 @@ export default function HomeDashboard() {
         </div>
       </div>
       <div className="hd-empty-state">
-        <div className="hd-empty-icon">◈</div>
+        <BriefcaseBusiness size={40} style={{ color: "var(--text-muted)", marginBottom: 8 }} />
         <div className="hd-empty-title">No holdings yet</div>
         <div className="hd-empty-sub">Deposit USDT and make your first trade</div>
       </div>
@@ -467,14 +467,14 @@ export default function HomeDashboard() {
           <div className="hd-profile-uid">UID: {userId}</div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
-          <span className={`hd-badge ${userProfile?.kycVerified ? "verified" : "unverified"}`}>
-            {userProfile?.kycVerified ? "✓ Verified" : "⚠ Unverified"}
+          <span className={`hd-badge ${userProfile?.kycVerified ? "verified" : "unverified"}`} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            {userProfile?.kycVerified ? <><ShieldCheck size={14} /> Verified</> : <><ShieldAlert size={14} /> Unverified</>}
           </span>
         </div>
       </div>
       {!userProfile?.kycVerified && (
         <button className="hd-kyc-banner" onClick={() => navigate("/verification")}>
-          <span style={{ fontSize: 20 }}>🪪</span>
+          <ShieldAlert size={20} style={{ color: "#ff8c32", flexShrink: 0 }} />
           <div style={{ flex: 1, textAlign: "left" }}>
             <div className="hd-kyc-title">Complete identity verification</div>
             <div className="hd-kyc-sub">Unlock deposits, withdrawals and trading</div>
@@ -487,10 +487,10 @@ export default function HomeDashboard() {
           <span className="hd-section-title">Account</span>
         </div>
         {[
-          { icon: "🪪", title: "KYC verification", sub: userProfile?.kycVerified ? "Verified" : "Not started", action: !userProfile?.kycVerified ? () => navigate("/verification") : undefined },
-          { icon: "🔒", title: "Security", sub: "Password · 2FA" },
-          { icon: "🔔", title: "Notifications", sub: "Price alerts, security notices", action: () => setShowNotifications(true) },
-          { icon: "🌐", title: "Language & region", sub: "English · USDT" },
+          { icon: userProfile?.kycVerified ? <ShieldCheck size={18} style={{ color: "#0ecb81" }} /> : <ShieldAlert size={18} style={{ color: "#ff8c32" }} />, title: "KYC verification", sub: userProfile?.kycVerified ? "Verified" : "Not started", action: !userProfile?.kycVerified ? () => navigate("/verification") : undefined },
+          { icon: <LockKeyhole size={18} />, title: "Security", sub: "Password · 2FA" },
+          { icon: <Bell size={18} />, title: "Notifications", sub: "Price alerts, security notices", action: () => setShowNotifications(true) },
+          { icon: <Globe size={18} />, title: "Language & region", sub: "English · USDT" },
         ].map((r, i) => (
           <button key={i} className="hd-acc-row" onClick={r.action} style={r.action ? {} : { cursor: "default" }}>
             <span style={{ fontSize: 18 }}>{r.icon}</span>
@@ -503,7 +503,7 @@ export default function HomeDashboard() {
         ))}
       </div>
       <button className="hd-logout-btn" onClick={handleLogout}>
-        <span>🚪</span> Log out
+        <LogOut size={16} /> Log out
       </button>
     </>
   );
@@ -903,8 +903,8 @@ export default function HomeDashboard() {
                   <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>UID: {userId}</div>
                 </div>
               </div>
-              <span className={`hd-badge ${userProfile?.kycVerified ? "verified" : "unverified"}`}>
-                {userProfile?.kycVerified ? "✓ Verified" : "⚠ Unverified"}
+              <span className={`hd-badge ${userProfile?.kycVerified ? "verified" : "unverified"}`} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                {userProfile?.kycVerified ? <><ShieldCheck size={14} /> Verified</> : <><ShieldAlert size={14} /> Unverified</>}
               </span>
             </div>
             <div style={{ background: "var(--surface, #1E2329)", border: "1px solid var(--border, #1e293b)", borderRadius: 12, padding: 10 }}>
