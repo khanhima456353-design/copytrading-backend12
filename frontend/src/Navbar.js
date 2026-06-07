@@ -2,14 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from './components/theme/ThemeContext';
 import { useMobileMenu } from './components/theme/MobileMenuContext';
-import { ChevronDown, Sun, Moon, Menu } from 'lucide-react';
+import { ChevronDown, Sun, Moon, Menu, X } from 'lucide-react';
 import logo from './assets/logo.jpg';
 import './navbar.css';
 
 export default function Navbar({ showAuth = true, minimal = false, homepage = false }) {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
-  const { setIsMobileMenuOpen } = useMobileMenu();
+  const { isMobileMenuOpen, setIsMobileMenuOpen } = useMobileMenu();
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
@@ -27,6 +27,15 @@ export default function Navbar({ showAuth = true, minimal = false, homepage = fa
     return () => clearInterval(int);
   }, [homepage]);
 
+  const navLinks = (
+    <nav className="nav-links">
+      <Link to="/trade" className="nav-dropdown">Trade <ChevronDown className="w-4 h-4" /></Link>
+      <Link to="/markets">Markets</Link>
+      <Link to="/earn">Earn</Link>
+      <Link to="/research">Research</Link>
+    </nav>
+  );
+
   return (
     <header className={`navbar${homepage ? " navbar-home" : ""}`} style={homepage ? { marginTop: 0, position: "fixed", top: 0, left: 0, right: 0, zIndex: 300 } : undefined}>
       <div className="container nav-content">
@@ -37,14 +46,7 @@ export default function Navbar({ showAuth = true, minimal = false, homepage = fa
               <span style={{ color: "var(--text-current)", fontSize: 18, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Inter', 'SF Pro Display', -apple-system, sans-serif" }}>SwanCore</span>
             </div>
           </Link>
-          {!minimal && !homepage && (
-            <nav className="nav-links">
-              <Link to="/trade" className="nav-dropdown">Trade <ChevronDown className="w-4 h-4" /></Link>
-              <Link to="/markets">Markets</Link>
-              <Link to="/earn">Earn</Link>
-              <Link to="/research">Research</Link>
-            </nav>
-          )}
+          {!minimal && !homepage && navLinks}
         </div>
         <div className="nav-right">
           <button onClick={toggleTheme} className="theme-toggle">
@@ -69,9 +71,35 @@ export default function Navbar({ showAuth = true, minimal = false, homepage = fa
               <button onClick={() => navigate('/register')} className="btn-primary">Sign Up</button>
             </div>
           ) : null}
-          <button className="mobile-menu" onClick={() => { if (homepage) setIsMobileMenuOpen(v => !v); }}><Menu className="w-6 h-6" /></button>
+          <button className="mobile-menu" onClick={() => setIsMobileMenuOpen(v => !v)}>
+            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
         </div>
       </div>
+
+      {/* Mobile menu drawer for non-homepage pages */}
+      {!homepage && isMobileMenuOpen && (
+        <div className="nav-mobile-overlay" onClick={() => setIsMobileMenuOpen(false)}>
+          <div className="nav-mobile-drawer" onClick={e => e.stopPropagation()}>
+            <div className="nav-mobile-body">
+              <nav className="nav-mobile-links">
+                <Link to="/trade" className="nav-mobile-item" onClick={() => setIsMobileMenuOpen(false)}>
+                  Trade
+                </Link>
+                <Link to="/markets" className="nav-mobile-item" onClick={() => setIsMobileMenuOpen(false)}>Markets</Link>
+                <Link to="/earn" className="nav-mobile-item" onClick={() => setIsMobileMenuOpen(false)}>Earn</Link>
+                <Link to="/research" className="nav-mobile-item" onClick={() => setIsMobileMenuOpen(false)}>Research</Link>
+              </nav>
+              {showAuth && !minimal && (
+                <div className="nav-mobile-auth">
+                  <button onClick={() => { navigate('/login'); setIsMobileMenuOpen(false); }} className="btn-ghost">Log in</button>
+                  <button onClick={() => { navigate('/register'); setIsMobileMenuOpen(false); }} className="btn-primary">Sign Up</button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }
