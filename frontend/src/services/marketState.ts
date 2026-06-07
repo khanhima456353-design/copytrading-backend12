@@ -570,7 +570,17 @@ async function initMarketState(): Promise<void> {
     // Propagate to individual pair market states so switching pairs is instant
     for (const t of allTickersData) {
       const pair = binanceSymbolToPair(t.symbol);
-      if (pair) {
+      if (!pair) continue;
+      if (isSimulationLocked(pair)) {
+        // Keep simulated price — only update 24h stats
+        updateMarketState(pair, {
+          high24h:   t.high24h,
+          low24h:    t.low24h,
+          volume24h: t.volume24h,
+          change24h: t.change24h,
+          changePct: t.changePct,
+        });
+      } else {
         updateMarketState(pair, {
           lastPrice:       t.price,
           markPrice:       t.price,

@@ -1625,6 +1625,7 @@ export default function Trading() {
   const [tradeHistory, setTradeHistory] = useState<TradeHistoryItem[]>(createFallbackTradeHistory());
   const [serverPositions, setServerPositions] = useState<any[]>([]);
   const [simulationFeedActive, setSimulationFeedActive] = useState(false);
+  const simulationFeedActiveRef = useRef(false);
   const [priceTransitionActive, setPriceTransitionActive] = useState(false);
   const [entryPriceOverlay, setEntryPriceOverlay] = useState<number | null>(null);
   const closePosition = async (position: { pair: string; id?: string; _id?: string; markPrice?: number; entryPrice?: number; }) => {
@@ -1768,7 +1769,7 @@ export default function Trading() {
       if (positionsRes?.data) setServerPositions((positionsRes.data || []).filter((p: any) => p && (p.size || p.quantity) && Number(p.size || p.quantity) !== 0));
       if (ordersRes?.data) {
         const orders = (ordersRes.data || []).map((o: any) => ({
-          id: o.orderId,
+          id: o._id || o.orderId,
           pair: o.pair || o.symbol,
           type: o.type,
           side: o.side,
@@ -1896,6 +1897,7 @@ export default function Trading() {
         socket.on('simulationEnded', () => {
           setPriceTransitionActive(false);
           setSimulationFeedActive(false);
+          simulationFeedActiveRef.current = false;
           setEntryPriceOverlay(null);
           refreshAccountData();
         });
@@ -1913,6 +1915,7 @@ export default function Trading() {
             setPriceTransitionActive(true);
           } else if (data.mode === 'natural' || data.mode === 'drift') {
             setSimulationFeedActive(true);
+            simulationFeedActiveRef.current = true;
             setPriceTransitionActive(false);
           }
           setServerPositions(prev => prev.map((p: any) => {
@@ -1936,6 +1939,13 @@ export default function Trading() {
               rawUnrealizedPnlPercent: pnlData.rawPnlPercent,
             };
           }));
+          if (data.pair === symbolRef.current && Number.isFinite(data.price) && data.price > 0) {
+            const p = Number(data.price);
+            lastPriceRef.current = p;
+            setLastPrice(p);
+            setDisplayPrice(p);
+            setLastPriceUpdate(data.time || Date.now());
+          }
         });
 
         socket.on('market_update', (data: any) => {
@@ -1988,6 +1998,7 @@ export default function Trading() {
         // priceUpdate — real-time price for tracked pairs
         socket.on('priceUpdate', (data: any) => {
           if (!data?.pair || !data?.price) return;
+          if (data.pair === symbolRef.current && simulationFeedActiveRef.current) return;
           const price = Number(data.price);
           if (!Number.isFinite(price) || price <= 0) return;
           const binanceSym = data.pair.replace("/", "");
