@@ -3,24 +3,16 @@ import React from "react";
 export default function LegalPage() {
   return (
     <div
-      className="text-[#EAECEF] min-h-screen px-6 md:px-20 py-16"
-      style={{
-        background:
-          "radial-gradient(circle at top, rgba(120, 200, 255, 0.25), transparent 45%), " +
-          "radial-gradient(circle at top right, rgba(0, 180, 255, 0.18), transparent 55%), " +
-          "radial-gradient(circle at bottom left, rgba(0, 120, 200, 0.20), transparent 60%), " +
-          "linear-gradient(180deg, #0a1a2a 0%, #06121f 60%, #040b14 100%)",
-        backgroundRepeat: "no-repeat",
-        backgroundSize: "cover"
-      }}
+      className="min-h-screen px-6 md:px-20 py-16"
+      style={{ background: "#f0f0f0" }}
     >
 
       {/* HEADER */}
       <div className="text-center mb-14">
-        <h1 className="text-4xl font-semibold text-white">
+        <h1 className="text-4xl font-semibold" style={{ color: "#111" }}>
           Licenses, Registrations & Legal Matters
         </h1>
-        <p className="text-gray-400 mt-3 text-sm max-w-3xl mx-auto">
+        <p className="mt-3 text-sm max-w-3xl mx-auto" style={{ color: "#555" }}>
           SwanCore operates under a global regulatory framework with licensed entities across multiple jurisdictions.
         </p>
       </div>
@@ -126,9 +118,9 @@ export default function LegalPage() {
 
 function Section({ title, children }) {
   return (
-    <div className="bg-[#11151c] border border-[#2a2f3a] rounded-2xl p-6">
-      <h2 className="text-yellow-400 font-medium text-lg mb-4">{title}</h2>
-      <div className="space-y-4 text-gray-300 text-sm leading-relaxed">
+    <div className="rounded-2xl p-6" style={{ background: "#f0f0f0", border: "1px solid #ddd" }}>
+      <h2 className="font-medium text-lg mb-4" style={{ color: "#ff8c32" }}>{title}</h2>
+      <div className="space-y-4 text-sm leading-relaxed" style={{ color: "#333" }}>
         {children}
       </div>
     </div>
@@ -137,9 +129,9 @@ function Section({ title, children }) {
 
 function Item({ title, children }) {
   return (
-    <div className="border-l-2 border-yellow-400/40 pl-4">
-      <h3 className="text-white font-medium">{title}</h3>
-      <p className="text-gray-400 mt-1">{children}</p>
+    <div className="border-l-2 pl-4" style={{ borderColor: "#ff8c32" }}>
+      <h3 className="font-medium" style={{ color: "#111" }}>{title}</h3>
+      <p className="mt-1" style={{ color: "#555" }}>{children}</p>
     </div>
   );
 }

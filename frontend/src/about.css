@@ -46,8 +46,8 @@
 .about-stats div {
   flex: 1;
   min-width: 220px;
-  background: #1e2329;
-  border: 1px solid #2b3139;
+  background: #f0f0f0;
+  border: 1px solid #ddd;
   border-radius: 14px;
   padding: 40px 30px;
   text-align: center;
@@ -66,7 +66,7 @@
 }
 
 .about-stats p {
-  color: #b7bdc6;
+  color: #444;
   font-size: 16px;
 }
 
@@ -136,8 +136,209 @@
   font-size: 15px;
 }
 
+/* LIGHT CARD (for white/off-white backgrounds) */
+.card-light {
+  background: #f0f0f0;
+  border: 1px solid #ddd;
+  padding: 30px;
+  border-radius: 14px;
+  transition: 0.3s;
+  cursor: pointer;
+}
+.card-light:hover {
+  border-color: #ff8c32;
+  transform: translateY(-5px);
+}
+.card-light p {
+  color: #444 !important;
+}
+.card-light h3 {
+  color: #ff8c32;
+  margin-bottom: 15px;
+  font-size: 22px;
+}
+
+/* LEARN MORE BUTTON */
+.learn-more-btn {
+  border: 1px solid transparent;
+  transition: 0.3s;
+  display: inline-block;
+}
+.learn-more-btn:hover {
+  border-color: #ff8c32;
+}
+
+/* VALUES SECTION - Putting Our Users First */
+.values-section {
+  background: #f0f0f0;
+  color: #222;
+  padding: 80px 24px;
+}
+.values-header {
+  text-align: center;
+  margin-bottom: 64px;
+}
+.values-header h2 {
+  font-size: 2rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+  margin-bottom: 16px;
+  color: #111;
+}
+.values-header p {
+  color: #555;
+  margin-top: 12px;
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
+  font-size: 0.95rem;
+  line-height: 1.8;
+}
+.values-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 32px;
+  max-width: 1200px;
+  margin: 0 auto 40px;
+}
+@media (min-width: 768px) {
+  .values-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.values-card {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 16px;
+  padding: 28px;
+  transition: all 0.3s;
+}
+.values-card:hover {
+  border-color: #ff8c32;
+}
+.values-card h3 {
+  color: #111;
+  font-weight: 600;
+  font-size: 1.15rem;
+  margin-bottom: 12px;
+  letter-spacing: -0.01em;
+}
+.values-card p {
+  color: #555;
+  font-size: 0.9rem;
+  line-height: 1.8;
+}
+
+.values-features {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  margin-bottom: 40px;
+}
+@media (min-width: 768px) {
+  .values-features {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+.values-feature {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  padding: 24px;
+  transition: all 0.3s;
+}
+.values-feature:hover {
+  border-color: #ff8c32;
+  transform: translateY(-4px);
+}
+.values-feature h4 {
+  color: #111;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.values-feature p {
+  color: #555;
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.values-row3 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  margin-bottom: 40px;
+}
+@media (min-width: 768px) {
+  .values-row3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.values-compliance {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 16px;
+  padding: 36px;
+}
+.values-compliance h3 {
+  color: #111;
+  font-weight: 600;
+  font-size: 1.15rem;
+  margin-bottom: 16px;
+  letter-spacing: -0.01em;
+}
+.values-compliance > p {
+  color: #555;
+  font-size: 0.9rem;
+  line-height: 1.8;
+  margin-bottom: 32px;
+}
+
+.values-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin-bottom: 28px;
+}
+.values-stat {
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+}
+.values-stat p:first-child {
+  color: #111;
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.values-stat p:last-child {
+  color: #666;
+  font-size: 0.8rem;
+  margin-top: 4px;
+}
+
+.values-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.values-tag {
+  padding: 6px 16px;
+  font-size: 0.82rem;
+  border-radius: 999px;
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  color: #444;
+}
+
 /* ACTIVE CARD */
-.card.active {
+.card.active,
+.card-light.active {
   grid-column: span 2;
 }
 

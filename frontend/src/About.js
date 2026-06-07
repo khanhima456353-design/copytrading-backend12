@@ -108,130 +108,128 @@ She holds a Bachelor of Commerce from McGill University and a Juris Doctor from 
         <h2>Our Ecosystem</h2>
 
         <div className="grid">
-          <div className="card"><h3>SwanCore Exchange</h3><p>SwanCore ranks among the largest digital asset exchanges by trading volume and is regulated by the ADGM Financial Services Regulatory Authority, ensuring compliance within the crypto and digital finance ecosystem.</p></div>
-          <div className="card"><h3>SwanCore Research</h3><p>SwanCore Research offers institutional-grade research, comprehensive market insights, and unbiased intelligence for stakeholders across the digital asset and cryptocurrency markets.</p></div>
-          <div className="card"><h3>SwanCore Academy</h3><p>SwanCore Academy is a global open-learning platform delivering free education in blockchain technology, cryptocurrency, and digital financial systems in 10+ languages.</p></div>
-          <div className="card"><h3>SwanCore Charity</h3><p>Swancore Charity is a non-profit initiative focused on leveraging Web3, blockchain, and digital finance innovations to create positive global social impact and drive meaningful change.</p></div>
-          <div className="card"><h3>SwanCore NFT</h3><p>Swancore NFT is the official digital asset marketplace within the Swancore ecosystem, designed to support a community-driven platform that enhances user experience in crypto, blockchain, and digital asset trading.</p></div>
-          <div className="card"><h3>SwanCore Square</h3><p>Swancore Square is a unified real-time hub for the latest trends in Web3, crypto markets, and digital finance, bringing together insights from industry experts, analysts, enthusiasts, and media sources as they emerge live across the ecosystem.</p></div>
+          <div className="card-light"><h3>SwanCore Exchange</h3><p>SwanCore ranks among the largest digital asset exchanges by trading volume and is regulated by the ADGM Financial Services Regulatory Authority, ensuring compliance within the crypto and digital finance ecosystem.</p></div>
+          <div className="card-light"><h3>SwanCore Research</h3><p>SwanCore Research offers institutional-grade research, comprehensive market insights, and unbiased intelligence for stakeholders across the digital asset and cryptocurrency markets.</p></div>
+          <div className="card-light"><h3>SwanCore Academy</h3><p>SwanCore Academy is a global open-learning platform delivering free education in blockchain technology, cryptocurrency, and digital financial systems in 10+ languages.</p></div>
+          <div className="card-light"><h3>SwanCore Charity</h3><p>Swancore Charity is a non-profit initiative focused on leveraging Web3, blockchain, and digital finance innovations to create positive global social impact and drive meaningful change.</p></div>
+          <div className="card-light"><h3>SwanCore NFT</h3><p>Swancore NFT is the official digital asset marketplace within the Swancore ecosystem, designed to support a community-driven platform that enhances user experience in crypto, blockchain, and digital asset trading.</p></div>
+          <div className="card-light"><h3>SwanCore Square</h3><p>Swancore Square is a unified real-time hub for the latest trends in Web3, crypto markets, and digital finance, bringing together insights from industry experts, analysts, enthusiasts, and media sources as they emerge live across the ecosystem.</p></div>
         </div>
       </div>
 
       {/* VALUES SECTION */}
-<div className="bg-[#0b0e11] text-[#EAECEF] py-20 px-6 md:px-16">
+<div className="values-section">
 
   {/* Title */}
-  <div className="text-center mb-14">
-    <h2 className="text-4xl font-semibold">
+  <div className="values-header">
+    <h2>
       Putting Our Users First
     </h2>
-    <p className="text-gray-400 mt-3 max-w-2xl mx-auto text-sm">
+    <p>
       Security, compliance, and trust built into every layer of SwanCore.
     </p>
   </div>
 
   {/* HORIZONTAL GRID */}
-  <div className="space-y-8">
+  <div className="values-grid">
 
     {/* ROW 1 */}
-    <div className="grid md:grid-cols-2 gap-6">
+    <div className="values-card">
+      <h3>
+        Our Commitment to User Protection
+      </h3>
+      <p>
+        Users are at the core of everything we build. We prioritize security, privacy,
+        and compliance across the SwanCore ecosystem with global regulatory alignment.
+      </p>
+    </div>
 
-      <div className="bg-[#1a1f2b] border border-[#2a2f3a] rounded-2xl p-6 hover:border-yellow-400/40 transition">
-        <h3 className="text-white font-medium mb-2">
-          Our Commitment to User Protection
-        </h3>
-        <p className="text-gray-400 text-sm leading-relaxed">
-          Users are at the core of everything we build. We prioritize security, privacy,
-          and compliance across the SwanCore ecosystem with global regulatory alignment.
-        </p>
+    <div className="values-card">
+      <h3>
+        Secure From Day One
+      </h3>
+      <p>
+        Real-time monitoring, advanced risk systems, and continuous protection ensure
+        a safe trading environment at all times.
+      </p>
+    </div>
+
+  </div>
+
+  {/* ROW 2 */}
+  <div className="values-features">
+    {[
+      { title: "Secure Storage", desc: "Cold storage protects majority of user assets." },
+      { title: "Real-Time Monitoring", desc: "Risk engine tracks all sensitive account actions." },
+      { title: "Organizational Security", desc: "Multisig + TSS infrastructure for fund safety." },
+      { title: "Encryption", desc: "End-to-end encrypted data protection." }
+    ].map((item, i) => (
+      <div key={i} className="values-feature">
+        <h4>{item.title}</h4>
+        <p>{item.desc}</p>
+      </div>
+    ))}
+  </div>
+
+  {/* ROW 3 */}
+  <div className="values-row3">
+
+    <div className="values-card">
+      <h3>Safe Sign-In</h3>
+      <p>Multi-factor authentication and hardware keys.</p>
+    </div>
+
+    <div className="values-card">
+      <h3>Access Control</h3>
+      <p>IP + wallet whitelist + device controls.</p>
+    </div>
+
+    <div className="values-card">
+      <h3>Security Alerts</h3>
+      <p>Instant fraud detection notifications.</p>
+    </div>
+
+  </div>
+
+  {/* ROW 4 */}
+  <div className="values-compliance">
+
+    <h3>
+      Opening New Doors for Digital Finance
+    </h3>
+
+    <p>
+      We maintain strict global compliance standards to ensure transparency and trust.
+    </p>
+
+    <div className="values-stats">
+
+      <div className="values-stat">
+        <p>500%</p>
+        <p>Team Growth</p>
       </div>
 
-      <div className="bg-[#1a1f2b] border border-[#2a2f3a] rounded-2xl p-6 hover:border-yellow-400/40 transition">
-        <h3 className="text-white font-medium mb-2">
-          Secure From Day One
-        </h3>
-        <p className="text-gray-400 text-sm leading-relaxed">
-          Real-time monitoring, advanced risk systems, and continuous protection ensure
-          a safe trading environment at all times.
-        </p>
+      <div className="values-stat">
+        <p>5,600+</p>
+        <p>Legal Requests</p>
+      </div>
+
+      <div className="values-stat">
+        <p>80+</p>
+        <p>Countries</p>
       </div>
 
     </div>
 
-    {/* ROW 2 */}
-    <div className="grid md:grid-cols-4 gap-4">
-      {[
-        { title: "Secure Storage", desc: "Cold storage protects majority of user assets." },
-        { title: "Real-Time Monitoring", desc: "Risk engine tracks all sensitive account actions." },
-        { title: "Organizational Security", desc: "Multisig + TSS infrastructure for fund safety." },
-        { title: "Encryption", desc: "End-to-end encrypted data protection." }
-      ].map((item, i) => (
-        <div key={i} className="bg-[#1a1f2b] border border-[#2a2f3a] rounded-xl p-5 hover:border-yellow-400/40 hover:-translate-y-1 transition">
-          <h4 className="text-white text-sm font-medium mb-2">{item.title}</h4>
-          <p className="text-gray-400 text-xs">{item.desc}</p>
-        </div>
+    <div className="values-tags">
+      {["KYC", "AML", "Sanctions", "Compliance"].map((tag, i) => (
+        <span key={i} className="values-tag">
+          {tag}
+        </span>
       ))}
     </div>
 
-    {/* ROW 3 */}
-    <div className="grid md:grid-cols-3 gap-6">
-
-      <div className="bg-[#1a1f2b] border border-[#2a2f3a] rounded-2xl p-6">
-        <h3 className="text-white font-medium mb-3">Safe Sign-In</h3>
-        <p className="text-gray-400 text-sm">Multi-factor authentication and hardware keys.</p>
-      </div>
-
-      <div className="bg-[#1a1f2b] border border-[#2a2f3a] rounded-2xl p-6">
-        <h3 className="text-white font-medium mb-3">Access Control</h3>
-        <p className="text-gray-400 text-sm">IP + wallet whitelist + device controls.</p>
-      </div>
-
-      <div className="bg-[#1a1f2b] border border-[#2a2f3a] rounded-2xl p-6">
-        <h3 className="text-white font-medium mb-3">Security Alerts</h3>
-        <p className="text-gray-400 text-sm">Instant fraud detection notifications.</p>
-      </div>
-
-    </div>
-
-    {/* ROW 4 */}
-    <div className="bg-[#1a1f2b] border border-[#2a2f3a] rounded-2xl p-8">
-
-      <h3 className="text-white font-medium mb-4">
-        Opening New Doors for Digital Finance
-      </h3>
-
-      <p className="text-gray-400 text-sm mb-6">
-        We maintain strict global compliance standards to ensure transparency and trust.
-      </p>
-
-      <div className="grid grid-cols-3 gap-4 mb-6">
-
-        <div className="bg-[#0f141c] border border-[#2a2f3a] rounded-xl p-4 text-center">
-          <p className="text-white text-lg font-semibold">500%</p>
-          <p className="text-gray-500 text-xs">Team Growth</p>
-        </div>
-
-        <div className="bg-[#0f141c] border border-[#2a2f3a] rounded-xl p-4 text-center">
-          <p className="text-white text-lg font-semibold">5,600+</p>
-          <p className="text-gray-500 text-xs">Legal Requests</p>
-        </div>
-
-        <div className="bg-[#0f141c] border border-[#2a2f3a] rounded-xl p-4 text-center">
-          <p className="text-white text-lg font-semibold">80+</p>
-          <p className="text-gray-500 text-xs">Countries</p>
-        </div>
-
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {["KYC", "AML", "Sanctions", "Compliance"].map((tag, i) => (
-          <span key={i} className="px-3 py-1 text-xs rounded-full bg-[#0f141c] border border-[#2a2f3a] text-gray-300">
-            {tag}
-          </span>
-        ))}
-      </div>
-
-    </div>
+  </div>
 
   </div>
 
@@ -239,15 +237,16 @@ She holds a Bachelor of Commerce from McGill University and a Juris Doctor from 
   <div
   style={{
     display: "flex",
-    alignItems: "flex-start",   // 👈 move upward
+    alignItems: "flex-start",
     justifyContent: "center",
-    paddingTop: "5vh"          // 👈 control how high it is
+    paddingTop: "5vh"
   }}
 >
   <Link
     to="/legal"
+    className="learn-more-btn"
     style={{
-      background: "#ff8c32",
+      background: "#f0f0f0",
       color: "black",
       padding: "12px 30px",
       borderRadius: "8px",
@@ -257,16 +256,14 @@ She holds a Bachelor of Commerce from McGill University and a Juris Doctor from 
     Learn More
   </Link>
 </div>
-</div>
-
 
       {/* FOUNDERS */}
       <div className="about-section">
         <h2>Our Founders</h2>
 
         <div className="grid">
-          <div className="card"><h3>CZ (Changpeng Zhao)</h3><p>Founder & visionary leader.</p></div>
-          <div className="card"><h3>Yi He</h3><p>Co-founder & strategist.</p></div>
+          <div className="card-light"><h3>CZ (Changpeng Zhao)</h3><p>Founder & visionary leader.</p></div>
+          <div className="card-light"><h3>Yi He</h3><p>Co-founder & strategist.</p></div>
         </div>
       </div>
 
@@ -279,7 +276,7 @@ She holds a Bachelor of Commerce from McGill University and a Juris Doctor from 
           {members.map((name, i) => (
             <div
               key={i}
-              className={`card ${activeMember === name ? "active" : ""}`}
+              className={`card-light ${activeMember === name ? "active" : ""}`}
               onClick={() => handleClick(name)}
               style={{ cursor: "pointer" }}
             >
