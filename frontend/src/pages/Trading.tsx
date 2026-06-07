@@ -1780,17 +1780,18 @@ export default function Trading() {
         setUserOrders(orders);
         setLockedUSDT(Number(summaryRes?.data?.locked || 0));
       }
-      if (historyRes?.data && Array.isArray(historyRes.data)) {
-        setTradeHistory(historyRes.data.map((t: any) => ({
+      const tradeData = historyRes?.data?.data ?? historyRes?.data;
+      if (Array.isArray(tradeData)) {
+        setTradeHistory(tradeData.map((t: any) => ({
           time:       Math.floor(new Date(t.createdAt || t.time).getTime() / 1000),
-          price:      t.price || 0,          // close price
-          entryPrice: t.entryPrice || 0,     // entry price
+          price:      t.closePrice || t.price || 0,
+          entryPrice: t.entryPrice || 0,
           quantity:   t.amount || t.quantity || 0,
           side:       t.side,
           pair:       t.pair || t.symbol || symbol,
           type:       t.type || 'market',
-          profit:     t.pnl ?? t.profit ?? 0,
-          pnl:        t.pnl ?? t.profit ?? 0,
+          profit:     t.clampedPnl ?? t.rawPnl ?? 0,
+          pnl:        t.clampedPnl ?? t.rawPnl ?? 0,
         })));
       }
 
