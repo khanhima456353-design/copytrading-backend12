@@ -55,6 +55,14 @@ const SAMPLE_NEWS: NewsItem[] = [
   { id: 4, src: "Bloomberg", title: "BNB Chain daily active addresses hit all-time high", time: "11h ago" },
 ];
 
+const COIN_IMAGES: Record<string, string> = {
+  BTC: "https://assets.coingecko.com/coins/images/1/small/bitcoin.png",
+  ETH: "https://assets.coingecko.com/coins/images/279/small/ethereum.png",
+  BNB: "https://assets.coingecko.com/coins/images/825/small/bnb-icon2_2x.png",
+  SOL: "https://assets.coingecko.com/coins/images/4128/small/solana.png",
+  AVAX: "https://assets.coingecko.com/coins/images/12559/small/Avalanche_Circle_RedWhite_Trans.png",
+};
+
 const COIN_COLORS: Record<string, { bg: string; color: string }> = {
   "₿":    { bg: "#F7931A22", color: "#F7931A" },
   "Ξ":    { bg: "#627EEA22", color: "#627EEA" },
@@ -944,7 +952,7 @@ export default function HomeDashboard() {
               {(liveTickers.length > 0 ? liveTickers : TICKERS).map(t => (
                 <div key={t.symbol} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border, #1e293b)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ width: 6, height: 6, borderRadius: "50%", background: t.up ? "#0ecb81" : "#f6465d" }} />
+                    <img src={COIN_IMAGES[t.symbol]} alt={t.symbol} style={{ width: 18, height: 18, objectFit: "contain", borderRadius: "50%" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
                     <span style={{ fontSize: 13, color: "var(--text-primary)", fontWeight: 500 }}>{t.symbol}</span>
                   </div>
                   <div style={{ textAlign: "right" }}>
