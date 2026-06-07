@@ -184,11 +184,6 @@ She holds a Bachelor of Commerce from McGill University and a Juris Doctor from 
       <p>IP + wallet whitelist + device controls.</p>
     </div>
 
-    <div className="values-card">
-      <h3>Security Alerts</h3>
-      <p>Instant fraud detection notifications.</p>
-    </div>
-
   </div>
 
   {/* ROW 4 */}
