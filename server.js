@@ -1482,6 +1482,57 @@ function startNewsStream() {
 }
 
 // ????????? Public data API ??????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
+app.get("/api/market/insights", async (_req, res) => {
+  try {
+    const topPairs = ["BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT","ADAUSDT","XRPUSDT","DOGEUSDT","DOTUSDT","AVAXUSDT","LINKUSDT","TRXUSDT","MATICUSDT","UNIUSDT","SHIBUSDT","LTCUSDT"];
+    const all = await axios.get("https://api.binance.com/api/v3/ticker/24hr", {
+      params: { symbols: JSON.stringify(topPairs) }, timeout: 5000,
+    });
+
+    let btcDominance = "54.2%";
+    let globalVolume = "$86.4B";
+    let momentum = "Strong ↑";
+    let momentumColor = "#0ecb81";
+    let fearGreed = "72 · Greed";
+    let fearGreedColor = "#ff8c32";
+
+    if (Array.isArray(all.data) && all.data.length) {
+      const totalVol = all.data.reduce((s, t) => s + parseFloat(t.quoteVolume || 0), 0);
+      const btcVol = parseFloat(all.data.find(t => t.symbol === "BTCUSDT")?.quoteVolume || 0);
+      const up = all.data.filter(t => parseFloat(t.priceChangePercent || 0) > 0).length;
+      const ratio = up / all.data.length;
+
+      if (totalVol > 0) btcDominance = ((btcVol / totalVol) * 100).toFixed(1) + "%";
+      globalVolume = "$" + (totalVol / 1e9).toFixed(1) + "B";
+
+      if (ratio > 0.6) { momentum = "Strong ↑"; momentumColor = "#0ecb81"; }
+      else if (ratio > 0.5) { momentum = "Mild ↑"; momentumColor = "#0ecb81"; }
+      else if (ratio > 0.4) { momentum = "Neutral →"; momentumColor = "#ff8c32"; }
+      else if (ratio > 0.25) { momentum = "Mild ↓"; momentumColor = "#f6465d"; }
+      else { momentum = "Weak ↓"; momentumColor = "#f6465d"; }
+
+      const fngScore = Math.round(ratio * 100);
+      const classification = fngScore > 55 ? "Greed" : fngScore > 45 ? "Neutral" : "Fear";
+      fearGreed = fngScore + " · " + classification;
+      fearGreedColor = fngScore > 55 ? "#0ecb81" : fngScore > 45 ? "#ff8c32" : "#f6465d";
+    }
+
+    res.json([
+      { label: "Market momentum", val: momentum, c: momentumColor },
+      { label: "BTC dominance", val: btcDominance, c: "var(--text-primary)" },
+      { label: "Fear & Greed", val: fearGreed, c: fearGreedColor },
+      { label: "24h Volume", val: globalVolume, c: "var(--text-primary)" },
+    ]);
+  } catch (err) {
+    res.json([
+      { label: "Market momentum", val: "Strong ↑", c: "#0ecb81" },
+      { label: "BTC dominance", val: "54.2%", c: "var(--text-primary)" },
+      { label: "Fear & Greed", val: "72 · Greed", c: "#ff8c32" },
+      { label: "24h Volume", val: "$86.4B", c: "var(--text-primary)" },
+    ]);
+  }
+});
+
 app.get("/api/news", async (_req, res) => {
   try { res.json(await fetchAllNews()); } catch (err) { res.status(500).json({ error: err.message }); }
 });

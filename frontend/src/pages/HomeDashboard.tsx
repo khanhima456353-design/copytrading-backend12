@@ -181,6 +181,7 @@ export default function HomeDashboard() {
   const [searchVal, setSearchVal] = useState("");
   const [liveTickers, setLiveTickers] = useState<{ symbol: string; price: string; change: string; up: boolean }[]>([]);
   const [liveMarkets, setLiveMarkets] = useState<MarketRow[]>([]);
+  const [marketInsights, setMarketInsights] = useState<{ label: string; val: string; c: string }[] | null>(null);
 
   const userEmail = localStorage.getItem("userEmail") || "user@example.com";
   const userId = localStorage.getItem("userId") || "SW-000000";
@@ -260,6 +261,13 @@ export default function HomeDashboard() {
     } catch {}
   };
 
+  const fetchMarketInsights = async () => {
+    try {
+      const res = await fetch(`${process.env.REACT_APP_API_URL || "http://localhost:5000"}/api/market/insights`);
+      if (res.ok) { const d = await res.json(); if (Array.isArray(d)) setMarketInsights(d); }
+    } catch {}
+  };
+
   const markAsRead = async (id: string) => {
     try {
       const res = await fetch(`${process.env.REACT_APP_API_URL || "http://localhost:5000"}/api/notifications/${id}/read`, {
@@ -279,13 +287,14 @@ export default function HomeDashboard() {
   };
 
   useEffect(() => {
-    fetchBalance(); fetchUserProfile(); fetchNotifications(); fetchUnreadCount(); fetchLiveTickers();
+    fetchBalance(); fetchUserProfile(); fetchNotifications(); fetchUnreadCount(); fetchLiveTickers(); fetchMarketInsights();
     const cached = localStorage.getItem("news-cache");
     if (cached) { try { const p = JSON.parse(cached); if (Array.isArray(p) && p.length) setNewsFeed(p); } catch {} }
     const tickerInt = setInterval(fetchLiveTickers, 30000);
+    const insightInt = setInterval(fetchMarketInsights, 60000);
     const socket = (window as any).socket;
-    if (socket) { socket.on("balanceUpdated", (d: any) => setBalance(d.balance)); return () => { socket.off("balanceUpdated"); clearInterval(tickerInt); }; }
-    return () => clearInterval(tickerInt);
+    if (socket) { socket.on("balanceUpdated", (d: any) => setBalance(d.balance)); return () => { socket.off("balanceUpdated"); clearInterval(tickerInt); clearInterval(insightInt); }; }
+    return () => { clearInterval(tickerInt); clearInterval(insightInt); };
   }, []);
 
   const displayedNews = newsFeed.length > 0 ? newsFeed.slice(0, 4).map(i => ({ id: i.id, src: "Swancore's News", title: i.title, time: i.time || "Just now" })) : SAMPLE_NEWS;
@@ -964,12 +973,12 @@ export default function HomeDashboard() {
             </div>
             <div style={{ background: "var(--surface, #1E2329)", border: "1px solid var(--border, #1e293b)", borderRadius: 12, padding: 14 }}>
               <div style={{ fontSize: 10, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 10 }}>Market Insights</div>
-              {[
+              {(marketInsights || [
                 { label: "Market momentum", val: "Strong ↑", c: "#0ecb81" },
                 { label: "BTC dominance", val: "54.2%", c: "var(--text-primary)" },
                 { label: "Fear & Greed", val: "72 · Greed", c: "#ff8c32" },
                 { label: "24h Volume", val: "$86.4B", c: "var(--text-primary)" },
-              ].map(r => (
+              ]).map(r => (
                 <div key={r.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderBottom: "1px solid var(--border, #1e293b)" }}>
                   <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{r.label}</span>
                   <span style={{ fontSize: 12, fontWeight: 600, color: r.c }}>{r.val}</span>
