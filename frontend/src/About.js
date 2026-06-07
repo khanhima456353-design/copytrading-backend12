@@ -247,7 +247,7 @@ She holds a Bachelor of Commerce from McGill University and a Juris Doctor from 
   <Link
     to="/legal"
     style={{
-      background: "#facc15",
+      background: "#ff8c32",
       color: "black",
       padding: "12px 30px",
       borderRadius: "8px",

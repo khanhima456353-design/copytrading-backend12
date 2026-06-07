@@ -15,7 +15,7 @@
 :root[data-theme="dark"] {
   /* Dark theme (default) */
   --primary: #ff8c32;
-  --primary-hover: #F0B90B;
+  --primary-hover: #e67a22;
   --accent: #7b9fff;
   --bg-light: #f8fafc;
   --bg-dark: #1E2329;
@@ -39,7 +39,7 @@
 :root[data-theme="light"] {
   /* Light theme */
   --primary: #ff8c32;
-  --primary-hover: #F0B90B;
+  --primary-hover: #e67a22;
   --accent: #3b82f6;
   --bg-current: #f8fafc;
   --text-current: #0f172a;
@@ -199,6 +199,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+.mobile-menu:hover {
+  color: var(--primary);
 }
 
 /* =========================
