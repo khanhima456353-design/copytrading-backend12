@@ -1825,6 +1825,12 @@ export default function Trading() {
     refreshAccountData();
   }, [refreshAccountData]);
 
+  // Refresh account data when trading pair changes
+  useEffect(() => {
+    if (!symbol) return;
+    refreshAccountData();
+  }, [symbol, refreshAccountData]);
+
   // WebSocket listeners for real-time balance and position updates
   useEffect(() => {
     let socket: any = null;
@@ -2010,6 +2016,8 @@ export default function Trading() {
 
   useEffect(() => {
     if (!marketState) return;
+    // Guard: ignore stale marketState for a different pair
+    if (marketState.pair !== symbol) return;
     setOrderbook({ buy: marketState.orderbook.bids, sell: marketState.orderbook.asks });
     setTrades(marketState.trades);
     // Keep local mirror for display only; single source of truth remains marketState.lastPrice
@@ -2078,14 +2086,14 @@ export default function Trading() {
   const bidPct = totalBidVol + totalAskVol > 0 ? (totalBidVol / (totalBidVol + totalAskVol) * 100).toFixed(1) : "50.0";
   const askPct = totalBidVol + totalAskVol > 0 ? (totalAskVol / (totalBidVol + totalAskVol) * 100).toFixed(1) : "50.0";
   
-  const activeOrders = userOrders.filter(o => o.status === "open");
+  const activeOrders = userOrders.filter(o => o.status === "open" && (o.pair === symbol || o.pair?.replace("/", "") === symbol?.replace("/", "")));
   
   const pendingLocked = useMemo(() => userOrders
-    .filter(o => o.status === "open" && o.side === "buy")
-    .reduce((sum, order) => sum + order.price * order.amount, 0), [userOrders]);
+    .filter(o => o.status === "open" && o.side === "buy" && o.pair === symbol)
+    .reduce((sum, order) => sum + order.price * order.amount, 0), [userOrders, symbol]);
     
   const pendingSellLockedBTC = useMemo(() => userOrders
-    .filter(o => o.status === "open" && o.side === "sell")
+    .filter(o => o.status === "open" && o.side === "sell" && o.pair === symbol)
     .reduce((sum, order) => sum + order.amount, 0), [userOrders]);
 
   // ─── UNIFIED BALANCES & RECONCILIATION ─────────────────────────────────────
@@ -3525,7 +3533,7 @@ serverPositions.length === 0
                   <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 0.5fr 0.5fr 0.8fr 0.8fr 0.7fr 0.8fr", padding: "8px 14px", fontSize: 10, fontFamily: "monospace", color: COLORS.textMuted, borderBottom: `1px solid ${COLORS.border}` }}>
                     <span>Date</span><span>Pair</span><span>Side</span><span>Type</span><span>Entry</span><span>Close</span><span>Qty</span><span style={{ textAlign: "right" }}>PnL</span>
                   </div>
-                  {tradeHistory.slice(0, 50).map((t: any, i: number) => (
+                  {tradeHistory.filter((t: any) => t.pair === symbol).slice(0, 50).map((t: any, i: number) => (
                     <div key={i} style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 0.5fr 0.5fr 0.8fr 0.8fr 0.7fr 0.8fr", padding: "6px 14px", fontSize: 11, fontFamily: "monospace", borderBottom: `1px solid ${COLORS.border}` }}>
                       <span style={{ color: COLORS.textMuted }}>{new Date(t.time * 1000).toLocaleString()}</span>
                       <span style={{ color: COLORS.textBright }}>{t.pair}</span>
