@@ -1072,8 +1072,8 @@ body {
   right: 0;
   width: 280px;
   height: 100%;
-  background: #1a1e24;
-  border-left: 1px solid #2a2e35;
+  background: var(--card-current);
+  border-left: 1px solid var(--border-current);
   padding: 24px;
   display: flex;
   flex-direction: column;
@@ -1107,13 +1107,13 @@ body {
   border-radius: 8px;
   font-size: 15px;
   font-weight: 500;
-  color: #eaecef;
+  color: var(--text-current);
   text-decoration: none;
   cursor: pointer;
   transition: background 0.15s;
 }
 .lm-nav-item:hover {
-  background: #2a2e35;
+  background: var(--surface-strong);
 }
 
 .lm-nav-auth {
@@ -1125,15 +1125,15 @@ body {
 .lm-btn-ghost {
   padding: 12px;
   border-radius: 8px;
-  border: 1px solid #2a2e35;
+  border: 1px solid var(--border-current);
   background: transparent;
-  color: #eaecef;
+  color: var(--text-current);
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
 }
 .lm-btn-ghost:hover {
-  background: #2a2e35;
+  background: var(--surface-strong);
 }
 
 .lm-btn-primary {

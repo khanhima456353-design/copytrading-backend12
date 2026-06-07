@@ -80,7 +80,7 @@ export default function Navbar({ showAuth = true, minimal = false, homepage = fa
       {/* Mobile menu drawer for non-homepage pages */}
       {!homepage && isMobileMenuOpen && (
         <div className="nav-mobile-overlay" onClick={() => setIsMobileMenuOpen(false)}>
-          <div className="nav-mobile-drawer" onClick={e => e.stopPropagation()}>
+          <div className="nav-mobile-drawer" onClick={e => e.stopPropagation()} style={{ background: theme === "light" ? "#ffffff" : "#1E2329" }}>
             <div className="nav-mobile-body">
               <nav className="nav-mobile-links">
                 <Link to="/trade" className="nav-mobile-item" onClick={() => setIsMobileMenuOpen(false)}>

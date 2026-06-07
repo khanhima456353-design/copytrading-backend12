@@ -152,7 +152,6 @@
   right: 0;
   width: 280px;
   height: 100%;
-  background: var(--clr-bg, #0b0e11);
   z-index: 1000;
   box-shadow: -4px 0 20px rgba(0, 0, 0, 0.3);
   overflow-y: auto;
