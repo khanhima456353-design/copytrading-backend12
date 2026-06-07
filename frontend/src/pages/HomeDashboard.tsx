@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import authService from "../services/authService";
 import { useMobileMenu } from "../components/theme/MobileMenuContext";
+import { BookCheck, AlertTriangle, XCircle, Megaphone, Bell } from "lucide-react";
 
 type Screen = "home" | "portfolio" | "markets" | "account";
 
@@ -107,8 +108,18 @@ function NotificationPanel({ notifications, isVisible, onClose, onMarkAsRead, on
 }) {
   if (!isVisible) return null;
   const gt = (t: string) => ({ success: "#0ecb81", warning: "#ff8c32", error: "#f6465d", admin: "#ff8c32" }[t] ?? "#378ADD");
-  const gi = (t: string) => ({ success: "✅", warning: "⚠️", error: "❌", admin: "📢" }[t] ?? "ℹ️");
+  const gi = (t: string) => {
+    const props = { size: 18, style: { flexShrink: 0 } as React.CSSProperties };
+    switch (t) {
+      case "success": return <BookCheck {...props} />;
+      case "warning": return <AlertTriangle {...props} />;
+      case "error": return <XCircle {...props} />;
+      case "admin": return <Megaphone {...props} />;
+      default: return <Bell {...props} />;
+    }
+  };
   const fd = (d: string) => { const m = Math.floor((Date.now() - new Date(d).getTime()) / 60000); if (m < 1) return "Just now"; if (m < 60) return `${m}m ago`; const h = Math.floor(m / 60); if (h < 24) return `${h}h ago`; return `${Math.floor(h / 24)}d ago`; };
+  const cleanTitle = (title: string) => title.replace(/^[\u{1F000}-\u{1FFFF}\u2700-\u27BF\u{2600}-\u{26FF}\u{2139}\u{2B50}\u{FE0F}]/u, '').trim();
   return (
     <div className="hd-notif-overlay" onClick={onClose}>
       <div className="hd-notif-panel" onClick={e => e.stopPropagation()}>
@@ -124,16 +135,16 @@ function NotificationPanel({ notifications, isVisible, onClose, onMarkAsRead, on
         <div className="hd-notif-list">
           {notifications.length === 0 ? (
             <div className="hd-notif-empty">
-              <div style={{ fontSize: 40, marginBottom: 12 }}>🔔</div>
+              <Bell size={40} style={{ marginBottom: 12, color: "var(--text-muted)" }} />
               <div className="hd-notif-empty-title">No notifications yet</div>
               <div className="hd-notif-empty-sub">Updates and alerts will appear here.</div>
             </div>
           ) : notifications.map(n => (
             <div key={n.id} className={`hd-notif-item${!n.isRead ? " unread" : ""}`} onClick={() => !n.isRead && onMarkAsRead(n.id)}>
               <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                <span style={{ fontSize: 18, color: gt(n.type), flexShrink: 0 }}>{gi(n.type)}</span>
+                <span style={{ color: gt(n.type), flexShrink: 0, display: "inline-flex" }}>{gi(n.type)}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="hd-notif-item-title">{n.title}</div>
+                  <div className="hd-notif-item-title">{cleanTitle(n.title)}</div>
                   <div className="hd-notif-item-msg">{n.message}</div>
                   <div className="hd-notif-item-time">{fd(n.createdAt)}</div>
                 </div>
@@ -478,7 +489,7 @@ export default function HomeDashboard() {
         {[
           { icon: "🪪", title: "KYC verification", sub: userProfile?.kycVerified ? "Verified" : "Not started", action: !userProfile?.kycVerified ? () => navigate("/verification") : undefined },
           { icon: "🔒", title: "Security", sub: "Password · 2FA" },
-          { icon: "🔔", title: "Notifications", sub: "Price alerts, security notices" },
+          { icon: "🔔", title: "Notifications", sub: "Price alerts, security notices", action: () => setShowNotifications(true) },
           { icon: "🌐", title: "Language & region", sub: "English · USDT" },
         ].map((r, i) => (
           <button key={i} className="hd-acc-row" onClick={r.action} style={r.action ? {} : { cursor: "default" }}>
@@ -565,8 +576,8 @@ export default function HomeDashboard() {
 
         /* Balance Hero */
         .hd-balance-hero {
-          background: linear-gradient(160deg, #0d1f35 0%, #0a1628 40%, #070f1e 100%);
-          border: 1px solid rgba(255,255,255,0.07);
+          background: var(--surface);
+          border: 1px solid var(--border);
           border-radius: 16px; overflow: hidden;
           padding: 20px 20px 0; position: relative; margin-bottom: 12px;
         }
@@ -576,11 +587,18 @@ export default function HomeDashboard() {
             linear-gradient(90deg, rgba(55,138,221,0.04) 1px, transparent 1px);
           background-size: 40px 40px; pointer-events: none;
         }
+        :root[data-theme="light"] .hd-hero-grid {
+          background-image: linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px);
+        }
         .hd-hero-glow {
           position: absolute; top: -40px; right: -30px;
           width: 200px; height: 200px; border-radius: 50%;
           background: radial-gradient(circle, rgba(55,138,221,0.12) 0%, transparent 70%);
           pointer-events: none;
+        }
+        :root[data-theme="light"] .hd-hero-glow {
+          background: radial-gradient(circle, rgba(255,140,50,0.06) 0%, transparent 70%);
         }
         .hd-hero-top {
           display: flex; justify-content: space-between; align-items: flex-start;
@@ -588,7 +606,7 @@ export default function HomeDashboard() {
         }
         .hd-hero-label {
           display: flex; align-items: center; gap: 6px;
-          font-size: 11px; color: #ff8c32;
+          font-size: 11px; color: var(--primary);
           text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px;
         }
         .hd-hero-dot {
@@ -597,39 +615,39 @@ export default function HomeDashboard() {
         }
         @keyframes hdPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.6; transform: scale(0.85); } }
         .hd-hero-amount {
-          font-size: 32px; font-weight: 600; color: #fff;
+          font-size: 32px; font-weight: 600; color: var(--text-primary);
           letter-spacing: -0.02em; line-height: 1; margin-bottom: 8px;
         }
-        .hd-hero-currency { font-size: 18px; color: #ff8c32; font-weight: 400; }
-        .hd-hero-unit { font-size: 13px; color: #ff8c32; margin-left: 6px; font-weight: 400; }
+        .hd-hero-currency { font-size: 18px; color: var(--primary); font-weight: 400; }
+        .hd-hero-unit { font-size: 13px; color: var(--primary); margin-left: 6px; font-weight: 400; }
         .hd-hero-sub-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
         .hd-hero-pill {
           display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600;
-          color: #ff8c32; background: rgba(255,255,255,0.06);
-          border: 1px solid rgba(255,255,255,0.1); border-radius: 999px; padding: 2px 8px;
+          color: var(--primary); background: var(--surface);
+          border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px;
         }
-        .hd-hero-sub-text { font-size: 11px; color: rgba(255,255,255,0.3); }
+        .hd-hero-sub-text { font-size: 11px; color: var(--text-muted); }
         .hd-hero-stats {
-          display: flex; gap: 0; background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden; flex-shrink: 0;
+          display: flex; gap: 0; background: var(--surface-strong);
+          border: 1px solid var(--border); border-radius: 10px; overflow: hidden; flex-shrink: 0;
         }
         .hd-hero-stat {
           display: flex; flex-direction: column; gap: 2px;
           padding: 8px 12px; min-width: 70px;
         }
-        .hd-hero-stat + .hd-hero-stat { border-left: 1px solid rgba(255,255,255,0.07); }
-        .hd-hero-stat-label { font-size: 9px; color: #ff8c32; text-transform: uppercase; letter-spacing: 0.5px; }
-        .hd-hero-stat-val { font-size: 13px; font-weight: 600; color: #fff; }
-        .hd-hero-stat-val.mute { color: rgba(255,255,255,0.25); }
+        .hd-hero-stat + .hd-hero-stat { border-left: 1px solid var(--border); }
+        .hd-hero-stat-label { font-size: 9px; color: var(--primary); text-transform: uppercase; letter-spacing: 0.5px; }
+        .hd-hero-stat-val { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+        .hd-hero-stat-val.mute { color: var(--text-muted); opacity: 0.6; }
         .hd-qa-grid {
           display: grid; grid-template-columns: repeat(4, 1fr);
-          border-top: 1px solid rgba(255,255,255,0.06); margin-top: 16px;
+          border-top: 1px solid var(--border); margin-top: 16px;
           position: relative; z-index: 1;
         }
         .hd-qa-item {
           display: flex; flex-direction: column; align-items: center; gap: 6px;
           padding: 14px 4px; cursor: pointer;
-          border-right: 1px solid rgba(255,255,255,0.05);
+          border-right: 1px solid var(--border);
         }
         .hd-qa-item:last-child { border-right: none; }
         .hd-qa-icon {
@@ -638,7 +656,7 @@ export default function HomeDashboard() {
           font-size: 18px; border: 1px solid; transition: transform 0.15s;
         }
         .hd-qa-item:hover .hd-qa-icon { transform: translateY(-2px); }
-        .hd-qa-label { font-size: 11px; color: #ff8c32; font-weight: 500; }
+        .hd-qa-label { font-size: 11px; color: var(--primary); font-weight: 500; }
 
         /* Ticker - animated marquee */
         .hd-ticker-wrap {
