@@ -265,7 +265,6 @@ function emitSimulationEnded(state, reason = 'snapback_complete') {
         timestamp: Date.now(),
     };
     io.to(`user:${state.userId}`).emit('simulationEnded', payload);
-    io.to(`user:${state.userId}`).emit('driftStopped', payload);
 }
 function finishSnapBack(state, key) {
     const realPrice = getCurrentPrice(state.pair);
@@ -488,6 +487,15 @@ function stopDrift(userId, pair, positionId) {
     };
     state.updatedAt = Date.now();
     emitSimulatedPrice(state);
+    // Notify frontend that admin drift was stopped
+    const realPrice = getCurrentPrice(pair);
+    if (io) {
+        io.to(`user:${userId}`).emit('driftStopped', {
+            userId, pair, positionId,
+            price: realPrice || state.lastPrice,
+            timestamp: Date.now(),
+        });
+    }
     return getDriftStatus(userId, pair, positionId);
 }
 function getDriftStatus(userId, pair, positionId) {
