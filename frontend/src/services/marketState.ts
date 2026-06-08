@@ -427,6 +427,9 @@ async function initMarketState(): Promise<void> {
   socket.on("orderbook", (data: any) => {
     if (!data?.pair) return;
 
+    // Block real Binance orderbook when simulation is active
+    if (isSimulationLocked(data.pair)) return;
+
     updateMarketState(data.pair, {
       orderbook: {
         bids: normalizeOrders(data.buy  || [], false),

@@ -3507,13 +3507,7 @@ serverPositions.length === 0
         <span style={{ color: COLORS.text }}>{Number(p.quantity ?? p.size ?? 0).toFixed(4)}</span>
         <span style={{ color: COLORS.text }}>
 {(() => {
-  const mark = (marketState?.pair === p.pair && marketState?.markPrice) ? marketState.markPrice : (p.markPrice ?? p.entryPrice ?? 0);
-  const side = p.side || 'long';
-  const size = Math.abs(p.size || p.quantity || 0);
-  const entry = p.entryPrice || 0;
-  const leverage = p.leverage || 1;
-  const direction = side === 'short' ? -1 : 1;
-  const livePnl = (mark - entry) * size * leverage * direction;
+  const livePnl = Number(p.unrealizedPnl ?? p.rawUnrealizedPnl ?? 0);
   return <span style={{ color: livePnl >= 0 ? COLORS.green : COLORS.red }}>{livePnl >= 0 ? "+" : ""}{livePnl.toFixed(2)}</span>;
 })()}
 </span>

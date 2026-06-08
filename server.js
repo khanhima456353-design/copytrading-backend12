@@ -726,7 +726,40 @@ app.get('/api/account/positions', authMiddleware, async (req, res) => {
 });
 
 app.post('/api/trade/close-position', authMiddleware, async (req, res) => {
-  res.redirect(307, '/api/orders/close');
+  try {
+    const userId = req.userId;
+    const { pair, positionId } = req.body;
+    if (!positionId || !pair) {
+      return res.status(400).json({ success: false, message: 'positionId and pair are required' });
+    }
+
+    const pos = await Position.findOne({ _id: positionId, userId });
+    if (!pos) {
+      return res.status(404).json({ success: false, message: 'Position not found' });
+    }
+
+    const closePrice = getPositionMarkPrice(userId, pos) || pos.entryPrice;
+
+    // Close all open orders for this user+pair
+    const openOrders = await Order.find({ userId, pair, status: 'open' });
+    for (const order of openOrders) {
+      await orderService.closeOrder(order._id, closePrice);
+    }
+
+    // Delete the position
+    await Position.deleteOne({ _id: positionId });
+
+    // Start snapback to real Binance
+    marketSimulator.clearSimulation(userId, pair, positionId);
+
+    // Notify frontend
+    io.to(`user:${userId}`).emit('positionClosed', { pair, positionId, closePrice });
+
+    return res.json({ success: true, message: 'Position closed' });
+  } catch (err) {
+    console.error('Close position error:', err?.message || err);
+    return res.status(500).json({ success: false, message: err?.message || 'Server error' });
+  }
 });
 
 app.get('/api/account/open-orders', authMiddleware, async (req, res) => {

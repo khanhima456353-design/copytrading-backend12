@@ -21,10 +21,14 @@ export const priceAlertsRef = { current: {} }; // Map: price -> callback
  */
 function detectIntervalSec(candles) {
   if (candles.length < 2) return 60;
-  const last = candles[candles.length - 1].time;
-  const prev = candles[candles.length - 2].time;
-  // Candle times are stored in seconds.
-  return Math.max(1, last - prev);
+  const last = candles[candles.length - 1];
+  const prev = candles[candles.length - 2];
+  if (!last || !prev || typeof last.time !== 'number' || typeof prev.time !== 'number') return 60;
+  const diff = last.time - prev.time;
+  // Guard: if diff is 0 or negative (duplicate timestamp), fall back to 60s.
+  // This can happen when the backend merges a live Redis bucket that shares
+  // the same timestamp boundary as the last Binance candle.
+  return diff > 0 ? diff : 60;
 }
 
 /**

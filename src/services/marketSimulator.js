@@ -172,20 +172,25 @@ function computeNaturalPrice(state) {
     ? (((currentPrice - anchorPrice) / anchorPrice) * 100) * direction
     : 0;
 
+  // Position-side-aware bounds: both longs and shorts get PnL in [-25%, +2%]
+  const maxDownOffset = positionSide === 'short' ? -0.02 : -0.25;
+  const maxUpOffset = positionSide === 'short' ? 0.25 : 0.02;
+
   // Gentle boundary rotation — never stick at +2% or -25%
+  // direction flips the bias for shorts (rawPnlPercent is already direction-aware)
   let boundaryBias = 0;
   if (rawPnlPercent > 1.4) {
-    boundaryBias -= (rawPnlPercent - 1.4) * 0.00035;
+    boundaryBias -= (rawPnlPercent - 1.4) * 0.00035 * direction;
   } else if (rawPnlPercent < -22) {
-    boundaryBias += (-22 - rawPnlPercent) * 0.00028;
+    boundaryBias += (-22 - rawPnlPercent) * 0.00028 * direction;
   }
 
-  const midOffset = (MAX_UP_OFFSET + MAX_DOWN_OFFSET) / 2;
+  const midOffset = (maxUpOffset + maxDownOffset) / 2;
   const meanReversion = (midOffset - currentOffset) * 0.00022;
   const tickNoise = (Math.random() - 0.5) * noiseScale * 0.35;
 
   state.velocity = (Number(state.velocity) || 0) * 0.86 + gaussianNoise(noiseScale * 0.42) + boundaryBias + meanReversion + tickNoise;
-  currentOffset = clamp(currentOffset + state.velocity, MAX_DOWN_OFFSET, MAX_UP_OFFSET);
+  currentOffset = clamp(currentOffset + state.velocity, maxDownOffset, maxUpOffset);
   state.naturalOffset = currentOffset;
 
   let nextPrice = anchorPrice * (1 + currentOffset);
