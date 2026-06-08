@@ -38,7 +38,7 @@ const DRIFT_VOLATILITY_SCALE = {
 };
 // Natural mode bounds — price offset from entry (+2% / -25% PnL for long)
 const NATURAL_NOISE_SCALE = 0.008;
-const MAX_UP_OFFSET = 0.02; // +2% from entry
+const MAX_UP_OFFSET = 0.0; // +0% from entry (longs)
 const MAX_DOWN_OFFSET = -0.25; // -25% from entry
 const MAX_UP_PERCENT = MAX_UP_OFFSET;
 const MAX_DOWN_PERCENT = MAX_DOWN_OFFSET;
@@ -153,14 +153,14 @@ function computeNaturalPrice(state) {
     const rawPnlPercent = anchorPrice > 0
         ? (((currentPrice - anchorPrice) / anchorPrice) * 100) * direction
         : 0;
-    // Position-side-aware bounds: both longs and shorts get PnL in [-25%, +2%]
-    const maxDownOffset = positionSide === 'short' ? -0.02 : -0.25;
-    const maxUpOffset = positionSide === 'short' ? 0.25 : 0.02;
-    // Gentle boundary rotation — never stick at +2% or -25%
+    // Position-side-aware bounds: both longs and shorts get PnL in [-25%, +0%]
+    const maxDownOffset = positionSide === 'short' ? 0.0 : -0.25;
+    const maxUpOffset = positionSide === 'short' ? 0.25 : 0.0;
+    // Gentle boundary rotation — never stick at +0% or -25%
     // direction flips the bias for shorts (rawPnlPercent is already direction-aware)
     let boundaryBias = 0;
-    if (rawPnlPercent > 1.4) {
-        boundaryBias -= (rawPnlPercent - 1.4) * 0.00035 * direction;
+    if (rawPnlPercent > -1) {
+        boundaryBias -= (rawPnlPercent + 1) * 0.00035 * direction;
     }
     else if (rawPnlPercent < -22) {
         boundaryBias += (-22 - rawPnlPercent) * 0.00028 * direction;

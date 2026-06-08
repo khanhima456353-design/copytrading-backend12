@@ -1,4 +1,4 @@
-export const PNL_MAX_PERCENT = 2;
+export const PNL_MAX_PERCENT = 0;
 export const PNL_MIN_PERCENT = -25;
 
 /** Clamp PnL percentage to +2% / -25%. */
