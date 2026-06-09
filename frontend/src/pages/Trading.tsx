@@ -3276,16 +3276,16 @@ export default function Trading() {
       <div className="trading-order-form trading-dashboard__ticket" style={{ height: "auto", minHeight: isDesktopLayout ? 320 : 210, borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, display: "flex", flexShrink: 0, overflow: "visible" }}>
         <div className="trading-order-form__inner" style={{ width: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
               {!isDesktopLayout && !isTablet && (
-                <div style={{ display: "flex", borderBottom: `1px solid ${COLORS.border}`, flexShrink: 0, marginTop: -4 }}>
-                  <button onClick={() => setOrderSide("buy")} style={{ flex: 1, height: 30, background: orderSide === "buy" ? COLORS.green : "transparent", border: "none", borderRadius: 0, color: orderSide === "buy" ? "#000" : COLORS.text, fontWeight: 700, fontSize: 12, cursor: "pointer", borderRight: `1px solid ${COLORS.border}` }}>BUY</button>
-                  <button onClick={() => setOrderSide("sell")} style={{ flex: 1, height: 30, background: orderSide === "sell" ? COLORS.red : "transparent", border: "none", borderRadius: 0, color: orderSide === "sell" ? "#fff" : COLORS.text, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>SELL</button>
+                <div style={{ display: "flex", gap: 4, padding: "0 8px", flexShrink: 0, marginTop: 2 }}>
+                  <button onClick={() => setOrderSide("buy")} style={{ flex: 1, height: 28, background: orderSide === "buy" ? COLORS.green : "rgba(23,199,132,0.1)", border: orderSide === "buy" ? "none" : "1px solid rgba(23,199,132,0.25)", borderRadius: 14, color: orderSide === "buy" ? "#000" : COLORS.green, fontWeight: 700, fontSize: 11, letterSpacing: 0.5, cursor: "pointer", transition: "all 0.2s" }}>BUY</button>
+                  <button onClick={() => setOrderSide("sell")} style={{ flex: 1, height: 28, background: orderSide === "sell" ? COLORS.red : "rgba(240,82,101,0.1)", border: orderSide === "sell" ? "none" : "1px solid rgba(240,82,101,0.25)", borderRadius: 14, color: orderSide === "sell" ? "#fff" : COLORS.red, fontWeight: 700, fontSize: 11, letterSpacing: 0.5, cursor: "pointer", transition: "all 0.2s" }}>SELL</button>
                 </div>
               )}
               <div className="trading-order-form__columns" style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0, paddingTop: isDesktopLayout ? undefined : 4 }}>
             {/* Left: Buy form */}
             <div className="trading-order-form__side trading-order-form__side--buy" style={{ flex: 1, padding: isDesktopLayout ? "10px 16px" : "6px 16px", borderRight: `1px solid ${COLORS.border}`, display: isDesktopLayout ? "flex" : windowWidth < 768 && orderSide !== "buy" ? "none" : "flex", flexDirection: "column", gap: 6 }}>
             {/* Order type tabs */}
-            <div style={{ display: "flex", gap: 12, marginBottom: 2 }}>
+            <div className="trading-order-type-tabs" style={{ display: "flex", gap: 12, marginBottom: 2 }}>
               {(["Limit", "Market", "Stop Limit", "OCO"] as const).map(t => (
                 <button key={t} onClick={() => handleOrderTypeChange(t.toLowerCase().replace(" ", "-") as any)} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: orderType === t.toLowerCase().replace(" ", "-") ? COLORS.textBright : COLORS.text, borderBottom: orderType === t.toLowerCase().replace(" ", "-") ? `2px solid ${"#f0b90b"}` : "2px solid transparent", paddingBottom: 2 }}>{t}</button>
               ))}
@@ -3312,7 +3312,7 @@ export default function Trading() {
               </div>
             </div>
             {/* Total */}
-            <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 32 }}>
+            <div className="trading-order-total" style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 32 }}>
               <span style={{ fontSize: 11, color: COLORS.textMuted, width: 40 }}>Total</span>
               <input type="number" value={buyTotalInput} onChange={e => updateBuyTotal(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="Minimum 5 USDT" />
               <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT <ChevronDown size={10} /></span>
@@ -3352,7 +3352,7 @@ export default function Trading() {
           </div>
           {/* Right: Sell form */}
           <div className="trading-order-form__side trading-order-form__side--sell" style={{ flex: 1, padding: isDesktopLayout ? "10px 16px" : "6px 16px", display: isDesktopLayout ? "flex" : windowWidth < 768 && orderSide !== "sell" ? "none" : "flex", flexDirection: "column", gap: 6 }}>
-            <div style={{ display: "flex", gap: 12, marginBottom: 2 }}>
+            <div className="trading-order-type-tabs" style={{ display: "flex", gap: 12, marginBottom: 2 }}>
               {(["Limit", "Market", "Stop Limit", "OCO"] as const).map(t => (
                 <button key={t} onClick={() => handleOrderTypeChange(t.toLowerCase().replace(" ", "-") as any)} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: orderType === t.toLowerCase().replace(" ", "-") ? COLORS.textBright : COLORS.text, borderBottom: orderType === t.toLowerCase().replace(" ", "-") ? `2px solid ${"#f0b90b"}` : "2px solid transparent", paddingBottom: 2 }}>{t}</button>
               ))}
@@ -3375,7 +3375,7 @@ export default function Trading() {
                 ))}
               </div>
             </div>
-            <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 32 }}>
+            <div className="trading-order-total" style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 32 }}>
               <span style={{ fontSize: 11, color: COLORS.textMuted, width: 40 }}>Total</span>
               <input type="number" value={sellTotalInput} onChange={e => updateSellTotal(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="0.00" />
               <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT <ChevronDown size={10} /></span>
@@ -3950,6 +3950,8 @@ serverPositions.length === 0
           .trading-header > div:first-child { padding: 4px 8px !important; }
           .trading-header > div:nth-child(2) { width: 100%; overflow-x: auto !important; padding-bottom: 2px; }
           .trading-header > div:nth-child(2) > div:nth-child(n+5) { display: none !important; }
+          .trading-order-type-tabs { margin-top: -6px !important; }
+          .trading-order-total { margin-top: -4px !important; }
           .trading-chart-stage { height: 240px !important; min-height: 240px !important; }
           .trading-order-form { height: auto !important; min-height: 0 !important; }
           .trading-order-form__columns { flex-direction: column !important; }
