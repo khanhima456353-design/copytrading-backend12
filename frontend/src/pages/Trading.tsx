@@ -1583,7 +1583,7 @@ export default function Trading() {
   const toggleButtonTop = calculateToggleButtonTop();
 
   const [chartType, setChartType] = useState<"candlestick" | "line" | "area" | "bar">("candlestick");
-  const [activeChartTab, setActiveChartTab] = useState<"original" | "tradingview" | "depth">("original");
+  const [activeChartTab, setActiveChartTab] = useState<"original" | "depth">("original");
   const [activeViewTab, setActiveViewTab] = useState<"chart" | "orderbook" | "trades" | "info" | "tradingdata">("chart");
   const [orderType, setOrderType] = useState<"limit" | "market" | "stop-limit" | "oco">("limit");
   const [buyStopLoss, setBuyStopLoss] = useState("");
@@ -3091,10 +3091,10 @@ export default function Trading() {
           <button key={ct} onClick={() => setChartType(ct)} title={ct} style={{ width: 26, height: 26, background: chartType === ct ? COLORS.bgHover : "transparent", border: chartType === ct ? `1px solid ${COLORS.border}` : "1px solid transparent", borderRadius: 3, color: chartType === ct ? "#f0b90b" : COLORS.text, cursor: "pointer", fontSize: 14 }}>{icon}</button>
         ))}
         <div style={{ width: 1, height: 18, background: COLORS.border, margin: isDesktop ? "0 8px" : "0 6px" }} />
-        {/* View tabs (Original / Trading View / Depth) */}
-        {(["original", "tradingview", "depth"] as const).map(tab => (
+        {/* View tabs (Original / Depth) */}
+        {(["original", "depth"] as const).map(tab => (
           <button key={tab} onClick={() => setActiveChartTab(tab)} style={{ padding: isDesktop ? "3px 10px" : "3px 8px", marginLeft: tab === "original" ? 0 : (isDesktop ? 6 : 4), background: activeChartTab === tab ? COLORS.bgHover : "transparent", border: activeChartTab === tab ? `1px solid ${COLORS.border}` : "1px solid transparent", borderRadius: 3, color: activeChartTab === tab ? "#f0b90b" : COLORS.text, cursor: "pointer", fontSize: 11, fontWeight: activeChartTab === tab ? 700 : 400 }}>
-            {tab === "original" ? "Original" : tab === "tradingview" ? "Trading View" : "Depth"}
+            {tab === "original" ? "Original" : "Depth"}
           </button>
         ))}
         <div style={{ width: 1, height: 18, background: COLORS.border, margin: isDesktop ? "0 8px" : "0 6px" }} />
@@ -3153,14 +3153,6 @@ export default function Trading() {
               {activeChartTab === "depth" && (
                 <div style={{ height: "100%", display: "flex", flexDirection: "column", padding: 16, gap: 16, background: COLORS.bgPanel, minHeight: 360 }}>
                   <DepthChart buyLevels={buyDisplay} sellLevels={sellDisplay} depthLimit={depthLimit} baseSymbol={baseSymbol} quoteSymbol={quoteSymbol} />
-                </div>
-              )}
-              {activeChartTab === "tradingview" && (
-                <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.text }}>
-                  <div style={{ textAlign: "center" }}>
-                    <BarChart3 size={48} style={{ color: COLORS.textMuted }} />
-                    <div>TradingView chart widget</div>
-                  </div>
                 </div>
               )}
             </div>
