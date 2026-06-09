@@ -271,6 +271,18 @@ function finishSnapBack(state, key) {
     if (realPrice && realPrice > 0) {
         state.lastPrice = formatPrice(realPrice);
     }
+    if (state.revertToNatural) {
+        state.snapBack = null;
+        state.activeDrift = null;
+        state.mode = 'natural';
+        state.naturalOffset = 0;
+        state.naturalAnchor = realPrice || state.lastPrice;
+        state.velocity = 0;
+        state.updatedAt = Date.now();
+        state.revertToNatural = false;
+        emitSimulatedPrice(state);
+        return;
+    }
     state.snapBack = null;
     state.activeDrift = null;
     state.mode = 'idle';
@@ -454,6 +466,7 @@ function startDrift({ userId, pair, positionId, entryPrice, outcomePercent, dire
                 clearInterval(s.driftTimer);
                 s.driftTimer = null;
                 s.mode = 'snapback';
+                s.revertToNatural = true;
                 s.snapBack = { startPrice: s.lastPrice, step: 0, totalSteps: randomSnapBackSteps(), velocity: 0 };
                 s.activeDrift = null;
                 s.updatedAt = Date.now();
@@ -479,6 +492,7 @@ function stopDrift(userId, pair, positionId) {
     }
     state.mode = 'snapback';
     state.activeDrift = null;
+    state.revertToNatural = true;
     state.snapBack = {
         startPrice: state.lastPrice,
         step: 0,
