@@ -2168,10 +2168,10 @@ export default function Trading() {
     [accountSummary.holdings]
   );
 
-  // 3. Equity / portfolio — cash (available + locked) plus marked crypto holdings
+  // 3. Equity / portfolio — cash (available + locked) plus marked crypto holdings plus unrealized PnL
   const totalEquity = useMemo(() => {
-    return availableBalanceRaw + reservedUSDT + holdingsValue;
-  }, [availableBalanceRaw, reservedUSDT, holdingsValue]);
+    return availableBalanceRaw + reservedUSDT + holdingsValue + accountUnrealizedPnl;
+  }, [availableBalanceRaw, reservedUSDT, holdingsValue, accountUnrealizedPnl]);
 
   // 1. Total Portfolio Value — same as equity for spot (USDT + marked positions)
   const portfolioTotal = useMemo(() => totalEquity, [totalEquity]);
