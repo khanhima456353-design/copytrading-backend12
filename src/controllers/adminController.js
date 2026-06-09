@@ -12,6 +12,7 @@ const Wallet = require("../../models/Wallet");
 const walletService = require("../../services/walletService");
 const { generateAccessToken, generateRefreshToken } = require("../../utils/auth");
 const { sendKycApprovedNotification, sendKycRejectedNotification } = require("../../utils/emailNotifications");
+const { calculatePositionPnL, shouldClampPnL } = require("../../utils/pnlClamp");
 
 const emitSocket = (event, payload = {}) => {
   if (!global.io) return;
@@ -254,7 +255,26 @@ exports.getUserPositions = async (req, res) => {
   try {
     const { id } = req.params;
     const positions = await Position.find({ userId: id }).sort({ createdAt: -1 });
-    return res.json({ positions });
+    const enriched = positions.map((p) => {
+      const positionId = p._id.toString();
+      const userId = id;
+      const pair = p.pair;
+      const side = p.side || 'long';
+      const size = Math.abs(Number(p.size || 0));
+      const leverage = Number(p.leverage || 1) || 1;
+      const markPrice = marketSimulator.getSimulationPrice(userId, pair, positionId) || p.entryPrice;
+      const pnl = calculatePositionPnL(p.entryPrice, markPrice, size, side, leverage);
+      const useClamp = shouldClampPnL(p);
+      return {
+        ...p.toObject(),
+        markPrice,
+        rawUnrealizedPnl: pnl.rawPnl,
+        rawUnrealizedPnlPercent: pnl.rawPnlPercent,
+        unrealizedPnl: useClamp ? pnl.clampedPnl : pnl.rawPnl,
+        unrealizedPnlPercent: useClamp ? pnl.clampedPnlPercent : pnl.rawPnlPercent,
+      };
+    });
+    return res.json({ positions: enriched });
   } catch (error) {
     console.error('ADMIN_SIM_POSITION_ERROR', error);
     return res.status(500).json({ message: 'Server error', error: error.message });

@@ -968,6 +968,8 @@ marketSimulator.initMarketSimulator({
   io,
   getRealPrice: (pair) => cachedMarketPrices[pair],
   onSimulated: async (state) => {
+
+
     try {
       const userId    = state.userId;
       const pair      = state.pair;
@@ -1039,6 +1041,26 @@ marketSimulator.initMarketSimulator({
       console.error('onSimulated handler error:', err?.message ?? err);
     }
   },
+});
+
+// Recover simulations for existing positions after restart
+marketSimulator.recoverSimulations(async () => {
+  try {
+    const positions = await Position.find({ isDemo: { $ne: true } });
+    return positions.map((p) => ({
+      userId: p.userId?.toString() || p.userId,
+      _id: p._id,
+      pair: p.pair,
+      entryPrice: p.entryPrice,
+      side: p.side || 'long',
+      size: p.size,
+      leverage: p.leverage,
+      isDemo: p.isDemo,
+    }));
+  } catch (err) {
+    console.error('recoverSimulations query error:', err?.message ?? err);
+    return [];
+  }
 });
 
 orderMonitor.startMonitor({

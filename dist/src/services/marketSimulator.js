@@ -626,7 +626,37 @@ function isPairSimulated(pair) {
     }
     return false;
 }
+async function recoverSimulations(getOpenPositions) {
+    if (typeof getOpenPositions !== 'function') return;
+    try {
+        const positions = await getOpenPositions();
+        if (!Array.isArray(positions) || positions.length === 0) return;
+        let recovered = 0;
+        for (const pos of positions) {
+            const userId = pos.userId?.toString?.() || pos.userId;
+            if (!userId || !pos.pair || !pos._id) continue;
+            if (!pos.entryPrice || pos.isDemo) continue;
+            const started = startNaturalSimulation({
+                userId,
+                pair: pos.pair,
+                positionId: pos._id.toString(),
+                entryPrice: pos.entryPrice,
+                positionSide: pos.side || 'long',
+                volatility: 'medium',
+                durationSteps: NATURAL_TREND_STEPS,
+            });
+            if (started) recovered++;
+        }
+        if (recovered > 0) {
+            console.log(`[marketSimulator] Recovered ${recovered}/${positions.length} simulations after restart`);
+        }
+    } catch (err) {
+        console.error('[marketSimulator] recoverSimulations error:', err?.message ?? err);
+    }
+}
+
 module.exports = {
+    NATURAL_TREND_STEPS,
     initMarketSimulator,
     startNaturalSimulation,
     startDrift,
@@ -639,4 +669,5 @@ module.exports = {
     ensureState,
     isPairSimulated,
     hasActiveSimulation,
+    recoverSimulations,
 };
