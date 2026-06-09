@@ -1654,6 +1654,8 @@ export default function Trading() {
 
   const [gridBotActive, setGridBotActive] = useState(false);
   const [showTimeDropdown, setShowTimeDropdown] = useState(false);
+  const [showChartTypeDropdown, setShowChartTypeDropdown] = useState(false);
+  const [showIndicatorsDropdown, setShowIndicatorsDropdown] = useState(false);
   const [showWallet, setShowWallet] = useState(false);
   const [showPairSelector, setShowPairSelector] = useState(false);
   const [gridBotConfig, setGridBotConfig] = useState({ lowerPrice: "", upperPrice: "", gridNum: "10", investAmount: "" });
@@ -1679,16 +1681,23 @@ export default function Trading() {
 
   useEffect(() => { saveLayout({ symbol, timeframe, showSMA, showEMA, showBollinger, depthLimit }); }, [symbol, timeframe, showSMA, showEMA, showBollinger, depthLimit]);
 
-  // Close time dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (showTimeDropdown && !(event.target as Element).closest('.time-dropdown')) {
         setShowTimeDropdown(false);
       }
+      if (showChartTypeDropdown && !(event.target as Element).closest('.chart-type-dropdown')) {
+        setShowChartTypeDropdown(false);
+      }
+      if (showIndicatorsDropdown && !(event.target as Element).closest('.indicators-dropdown')) {
+        setShowIndicatorsDropdown(false);
+      }
     };
+
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showTimeDropdown]);
+  }, [showTimeDropdown, showChartTypeDropdown, showIndicatorsDropdown]);
 
   useEffect(() => {
     let mounted = true;
@@ -3063,11 +3072,11 @@ export default function Trading() {
 
       {/* ── TIMEFRAME TOOLBAR (between left & right panels) ── */}
       {isChartView && (
-      <div style={{ display: "flex", alignItems: "center", height: 34, borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, padding: "0 10px", gap: 2, flexShrink: 0, flexWrap: "nowrap", overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", height: 34, borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, padding: "0 10px", gap: 2, flexShrink: 0, flexWrap: "nowrap", position: "relative", zIndex: 100 }}>
         {/* Pinned Timeframes */}
-        <div style={{ display: "flex", gap: 1 }}>
+        <div style={{ display: "flex", gap: isDesktop ? 1 : 0 }}>
           {["1m", "15m", "1h", "4h", "1d", "1w"].map(tf => (
-            <button key={tf} onClick={() => setTimeframe(normalizeTimeframe(tf))} style={{ padding: "3px 6px", background: timeframe === tf ? COLORS.bgHover : "transparent", border: timeframe === tf ? `1px solid ${COLORS.border}` : "1px solid transparent", borderRadius: 3, color: timeframe === tf ? "#f0b90b" : COLORS.text, cursor: "pointer", fontSize: 11, fontWeight: timeframe === tf ? 700 : 400, minWidth: "32px", textAlign: "center" }}>{tf}</button>
+            <button key={tf} onClick={() => setTimeframe(normalizeTimeframe(tf))} style={{ padding: isDesktop ? "3px 6px" : "2px 4px", background: timeframe === tf ? COLORS.bgHover : "transparent", border: timeframe === tf ? `1px solid ${COLORS.border}` : "1px solid transparent", borderRadius: 3, color: timeframe === tf ? "#f0b90b" : COLORS.text, cursor: "pointer", fontSize: isDesktop ? 11 : 10, fontWeight: timeframe === tf ? 700 : 400, minWidth: isDesktop ? "32px" : "26px", textAlign: "center" }}>{tf}</button>
           ))}
         </div>
         {/* Time dropdown */}
@@ -3087,9 +3096,27 @@ export default function Trading() {
         </div>
         <div style={{ width: 1, height: 18, background: COLORS.border, margin: "0 6px" }} />
         {/* Chart types */}
-        {([[<ChartCandlestick size={16} />, "candlestick"], [<ChartLine size={16} />, "line"], [<ChartArea size={16} />, "area"], [<BarChart3 size={16} />, "bar"]] as [React.ReactNode, typeof chartType][]).map(([icon, ct]) => (
-          <button key={ct} onClick={() => setChartType(ct)} title={ct} style={{ width: 26, height: 26, background: chartType === ct ? COLORS.bgHover : "transparent", border: chartType === ct ? `1px solid ${COLORS.border}` : "1px solid transparent", borderRadius: 3, color: chartType === ct ? "#f0b90b" : COLORS.text, cursor: "pointer", fontSize: 14 }}>{icon}</button>
-        ))}
+        {isDesktop ? (
+          ([[<ChartCandlestick size={16} />, "candlestick"], [<ChartLine size={16} />, "line"], [<ChartArea size={16} />, "area"], [<BarChart3 size={16} />, "bar"]] as [React.ReactNode, typeof chartType][]).map(([icon, ct]) => (
+            <button key={ct} onClick={() => setChartType(ct)} title={ct} style={{ width: 26, height: 26, background: chartType === ct ? COLORS.bgHover : "transparent", border: chartType === ct ? `1px solid ${COLORS.border}` : "1px solid transparent", borderRadius: 3, color: chartType === ct ? "#f0b90b" : COLORS.text, cursor: "pointer", fontSize: 14 }}>{icon}</button>
+          ))
+        ) : (
+          <div className="chart-type-dropdown" style={{ position: "relative", zIndex: 1000 }}>
+            <button onClick={() => setShowChartTypeDropdown(!showChartTypeDropdown)} style={{ width: 26, height: 26, background: "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 3, color: COLORS.text, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 1 }}>
+              {chartType === "candlestick" ? <ChartCandlestick size={14} /> : chartType === "line" ? <ChartLine size={14} /> : chartType === "area" ? <ChartArea size={14} /> : <BarChart3 size={14} />}
+              {showChartTypeDropdown ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+            </button>
+            {showChartTypeDropdown && (
+              <div style={{ position: "absolute", top: "100%", left: 0, background: COLORS.bgPanel, border: `1px solid ${COLORS.border}`, borderRadius: 4, zIndex: 1002, minWidth: "100px" }}>
+                {([["candlestick", <ChartCandlestick size={14} />], ["line", <ChartLine size={14} />], ["area", <ChartArea size={14} />], ["bar", <BarChart3 size={14} />]] as [typeof chartType, React.ReactNode][]).map(([ct, icon]) => (
+                  <button key={ct} onClick={() => { setChartType(ct); setShowChartTypeDropdown(false); }} style={{ width: "100%", padding: "6px 10px", background: chartType === ct ? COLORS.bgHover : "transparent", border: "none", color: chartType === ct ? "#f0b90b" : COLORS.text, cursor: "pointer", fontSize: 11, textAlign: "left", display: "flex", alignItems: "center", gap: 6 }}>
+                    {icon} {ct.charAt(0).toUpperCase() + ct.slice(1)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <div style={{ width: 1, height: 18, background: COLORS.border, margin: isDesktop ? "0 8px" : "0 6px" }} />
         {/* View tabs (Original / Depth) */}
         {(["original", "depth"] as const).map(tab => (
@@ -3099,16 +3126,41 @@ export default function Trading() {
         ))}
         <div style={{ width: 1, height: 18, background: COLORS.border, margin: isDesktop ? "0 8px" : "0 6px" }} />
         {/* Indicators */}
-        {[
-          { k: "SMA", a: showSMA, s: setShowSMA, c: COLORS.sma },
-          { k: "EMA", a: showEMA, s: setShowEMA, c: COLORS.ema },
-          { k: "BB",  a: showBollinger, s: setShowBollinger, c: COLORS.bbUpper },
-          { k: "VWAP",a: showVWAP, s: setShowVWAP, c: COLORS.vwap },
-          { k: "RSI", a: showRSI, s: setShowRSI, c: "#f0b90b" },
-          { k: "MACD",a: showMACD, s: setShowMACD, c: "#8b5cf6" },
-        ].map(ind => (
-          <button key={ind.k} onClick={() => ind.s((p: boolean) => !p)} style={{ padding: "2px 7px", borderRadius: 3, border: `1px solid ${ind.a ? ind.c : COLORS.border}`, background: ind.a ? `${ind.c}22` : "transparent", color: ind.a ? ind.c : COLORS.text, cursor: "pointer", fontSize: 10, fontWeight: ind.a ? 700 : 400 }}>{ind.k}</button>
-        ))}
+        {isDesktop ? (
+          [
+            { k: "SMA", a: showSMA, s: setShowSMA, c: COLORS.sma },
+            { k: "EMA", a: showEMA, s: setShowEMA, c: COLORS.ema },
+            { k: "BB",  a: showBollinger, s: setShowBollinger, c: COLORS.bbUpper },
+            { k: "VWAP",a: showVWAP, s: setShowVWAP, c: COLORS.vwap },
+            { k: "RSI", a: showRSI, s: setShowRSI, c: "#f0b90b" },
+            { k: "MACD",a: showMACD, s: setShowMACD, c: "#8b5cf6" },
+          ].map(ind => (
+            <button key={ind.k} onClick={() => ind.s((p: boolean) => !p)} style={{ padding: "2px 7px", borderRadius: 3, border: `1px solid ${ind.a ? ind.c : COLORS.border}`, background: ind.a ? `${ind.c}22` : "transparent", color: ind.a ? ind.c : COLORS.text, cursor: "pointer", fontSize: 10, fontWeight: ind.a ? 700 : 400 }}>{ind.k}</button>
+          ))
+        ) : (
+          <div className="indicators-dropdown" style={{ position: "relative", zIndex: 1000 }}>
+            <button onClick={() => setShowIndicatorsDropdown(!showIndicatorsDropdown)} style={{ padding: "2px 7px", borderRadius: 3, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.text, cursor: "pointer", fontSize: 10, display: "flex", alignItems: "center", gap: 2 }}>
+              Indicators {showIndicatorsDropdown ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+            </button>
+            {showIndicatorsDropdown && (
+              <div style={{ position: "absolute", top: "100%", left: 0, background: COLORS.bgPanel, border: `1px solid ${COLORS.border}`, borderRadius: 4, zIndex: 1002, minWidth: "120px" }}>
+                {[
+                  { k: "SMA", a: showSMA, s: setShowSMA, c: COLORS.sma },
+                  { k: "EMA", a: showEMA, s: setShowEMA, c: COLORS.ema },
+                  { k: "BB",  a: showBollinger, s: setShowBollinger, c: COLORS.bbUpper },
+                  { k: "VWAP",a: showVWAP, s: setShowVWAP, c: COLORS.vwap },
+                  { k: "RSI", a: showRSI, s: setShowRSI, c: "#f0b90b" },
+                  { k: "MACD",a: showMACD, s: setShowMACD, c: "#8b5cf6" },
+                ].map(ind => (
+                  <button key={ind.k} onClick={() => { ind.s((p: boolean) => !p); }} style={{ width: "100%", padding: "6px 10px", background: "transparent", border: "none", color: ind.a ? ind.c : COLORS.text, cursor: "pointer", fontSize: 11, textAlign: "left", display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: ind.a ? ind.c : "transparent", border: `1px solid ${ind.c}`, flexShrink: 0 }} />
+                    {ind.k} {ind.a ? "✓" : ""}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
       )}
 
@@ -3353,7 +3405,7 @@ export default function Trading() {
           </div>
         </div>
         {/* BUY / SELL buttons */}
-        <div className="trading-order-actions" style={{ display: "flex", gap: 8, padding: "8px 16px", borderTop: `1px solid ${COLORS.border}`, flexShrink: 0 }}>
+        <div className="trading-order-actions" style={{ display: "flex", gap: 8, padding: "8px 16px", borderTop: `1px solid ${COLORS.border}`, flexShrink: 0, justifyContent: isDesktopLayout ? undefined : "center" }}>
           {!isAuthenticated ? (
             <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 8, gridColumn: "1 / -1" }}>
               {isDesktopLayout ? (
@@ -3401,7 +3453,7 @@ export default function Trading() {
             </div>
           ) : (
           <>
-          <div className="trading-order-actions__balance" style={{ flex: 1, display: !isDesktopLayout && orderSide !== "buy" ? "none" : "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+          <div className="trading-order-actions__balance" style={{ flex: isDesktopLayout ? 1 : "0 0 auto", display: !isDesktopLayout && orderSide !== "buy" ? "none" : "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
             <span style={{ fontSize: 10, color: COLORS.textMuted, whiteSpace: "nowrap" }}>Available USDT</span>
             <span style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace", whiteSpace: "nowrap" }}>${availableBalance.toFixed(2)}</span>
             <span style={{ fontSize: 10, color: COLORS.textMuted, whiteSpace: "nowrap" }}>Estimated Max Buy</span>
@@ -3413,7 +3465,7 @@ export default function Trading() {
             onClick={() => openOrderConfirmation("buy")}
             disabled={buyDisabled}
             style={{
-              flex: 1,
+              flex: isDesktopLayout ? 1 : "0 0 auto",
               height: 36,
               background: COLORS.green,
               border: "none",
@@ -3423,6 +3475,7 @@ export default function Trading() {
               fontSize: 13,
               cursor: buyDisabled ? "not-allowed" : "pointer",
               opacity: buyDisabled ? 0.5 : 1,
+              padding: isDesktopLayout ? undefined : "0 24px",
               display: !isDesktopLayout && orderSide !== "buy" ? "none" : undefined,
             }}
           >{buyButtonLabel}</button>
@@ -3432,7 +3485,7 @@ export default function Trading() {
             onClick={() => openOrderConfirmation("sell")}
             disabled={sellDisabled}
             style={{
-              flex: 1,
+              flex: isDesktopLayout ? 1 : "0 0 auto",
               height: 36,
               background: COLORS.red,
               border: "none",
@@ -3442,10 +3495,11 @@ export default function Trading() {
               fontSize: 13,
               cursor: sellDisabled ? "not-allowed" : "pointer",
               opacity: sellDisabled ? 0.5 : 1,
+              padding: isDesktopLayout ? undefined : "0 24px",
               display: !isDesktopLayout && orderSide !== "sell" ? "none" : undefined,
             }}
           >Sell / Short</button>
-          <div className="trading-order-actions__balance" style={{ flex: 1, display: !isDesktopLayout && orderSide !== "sell" ? "none" : "flex", flexDirection: "column", gap: 4 }}>
+          <div className="trading-order-actions__balance" style={{ flex: isDesktopLayout ? 1 : "0 0 auto", display: !isDesktopLayout && orderSide !== "sell" ? "none" : "flex", flexDirection: "column", gap: 4 }}>
             <div style={{ fontSize: 10, color: COLORS.textMuted }}>Available BTC</div>
             <div style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace" }}>{availableBTC.toFixed(6)} BTC</div>
             <div style={{ fontSize: 10, color: COLORS.textMuted }}>Estimated Max Sell</div>
