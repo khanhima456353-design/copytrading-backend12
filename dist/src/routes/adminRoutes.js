@@ -1,7 +1,7 @@
 "use strict";
 const express = require("express");
 const { authMiddleware, adminMiddleware, superAdminMiddleware } = require("../middleware/authMiddleware");
-const { adminLogin, getDashboardStats, getKycSubmissions, getUsers, getUserById, getUserOpenOrders, updateUser, addBalance, removeBalance, creditBonus, freezeFunds, getBalanceHistory, getSettings, updateTradeSettings, adminStartDrift, adminStopDrift, adminDriftStatus, setPriceOverride, removePriceOverride } = require("../controllers/adminController");
+const { adminLogin, getDashboardStats, getKycSubmissions, getUsers, getUserById, getUserOpenOrders, getUserPositions, updateUser, addBalance, removeBalance, creditBonus, freezeFunds, getBalanceHistory, getSettings, updateTradeSettings, adminStartDrift, adminStopDrift, adminDriftStatus, setPriceOverride, removePriceOverride } = require("../controllers/adminController");
 const router = express.Router();
 router.post("/login", adminLogin);
 router.get("/stats", authMiddleware, adminMiddleware, getDashboardStats);
@@ -10,7 +10,7 @@ router.use(authMiddleware, adminMiddleware);
 router.get("/kyc-submissions", getKycSubmissions);
 router.get("/users", getUsers);
 router.get("/user/:id", getUserById);
-// positions route removed: corresponding model/controllers were deleted
+router.get("/user/:id/positions", getUserPositions);
 router.get("/user/:id/open-orders", getUserOpenOrders);
 router.get("/users/:id/open-orders", getUserOpenOrders);
 router.get("/user/:id/open-order", getUserOpenOrders);

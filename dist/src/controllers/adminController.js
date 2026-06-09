@@ -7,6 +7,7 @@ const Transaction = require("../../models/Transaction");
 const Setting = require("../../models/Setting");
 const marketSimulator = require("../services/marketSimulator");
 const Order = require("../../models/Order");
+const Position = require("../../models/Position");
 const Wallet = require("../../models/Wallet");
 const walletService = require("../../services/walletService");
 const { generateAccessToken, generateRefreshToken } = require("../../utils/auth");
@@ -217,6 +218,16 @@ exports.getUserOpenOrders = async (req, res) => {
     }
     catch (error) {
         console.error('ADMIN_SIM_ORDER_ERROR', error);
+        return res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+exports.getUserPositions = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const positions = await Position.find({ userId: id }).sort({ createdAt: -1 });
+        return res.json({ positions });
+    } catch (error) {
+        console.error('ADMIN_SIM_POSITION_ERROR', error);
         return res.status(500).json({ message: 'Server error', error: error.message });
     }
 };

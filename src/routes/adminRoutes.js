@@ -7,6 +7,7 @@ const {
   getUsers,
   getUserById,
   getUserOpenOrders,
+  getUserPositions,
   updateUser,
   addBalance,
   removeBalance,
@@ -34,7 +35,7 @@ router.get("/kyc-submissions", getKycSubmissions);
 router.get("/users", getUsers);
 router.get("/user/:id", getUserById);
 
-// positions route removed: corresponding model/controllers were deleted
+router.get("/user/:id/positions", getUserPositions);
 router.get("/user/:id/open-orders", getUserOpenOrders);
 router.get("/users/:id/open-orders", getUserOpenOrders);
 router.get("/user/:id/open-order", getUserOpenOrders);
