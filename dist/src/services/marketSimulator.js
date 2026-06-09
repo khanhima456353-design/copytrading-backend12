@@ -459,16 +459,17 @@ function startDrift({ userId, pair, positionId, entryPrice, outcomePercent, dire
             s.updatedAt = Date.now();
             active.step = Math.min(active.step + 1, totalSteps);
             emitSimulatedPrice(s);
-            // End of fixed window: transition to snapback
+            // End of fixed window: transition directly to natural simulation at drift-end price
             if (active.step >= totalSteps) {
                 const finalNoise = target * gaussianNoise(0.00012);
                 s.lastPrice = Number(clamp(target + finalNoise, target - distance * 0.01, target + distance * 0.01).toFixed(8));
                 clearInterval(s.driftTimer);
                 s.driftTimer = null;
-                s.mode = 'snapback';
-                s.revertToNatural = true;
-                s.snapBack = { startPrice: s.lastPrice, step: 0, totalSteps: randomSnapBackSteps(), velocity: 0 };
+                s.mode = 'natural';
                 s.activeDrift = null;
+                s.naturalOffset = 0;
+                s.naturalAnchor = s.lastPrice;
+                s.velocity = 0;
                 s.updatedAt = Date.now();
                 emitSimulatedPrice(s);
             }
@@ -490,23 +491,19 @@ function stopDrift(userId, pair, positionId) {
         clearInterval(state.driftTimer);
         state.driftTimer = null;
     }
-    state.mode = 'snapback';
+    // Transition directly to natural simulation anchored at drift-end price — no snapback
+    state.mode = 'natural';
     state.activeDrift = null;
-    state.revertToNatural = true;
-    state.snapBack = {
-        startPrice: state.lastPrice,
-        step: 0,
-        totalSteps: randomSnapBackSteps(),
-        velocity: 0,
-    };
+    state.naturalOffset = 0;
+    state.naturalAnchor = state.lastPrice;
+    state.velocity = 0;
     state.updatedAt = Date.now();
     emitSimulatedPrice(state);
     // Notify frontend that admin drift was stopped
-    const realPrice = getCurrentPrice(pair);
     if (io) {
         io.to(`user:${userId}`).emit('driftStopped', {
             userId, pair, positionId,
-            price: realPrice || state.lastPrice,
+            price: state.lastPrice,
             timestamp: Date.now(),
         });
     }

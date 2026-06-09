@@ -1902,9 +1902,8 @@ export default function Trading() {
           refreshAccountData();
         });
 
-        // Drift stopped — snap-back to Binance in progress
+        // Drift stopped — simulation continues in natural mode at drift-end price
         socket.on('driftStopped', () => {
-          setPriceTransitionActive(true);
           refreshAccountData();
         });
 
