@@ -139,8 +139,6 @@ export function HomeBalanceCard() {
       <div style={styles.balanceWidget}>
         <BalanceDisplay
           data={balances}
-          selectedMode={selectedMode}
-          onModeChange={setSelectedMode}
           loading={loading}
           compact={true}
         />

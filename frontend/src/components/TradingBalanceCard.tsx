@@ -1,24 +1,9 @@
-import React, { useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import React from "react";
 import { useBalance } from "../context/BalanceContext";
 import { BalanceDisplay } from "./BalanceDisplay";
 
-/**
- * Full Balance Card for Trading Page Header
- * Shows detailed balance information for the current trading mode
- * Reads mode from location state (passed from home page) and applies it
- */
 export function TradingBalanceCard() {
-  const { balances, loading, selectedMode, setSelectedMode, refreshBalances } = useBalance();
-  const location = useLocation();
-
-  // Apply mode from location state when navigating from home page
-  useEffect(() => {
-    const state = location.state as { mode?: "portfolio" | "spot" | "cross" | "isolated" } | undefined;
-    if (state?.mode && state.mode !== selectedMode) {
-      setSelectedMode(state.mode);
-    }
-  }, [location.state, selectedMode, setSelectedMode]);
+  const { balances, loading, refreshBalances } = useBalance();
 
   return (
     <div style={styles.card}>
@@ -35,8 +20,6 @@ export function TradingBalanceCard() {
 
       <BalanceDisplay
         data={balances}
-        selectedMode={selectedMode}
-        onModeChange={setSelectedMode}
         loading={loading}
         compact={false}
       />

@@ -1643,7 +1643,7 @@ export default function Trading() {
     }
   };
   const [rightTab, setRightTab] = useState<"market" | "mytrades">("market");
-  const [bottomTab, setBottomTab] = useState<"openorders" | "positions" | "orderhistory" | "holdings" | "bots">("openorders");
+  const [bottomTab, setBottomTab] = useState<"openorders" | "positions" | "orderhistory" | "bots">("openorders");
   const [pairTab, setPairTab] = useState<"usdt" | "fav">("usdt");
   const [activeTool, setActiveTool] = useState<DrawingTool>("cursor");
   const [drawings, setDrawings] = useState<DrawingObject[]>([]);
@@ -1651,7 +1651,7 @@ export default function Trading() {
   const [drawingWidth, setDrawingWidth] = useState(1.5);
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
   const [slippageTol, setSlippageTol] = useState(false);
-  const [activeTab, setActiveTab] = useState<"spot" | "cross" | "isolated" | "grid">("spot");
+
   const [gridBotActive, setGridBotActive] = useState(false);
   const [showTimeDropdown, setShowTimeDropdown] = useState(false);
   const [showWallet, setShowWallet] = useState(false);
@@ -2728,29 +2728,12 @@ export default function Trading() {
     ? (availableBTC * sellPrice).toFixed(2)
     : "0.00";
   const modeBalanceSummary = useMemo(() => {
-    const usableMargin = availableBalance;
-    const effPrice = orderType === "market" ? marketPrice : getEffectivePrice(priceInput, lastPrice);
-    const pairNotional = effPrice ? ((Number(buyAmountInput) || 0) * effPrice).toFixed(2) : "0.00";
-    const formattedTotalEquity = `$${totalEquity.toFixed(2)}`;
-    if (activeTab === "cross") return [
-      { label: "Available USDT", value: `$${availableBalance.toFixed(2)}` },
-      { label: "Locked USDT", value: `$${lockedUSDT.toFixed(2)}` },
-      { label: "Total Equity", value: formattedTotalEquity },
-      { label: "Total Portfolio", value: `$${portfolioTotal.toFixed(2)}` },
-    ];
-    if (activeTab === "isolated") return [
-      { label: "Available USDT", value: `$${availableBalance.toFixed(2)}` },
-      { label: "Estimated Max BTC", value: `${estimatedMaxBuyBTC} BTC` },
-      { label: "Total Equity", value: formattedTotalEquity },
-      { label: "Pair Exposure", value: `$${pairNotional}` },
-    ];
     return [
       { label: "Available USDT", value: `$${availableBalance.toFixed(2)}` },
       { label: "Locked USDT", value: `$${lockedUSDT.toFixed(2)}` },
-      { label: "Total Equity", value: formattedTotalEquity },
       { label: "Total Portfolio", value: `$${portfolioTotal.toFixed(2)}` },
     ];
-  }, [activeTab, availableBalance, pendingLocked, buyAmountInput, buyPrice, lastPrice, portfolioTotal, totalEquity, lockedUSDT]);
+  }, [availableBalance, lockedUSDT, portfolioTotal]);
 
   const confirmOrderDetails = useMemo(() => [
     { label: "Pair", value: symbol },
@@ -3237,10 +3220,6 @@ export default function Trading() {
           <div style={{ fontSize: 12, color: COLORS.textBright, fontWeight: 600, fontFamily: "monospace" }}>${lockedUSDT.toFixed(2)}</div>
         </div>
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 10, color: COLORS.text }}>Total Equity</div>
-          <div style={{ fontSize: 12, color: COLORS.textBright, fontWeight: 600, fontFamily: "monospace" }}>${totalEquity.toFixed(2)}</div>
-        </div>
-        <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 10, color: COLORS.text }}>Total Portfolio</div>
           <div style={{ fontSize: 12, color: COLORS.textBright, fontWeight: 600, fontFamily: "monospace" }}>${portfolioTotal.toFixed(2)}</div>
         </div>
@@ -3250,19 +3229,7 @@ export default function Trading() {
       {/* ── ORDER FORM (between left & right panels) ── */}
       {isChartView && (
       <div className="trading-order-form trading-dashboard__ticket" style={{ height: "auto", minHeight: isDesktopLayout ? 320 : 210, borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, display: "flex", flexShrink: 0, overflow: "visible" }}>
-        {/* Spot/Cross tabs */}
         <div className="trading-order-form__inner" style={{ width: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
-          {/* Tab row */}
-          <div className="trading-order-form__tabs" style={{ display: "flex", alignItems: "center", height: 36, borderBottom: `1px solid ${COLORS.border}`, padding: "0 12px", gap: 0, flexShrink: 0 }}>
-            {(["Spot", "Cross", "Isolated", "Grid"] as const).map(t => (
-              <button key={t} onClick={() => setActiveTab(t.toLowerCase() as any)} style={{ padding: "0 14px", height: "100%", background: "transparent", border: "none", cursor: "pointer", fontSize: 13, color: activeTab === t.toLowerCase() ? COLORS.textBright : COLORS.text, borderBottom: activeTab === t.toLowerCase() ? `2px solid ${"#f0b90b"}` : "2px solid transparent", fontWeight: activeTab === t.toLowerCase() ? 600 : 400 }}>{t}</button>
-            ))}
-          </div>
-          {activeTab === "grid" ? (
-            <div style={{ flex: 1, padding: "10px 12px" }}>Grid bot placeholder</div>
-          ) : (
-
-            <>
               {!isDesktopLayout && (
                 <div style={{ display: "flex", borderBottom: `1px solid ${COLORS.border}`, flexShrink: 0 }}>
                   <button onClick={() => setOrderSide("buy")} style={{ flex: 1, height: 34, background: orderSide === "buy" ? COLORS.green : "transparent", border: "none", borderRadius: 0, color: orderSide === "buy" ? "#000" : COLORS.text, fontWeight: 700, fontSize: 13, cursor: "pointer", borderRight: `1px solid ${COLORS.border}` }}>BUY</button>
@@ -3495,8 +3462,6 @@ export default function Trading() {
           </>
           )}
         </div>
-            </>
-          )}
       </div>
       </div>
       )}
@@ -3504,7 +3469,7 @@ export default function Trading() {
       {/* ── BOTTOM TAB BAR (between left & right panels) ── */}
       <div ref={bottomScrollRef} className="trading-bottom-panel trading-dashboard__activity" style={{ borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", height: 36, padding: "0 12px", gap: 0, borderBottom: `1px solid ${COLORS.border}` }}>
-          {[["openorders", `Open Orders(${activeOrders.length})`], ["positions", `Positions(${serverPositions.length})`], ["orderhistory", "Order History"], ["holdings", "Holdings"], ["bots", "Bots"]].map(([key, label]) => (
+          {[["openorders", `Open Orders(${activeOrders.length})`], ["positions", `Positions(${serverPositions.length})`], ["orderhistory", "Order History"], ["bots", "Bots"]].map(([key, label]) => (
             <button key={key} onClick={() => setBottomTab(key as any)} style={{ padding: "0 14px", height: "100%", background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: bottomTab === key ? COLORS.textBright : COLORS.text, borderBottom: bottomTab === key ? `2px solid ${"#f0b90b"}` : "2px solid transparent", whiteSpace: "nowrap" }}>{label}</button>
           ))}
         </div>
@@ -3571,13 +3536,7 @@ serverPositions.length === 0
                   ))}
                 </>
             )}
-            {bottomTab === "holdings" && accountSummary.holdings.map(h => (
-              <div key={h.asset} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", padding: "6px 14px", fontSize: 11, fontFamily: "monospace", borderBottom: `1px solid ${COLORS.border}` }}>
-                <span style={{ color: COLORS.textBright }}>{h.asset}</span>
-                <span style={{ color: COLORS.text }}>{h.amount.toFixed(6)}</span>
-                <span style={{ color: COLORS.textBright }}>${h.value.toLocaleString()}</span>
-              </div>
-            ))}
+
         </div>
       </div>
 
@@ -3692,16 +3651,7 @@ serverPositions.length === 0
                   </div>
                 ))}
               </div>
-              <div style={{ padding: "0 20px 14px" }}>
-                <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>Holdings</div>
-                {accountSummary.holdings.map(h => (
-                  <div key={h.asset} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", padding: "8px 0", borderBottom: `1px solid ${COLORS.border}`, fontSize: 12 }}>
-                    <span style={{ fontWeight: 700 }}>{h.asset}</span>
-                    <span style={{ color: COLORS.text, fontFamily: "monospace" }}>{h.amount.toFixed(6)}</span>
-                    <span style={{ textAlign: "right", fontFamily: "monospace", fontWeight: 600 }}>${h.value.toLocaleString()}</span>
-                  </div>
-                ))}
-              </div>
+
               <div style={{ padding: "0 20px 14px" }}>
                 <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>Trade History</div>
                 {tradeHistory.slice(0, 8).map((t, i) => (
