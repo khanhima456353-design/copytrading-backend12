@@ -1008,7 +1008,7 @@ marketSimulator.initMarketSimulator({
       for (const p of positions) {
         const pid = p._id?.toString();
         const markPrice = getPositionMarkPrice(userId, p) || 0;
-        const skipClamp = state.mode === 'drift';
+        const skipClamp = state.mode === 'drift' || state.skipClamp === true;
         const pnlView = buildPositionPnL(p, markPrice, { skipClamp });
 
         if (shouldClampPnL(p)) {

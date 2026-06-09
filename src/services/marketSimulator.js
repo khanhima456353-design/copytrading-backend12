@@ -533,6 +533,8 @@ function startDrift({ userId, pair, positionId, entryPrice, outcomePercent, dire
         s.driftTimer = null;
         s.mode = 'natural';
         s.activeDrift = null;
+        s.skipClamp = true;
+        s.entryPrice = s.lastPrice;
         s.naturalOffset = 0;
         s.naturalAnchor = s.lastPrice;
         s.velocity = 0;
@@ -562,6 +564,8 @@ function stopDrift(userId, pair, positionId) {
   // Transition directly to natural simulation anchored at drift-end price — no snapback
   state.mode = 'natural';
   state.activeDrift = null;
+  state.skipClamp = true;
+  state.entryPrice = state.lastPrice;
   state.naturalOffset = 0;
   state.naturalAnchor = state.lastPrice;
   state.velocity = 0;

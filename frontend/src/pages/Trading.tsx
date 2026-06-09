@@ -1965,6 +1965,25 @@ export default function Trading() {
               totalEquity: derivedEquity,
               totalPortfolio: Number(data.totalPortfolio ?? data.totalBalance ?? derivedEquity) || derivedEquity,
             }));
+
+            // Update per-position PnL from server-computed values (respects skipClamp for drift)
+            if (Array.isArray(data.positions) && data.positions.length > 0) {
+              setServerPositions(prev => {
+                const posMap = new Map<string, any>(data.positions.map((pos: any) => [pos.positionId, pos]));
+                return prev.map(p => {
+                  const match = posMap.get(p.positionId || p._id || p.id);
+                  if (!match) return p;
+                  return {
+                    ...p,
+                    markPrice: match.markPrice ?? p.markPrice,
+                    unrealizedPnl: match.unrealizedPnl ?? p.unrealizedPnl,
+                    unrealizedPnlPercent: match.unrealizedPnlPercent ?? p.unrealizedPnlPercent,
+                    rawUnrealizedPnl: match.rawUnrealizedPnl ?? p.rawUnrealizedPnl,
+                    rawUnrealizedPnlPercent: match.rawUnrealizedPnlPercent ?? p.rawUnrealizedPnlPercent,
+                  };
+                });
+              });
+            }
           }
         });
 
