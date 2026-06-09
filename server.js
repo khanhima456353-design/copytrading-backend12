@@ -955,7 +955,6 @@ app.post("/api/auth/login", async (req, res) => {
 });
 
 // Token refresh endpoint — returns a new access token from a valid refresh token
-const JWT_SECRET = process.env.JWT_SECRET || 'default-secret-change-this';
 const REFRESH_SECRET = process.env.REFRESH_SECRET || 'default-refresh-secret-change-this';
 
 app.post('/api/auth/refresh', async (req, res) => {
