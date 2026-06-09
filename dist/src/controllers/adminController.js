@@ -75,6 +75,7 @@ exports.adminLogin = async (req, res) => {
             success: true,
             message: "Admin login successful",
             token: accessToken,
+            refreshToken,
             user: {
                 id: user.id,
                 email: user.email,

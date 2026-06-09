@@ -41,6 +41,9 @@ const AdminLogin: React.FC = () => {
 
       if (result.token) {
         localStorage.setItem("adminToken", result.token);
+        if (result.refreshToken) {
+          localStorage.setItem("adminRefreshToken", result.refreshToken);
+        }
         localStorage.setItem("adminEmail", email.toLowerCase().trim());
 
         setMessageType("success");

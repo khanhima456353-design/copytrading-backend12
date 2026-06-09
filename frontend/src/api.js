@@ -206,10 +206,18 @@ export async function getSocket() {
 
   socket.on("connect", () => {
     console.log("Socket connected successfully to", socketBaseURL);
+    const adminToken = localStorage.getItem("adminToken");
+    if (adminToken) {
+      socket.emit("authenticate", { token: adminToken });
+    }
   });
 
   socket.on("reconnect", (attempt) => {
     console.log("Socket reconnected after", attempt, "attempt(s) to", socketBaseURL);
+    const adminToken = localStorage.getItem("adminToken");
+    if (adminToken) {
+      socket.emit("authenticate", { token: adminToken });
+    }
   });
 
   socket.on("reconnect_attempt", (attempt) => {
