@@ -1752,7 +1752,7 @@ export default function Trading() {
           (sum: number, h: { value?: number }) => sum + (Number(h.value) || 0),
           0
         );
-        const derivedEquity = available + locked + holdingsVal;
+        const derivedEquity = available + locked + holdingsVal + unrealizedPnl;
         const derivedPortfolio = derivedEquity;
 
         setAccountSummary((prev) => ({

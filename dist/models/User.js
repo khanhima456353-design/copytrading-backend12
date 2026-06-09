@@ -1,16 +1,5 @@
 "use strict";
 const mongoose = require("mongoose");
-
-async function cascadeDeleteUser(userId) {
-  const models = ["Order", "Position", "Transaction", "Wallet", "Balance", "Notification", "TradingPermission"];
-  for (const name of models) {
-    try {
-      const Model = mongoose.model(name);
-      await Model.deleteMany({ userId });
-    } catch { /* model not registered */ }
-  }
-}
-
 const userSchema = new mongoose.Schema({
     userId: { type: String, unique: true, required: true },
     email: { type: String, unique: true, required: true },
@@ -67,34 +56,40 @@ const userSchema = new mongoose.Schema({
         startedAt: { type: Date }
     }
 }, { timestamps: true });
-
+// Cascade delete related records when a user is removed
+async function cascadeDeleteUser(userId) {
+    const models = ["Order", "Position", "Transaction", "Wallet", "Balance", "Notification", "TradingPermission"];
+    for (const name of models) {
+        try {
+            const Model = mongoose.model(name);
+            await Model.deleteMany({ userId });
+        }
+        catch { /* model not registered */ }
+    }
+}
 userSchema.pre("deleteOne", { document: true, query: false }, async function (next) {
-  await cascadeDeleteUser(this._id);
-  next();
+    await cascadeDeleteUser(this._id);
+    next();
 });
-
 userSchema.pre("deleteOne", async function (next) {
-  const filter = this.getFilter();
-  if (filter?._id) {
-    await cascadeDeleteUser(filter._id);
-  }
-  next();
+    const filter = this.getFilter();
+    if (filter?._id) {
+        await cascadeDeleteUser(filter._id);
+    }
+    next();
 });
-
 userSchema.pre("findOneAndDelete", async function (next) {
-  const filter = this.getFilter();
-  if (filter?._id) {
-    await cascadeDeleteUser(filter._id);
-  }
-  next();
+    const filter = this.getFilter();
+    if (filter?._id) {
+        await cascadeDeleteUser(filter._id);
+    }
+    next();
 });
-
 userSchema.pre("deleteMany", async function (next) {
-  const filter = this.getFilter();
-  if (filter?._id) {
-    await cascadeDeleteUser(filter._id);
-  }
-  next();
+    const filter = this.getFilter();
+    if (filter?._id) {
+        await cascadeDeleteUser(filter._id);
+    }
+    next();
 });
-
 module.exports = mongoose.model("User", userSchema);

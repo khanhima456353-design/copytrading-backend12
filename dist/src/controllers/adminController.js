@@ -237,14 +237,18 @@ exports.getUserPositions = async (req, res) => {
             const markPrice = marketSimulator.getSimulationPrice(userId, pair, positionId) || p.entryPrice;
             const pnl = calculatePositionPnL(p.entryPrice, markPrice, size, side, leverage);
             const useClamp = shouldClampPnL(p);
-            return Object.assign(Object.assign({}, p.toObject()), { markPrice,
+            return {
+                ...p.toObject(),
+                markPrice,
                 rawUnrealizedPnl: pnl.rawPnl,
                 rawUnrealizedPnlPercent: pnl.rawPnlPercent,
                 unrealizedPnl: useClamp ? pnl.clampedPnl : pnl.rawPnl,
-                unrealizedPnlPercent: useClamp ? pnl.clampedPnlPercent : pnl.rawPnlPercent });
+                unrealizedPnlPercent: useClamp ? pnl.clampedPnlPercent : pnl.rawPnlPercent,
+            };
         });
         return res.json({ positions: enriched });
-    } catch (error) {
+    }
+    catch (error) {
         console.error('ADMIN_SIM_POSITION_ERROR', error);
         return res.status(500).json({ message: 'Server error', error: error.message });
     }

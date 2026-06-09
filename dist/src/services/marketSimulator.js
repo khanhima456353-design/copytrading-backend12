@@ -272,6 +272,7 @@ function finishSnapBack(state, key) {
         state.lastPrice = formatPrice(realPrice);
     }
     if (state.revertToNatural) {
+        // Drift ended but position still open — transition back to natural simulation
         state.snapBack = null;
         state.activeDrift = null;
         state.mode = 'natural';
@@ -504,13 +505,11 @@ function stopDrift(userId, pair, positionId) {
     state.updatedAt = Date.now();
     emitSimulatedPrice(state);
     // Notify frontend that admin drift was stopped
-    if (io) {
-        io.to(`user:${userId}`).emit('driftStopped', {
-            userId, pair, positionId,
-            price: state.lastPrice,
-            timestamp: Date.now(),
-        });
-    }
+    io.to(`user:${userId}`).emit('driftStopped', {
+        userId, pair, positionId,
+        price: state.lastPrice,
+        timestamp: Date.now(),
+    });
     return getDriftStatus(userId, pair, positionId);
 }
 function getDriftStatus(userId, pair, positionId) {
@@ -641,16 +640,25 @@ function isPairSimulated(pair) {
     }
     return false;
 }
+/**
+ * Recover simulations from persisted positions after server restart.
+ * Call this once after initMarketSimulator.
+ * @param {Function} getOpenPositions - async (userId) => array of position docs
+ */
 async function recoverSimulations(getOpenPositions) {
-    if (typeof getOpenPositions !== 'function') return;
+    if (typeof getOpenPositions !== 'function')
+        return;
     try {
         const positions = await getOpenPositions();
-        if (!Array.isArray(positions) || positions.length === 0) return;
+        if (!Array.isArray(positions) || positions.length === 0)
+            return;
         let recovered = 0;
         for (const pos of positions) {
             const userId = pos.userId?.toString?.() || pos.userId;
-            if (!userId || !pos.pair || !pos._id) continue;
-            if (!pos.entryPrice || pos.isDemo) continue;
+            if (!userId || !pos.pair || !pos._id)
+                continue;
+            if (!pos.entryPrice || pos.isDemo)
+                continue;
             const started = startNaturalSimulation({
                 userId,
                 pair: pos.pair,
@@ -660,16 +668,17 @@ async function recoverSimulations(getOpenPositions) {
                 volatility: 'medium',
                 durationSteps: NATURAL_TREND_STEPS,
             });
-            if (started) recovered++;
+            if (started)
+                recovered++;
         }
         if (recovered > 0) {
             console.log(`[marketSimulator] Recovered ${recovered}/${positions.length} simulations after restart`);
         }
-    } catch (err) {
+    }
+    catch (err) {
         console.error('[marketSimulator] recoverSimulations error:', err?.message ?? err);
     }
 }
-
 module.exports = {
     NATURAL_TREND_STEPS,
     initMarketSimulator,
