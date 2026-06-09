@@ -2956,7 +2956,7 @@ export default function Trading() {
   ], [changePct, high24h, low24h, vol24h, vol24hUSDT, isPriceUp]);
 
   return (
-    <div ref={tradingPageRef} className="trading-page trading-dashboard" style={{ display: "flex", flexDirection: "column", height: "auto", background: COLORS.bg, color: COLORS.textBright, fontFamily: "'IBM Plex Sans', 'Helvetica Neue', sans-serif", fontSize: 13, overflowY: "auto", overflowX: "hidden", minHeight: "100dvh", scrollBehavior: "smooth", WebkitOverflowScrolling: "touch", touchAction: "pan-y", overscrollBehaviorY: "auto", position: "relative" }}>
+    <div ref={tradingPageRef} className="trading-page trading-dashboard" style={{ display: "flex", flexDirection: "column", height: "auto", background: COLORS.bg, color: COLORS.textBright, fontFamily: "'IBM Plex Sans', 'Helvetica Neue', sans-serif", fontSize: 13, overflowY: "auto", overflowX: "hidden", minHeight: "100dvh", scrollBehavior: "smooth", WebkitOverflowScrolling: "touch", touchAction: "pan-y", overscrollBehaviorY: "auto", position: "relative", margin: 0 }}>
 
       {/* ── WALLET + LIVE STATUS (desktop top-right) ── */}
       {isDesktopLayout && (
@@ -3009,11 +3009,11 @@ export default function Trading() {
           </div>
         </div>
         {/* Stats bar */}
-        <div style={{ display: "flex", gap: 24, alignItems: "center", flex: 1, overflow: "hidden" }}>
+        <div style={{ display: "flex", gap: isDesktopLayout ? 24 : 16, alignItems: "center", flex: 1, overflow: "hidden" }}>
           {headerStats.map(stat => (
             <div key={stat.label} style={{ flexShrink: 0 }}>
-              <div style={{ fontSize: 10, color: COLORS.text, marginBottom: 2 }}>{stat.label}</div>
-              <div style={{ fontSize: 12, color: stat.color, fontWeight: stat.color !== COLORS.textBright ? 700 : 400, fontFamily: "monospace" }}>{stat.value}</div>
+              <div style={{ fontSize: isDesktopLayout ? 10 : 9, color: COLORS.text, marginBottom: isDesktopLayout ? 2 : 1 }}>{stat.label}</div>
+              <div style={{ fontSize: isDesktopLayout ? 12 : 10, color: stat.color, fontWeight: stat.color !== COLORS.textBright ? 700 : 400, fontFamily: "monospace" }}>{stat.value}</div>
             </div>
           ))}
         </div>
@@ -3255,7 +3255,7 @@ export default function Trading() {
 
       {/* ── BALANCE STRIP (between left & right panels) ── */}
       {isChartView && (
-      <div className="trading-balance-strip" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, padding: "8px 16px", borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, flexShrink: 0 }}>
+      <div className="trading-balance-strip" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, padding: isDesktopLayout ? "8px 16px" : "4px 16px 8px", borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, flexShrink: 0 }}>
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 10, color: COLORS.text }}>Available USDT</div>
           <div style={{ fontSize: 12, color: COLORS.textBright, fontWeight: 600, fontFamily: "monospace" }}>${availableBalance.toFixed(2)}</div>
@@ -3276,14 +3276,14 @@ export default function Trading() {
       <div className="trading-order-form trading-dashboard__ticket" style={{ height: "auto", minHeight: isDesktopLayout ? 320 : 210, borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, display: "flex", flexShrink: 0, overflow: "visible" }}>
         <div className="trading-order-form__inner" style={{ width: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
               {!isDesktopLayout && !isTablet && (
-                <div style={{ display: "flex", borderBottom: `1px solid ${COLORS.border}`, flexShrink: 0 }}>
-                  <button onClick={() => setOrderSide("buy")} style={{ flex: 1, height: 34, background: orderSide === "buy" ? COLORS.green : "transparent", border: "none", borderRadius: 0, color: orderSide === "buy" ? "#000" : COLORS.text, fontWeight: 700, fontSize: 13, cursor: "pointer", borderRight: `1px solid ${COLORS.border}` }}>BUY</button>
-                  <button onClick={() => setOrderSide("sell")} style={{ flex: 1, height: 34, background: orderSide === "sell" ? COLORS.red : "transparent", border: "none", borderRadius: 0, color: orderSide === "sell" ? "#fff" : COLORS.text, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>SELL</button>
+                <div style={{ display: "flex", borderBottom: `1px solid ${COLORS.border}`, flexShrink: 0, marginTop: -4 }}>
+                  <button onClick={() => setOrderSide("buy")} style={{ flex: 1, height: 30, background: orderSide === "buy" ? COLORS.green : "transparent", border: "none", borderRadius: 0, color: orderSide === "buy" ? "#000" : COLORS.text, fontWeight: 700, fontSize: 12, cursor: "pointer", borderRight: `1px solid ${COLORS.border}` }}>BUY</button>
+                  <button onClick={() => setOrderSide("sell")} style={{ flex: 1, height: 30, background: orderSide === "sell" ? COLORS.red : "transparent", border: "none", borderRadius: 0, color: orderSide === "sell" ? "#fff" : COLORS.text, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>SELL</button>
                 </div>
               )}
-              <div className="trading-order-form__columns" style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0 }}>
+              <div className="trading-order-form__columns" style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0, paddingTop: isDesktopLayout ? undefined : 4 }}>
             {/* Left: Buy form */}
-            <div className="trading-order-form__side trading-order-form__side--buy" style={{ flex: 1, padding: "10px 16px", borderRight: `1px solid ${COLORS.border}`, display: isDesktopLayout ? "flex" : windowWidth < 768 && orderSide !== "buy" ? "none" : "flex", flexDirection: "column", gap: 6 }}>
+            <div className="trading-order-form__side trading-order-form__side--buy" style={{ flex: 1, padding: isDesktopLayout ? "10px 16px" : "6px 16px", borderRight: `1px solid ${COLORS.border}`, display: isDesktopLayout ? "flex" : windowWidth < 768 && orderSide !== "buy" ? "none" : "flex", flexDirection: "column", gap: 6 }}>
             {/* Order type tabs */}
             <div style={{ display: "flex", gap: 12, marginBottom: 2 }}>
               {(["Limit", "Market", "Stop Limit", "OCO"] as const).map(t => (
@@ -3351,7 +3351,7 @@ export default function Trading() {
             )}
           </div>
           {/* Right: Sell form */}
-          <div className="trading-order-form__side trading-order-form__side--sell" style={{ flex: 1, padding: "10px 16px", display: isDesktopLayout ? "flex" : windowWidth < 768 && orderSide !== "sell" ? "none" : "flex", flexDirection: "column", gap: 6 }}>
+          <div className="trading-order-form__side trading-order-form__side--sell" style={{ flex: 1, padding: isDesktopLayout ? "10px 16px" : "6px 16px", display: isDesktopLayout ? "flex" : windowWidth < 768 && orderSide !== "sell" ? "none" : "flex", flexDirection: "column", gap: 6 }}>
             <div style={{ display: "flex", gap: 12, marginBottom: 2 }}>
               {(["Limit", "Market", "Stop Limit", "OCO"] as const).map(t => (
                 <button key={t} onClick={() => handleOrderTypeChange(t.toLowerCase().replace(" ", "-") as any)} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: orderType === t.toLowerCase().replace(" ", "-") ? COLORS.textBright : COLORS.text, borderBottom: orderType === t.toLowerCase().replace(" ", "-") ? `2px solid ${"#f0b90b"}` : "2px solid transparent", paddingBottom: 2 }}>{t}</button>
@@ -3707,7 +3707,7 @@ serverPositions.length === 0
 
       <style>{`
         * { box-sizing: border-box; }
-        body { margin: 0; }
+        html, body { margin: 0 !important; padding: 0 !important; }
         input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
         input[type=range] { height: 3px; }
         ::-webkit-scrollbar { width: 3px; height: 3px; }
@@ -3864,7 +3864,7 @@ serverPositions.length === 0
             overscroll-behavior-y: auto;
             touch-action: pan-y;
           }
-          .trading-header { flex-wrap: wrap !important; height: auto !important; min-height: 56px !important; padding: 6px 10px !important; gap: 8px !important; overflow: visible !important; }
+          .trading-header { flex-wrap: wrap !important; height: auto !important; min-height: 56px !important; padding: 0 10px 6px !important; gap: 8px !important; overflow: visible !important; }
           .trading-body {
             flex-direction: column !important;
             flex-wrap: nowrap !important;
@@ -3947,6 +3947,7 @@ serverPositions.length === 0
         @media (max-width: 767px) {
           .trading-main-tabs { height: 34px !important; padding: 0 6px !important; }
           .trading-main-tabs button { padding: 0 8px !important; font-size: 11px !important; }
+          .trading-header > div:first-child { padding: 4px 8px !important; }
           .trading-header > div:nth-child(2) { width: 100%; overflow-x: auto !important; padding-bottom: 2px; }
           .trading-header > div:nth-child(2) > div:nth-child(n+5) { display: none !important; }
           .trading-chart-stage { height: 240px !important; min-height: 240px !important; }
@@ -3976,7 +3977,7 @@ serverPositions.length === 0
         @media (max-width: 479px) {
           .trading-main-tabs { height: 30px !important; padding: 0 4px !important; overflow-x: auto !important; }
           .trading-main-tabs button { padding: 0 6px !important; font-size: 10px !important; white-space: nowrap; }
-          .trading-header { min-height: 62px !important; }
+          .trading-header { min-height: 0 !important; }
           .trading-header button,
           .trading-header span,
           .trading-header div { max-width: 100%; }

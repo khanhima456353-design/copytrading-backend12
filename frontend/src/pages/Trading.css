@@ -3754,6 +3754,12 @@ input,select{
   padding: 6px 0;
 }
 
+@media (max-width: 767px) {
+  .trading-dashboard__header > div:nth-child(2) > div:not(:last-child) {
+    padding: 3px 0;
+  }
+}
+
 .trading-dashboard__account-strip {
   display: grid;
   grid-template-columns: repeat(4, minmax(118px, 1fr));
@@ -3900,6 +3906,12 @@ input,select{
   border-bottom: 1px solid var(--dash-border) !important;
 }
 
+@media (max-width: 767px) {
+  .trading-dashboard .trading-balance-strip {
+    padding: 4px 12px 8px !important;
+  }
+}
+
 .trading-dashboard .trading-balance-strip > div {
   border-radius: 8px !important;
   background: var(--dash-panel-soft) !important;
@@ -4033,7 +4045,8 @@ input,select{
 
 @media (max-width: 1023px) {
   .trading-dashboard__header {
-    padding: 10px !important;
+    padding: 0 10px 8px !important;
+    min-height: 52px !important;
   }
 
   .trading-dashboard__body {
@@ -4088,7 +4101,7 @@ input,select{
   .trading-dashboard .trading-order-form__columns {
     display: flex !important;
     flex-direction: column !important;
-    padding: 10px !important;
+    padding: 4px 10px 10px !important;
   }
 
   .trading-dashboard .trading-order-form__side {
@@ -4139,6 +4152,12 @@ input,select{
   min-height: 76px !important;
   margin-left: 0 !important;
   flex-wrap: wrap !important;
+}
+
+@media (max-width: 767px) {
+  .trading-page.trading-dashboard .trading-header.trading-dashboard__header {
+    min-height: 52px !important;
+  }
 }
 
 .trading-page.trading-dashboard .trading-body.trading-dashboard__body {
