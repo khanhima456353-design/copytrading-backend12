@@ -4096,11 +4096,11 @@ input,select{
   }
 
   .trading-dashboard .trading-order-actions {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr !important;
+    display: flex !important;
   }
 
   .trading-dashboard .trading-order-actions__button {
+    flex: 1 !important;
     min-width: 0 !important;
   }
 

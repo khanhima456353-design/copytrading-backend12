@@ -1669,6 +1669,7 @@ export default function Trading() {
   const bottomScrollRef = useRef<HTMLDivElement | null>(null);
   const isChartView = activeViewTab === "chart";
   const isDesktopLayout = windowWidth >= 1024;
+  const isTablet = windowWidth >= 768 && !isDesktopLayout;
   const isCompactLayout = !isDesktopLayout;
   const [orderSide, setOrderSide] = useState<"buy" | "sell">("buy");
   const isAuthenticated = authService.isSessionValid();
@@ -3274,7 +3275,7 @@ export default function Trading() {
       {isChartView && (
       <div className="trading-order-form trading-dashboard__ticket" style={{ height: "auto", minHeight: isDesktopLayout ? 320 : 210, borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, display: "flex", flexShrink: 0, overflow: "visible" }}>
         <div className="trading-order-form__inner" style={{ width: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
-              {!isDesktopLayout && (
+              {!isDesktopLayout && !isTablet && (
                 <div style={{ display: "flex", borderBottom: `1px solid ${COLORS.border}`, flexShrink: 0 }}>
                   <button onClick={() => setOrderSide("buy")} style={{ flex: 1, height: 34, background: orderSide === "buy" ? COLORS.green : "transparent", border: "none", borderRadius: 0, color: orderSide === "buy" ? "#000" : COLORS.text, fontWeight: 700, fontSize: 13, cursor: "pointer", borderRight: `1px solid ${COLORS.border}` }}>BUY</button>
                   <button onClick={() => setOrderSide("sell")} style={{ flex: 1, height: 34, background: orderSide === "sell" ? COLORS.red : "transparent", border: "none", borderRadius: 0, color: orderSide === "sell" ? "#fff" : COLORS.text, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>SELL</button>
@@ -3319,6 +3320,7 @@ export default function Trading() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2, fontSize: 12, color: COLORS.textMuted, padding: "0 2px" }}>
               <div>Available {accountSummary.available.toFixed(2)} USDT</div>
               <div>Reserved {reservedUSDT.toFixed(2)} USDT</div>
+              <div style={{ gridColumn: "1 / span 2", color: COLORS.textBright }}>Estimated Max Buy {estimatedMaxBuyBTC} BTC</div>
               <div style={{ gridColumn: "1 / span 2", color: COLORS.textBright }}>Free to trade {freeToTrade.toFixed(2)} USDT</div>
               <div style={{ gridColumn: "1 / span 2" }}>Minimum Order: 5 USDT</div>
             </div>
@@ -3378,9 +3380,12 @@ export default function Trading() {
               <input type="number" value={sellTotalInput} onChange={e => updateSellTotal(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="0.00" />
               <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT <ChevronDown size={10} /></span>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 12, color: COLORS.textMuted, padding: "0 2px" }}>
-              <span>Available {availableBTC.toFixed(6)} BTC</span>
-              <span>Minimum Order: 5 USDT</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 12, color: COLORS.textMuted, padding: "0 2px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span>Available {availableBTC.toFixed(6)} BTC</span>
+                <span>Minimum Order: 5 USDT</span>
+              </div>
+              <div style={{ color: COLORS.textBright }}>Estimated Max Sell ${estimatedMaxSellUSDT}</div>
             </div>
             {/* Stop Loss */}
             <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 32 }}>
@@ -3405,7 +3410,7 @@ export default function Trading() {
           </div>
         </div>
         {/* BUY / SELL buttons */}
-        <div className="trading-order-actions" style={{ display: "flex", gap: 8, padding: "8px 16px", borderTop: `1px solid ${COLORS.border}`, flexShrink: 0, justifyContent: isDesktopLayout ? undefined : "center" }}>
+        <div className="trading-order-actions" style={{ display: "flex", gap: 8, padding: "8px 16px", borderTop: `1px solid ${COLORS.border}`, flexShrink: 0 }}>
           {!isAuthenticated ? (
             <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 8, gridColumn: "1 / -1" }}>
               {isDesktopLayout ? (
@@ -3453,19 +3458,13 @@ export default function Trading() {
             </div>
           ) : (
           <>
-          <div className="trading-order-actions__balance" style={{ flex: isDesktopLayout ? 1 : "0 0 auto", display: !isDesktopLayout && orderSide !== "buy" ? "none" : "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 10, color: COLORS.textMuted, whiteSpace: "nowrap" }}>Available USDT</span>
-            <span style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace", whiteSpace: "nowrap" }}>${availableBalance.toFixed(2)}</span>
-            <span style={{ fontSize: 10, color: COLORS.textMuted, whiteSpace: "nowrap" }}>Estimated Max Buy</span>
-            <span style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace", whiteSpace: "nowrap" }}>{estimatedMaxBuyBTC} BTC</span>
-          </div>
           <button
             className="trading-order-actions__button"
             type="button"
             onClick={() => openOrderConfirmation("buy")}
             disabled={buyDisabled}
             style={{
-              flex: isDesktopLayout ? 1 : "0 0 auto",
+              flex: 1,
               height: 36,
               background: COLORS.green,
               border: "none",
@@ -3475,8 +3474,7 @@ export default function Trading() {
               fontSize: 13,
               cursor: buyDisabled ? "not-allowed" : "pointer",
               opacity: buyDisabled ? 0.5 : 1,
-              padding: isDesktopLayout ? undefined : "0 24px",
-              display: !isDesktopLayout && orderSide !== "buy" ? "none" : undefined,
+              display: !isDesktopLayout && !isTablet && orderSide !== "buy" ? "none" : undefined,
             }}
           >{buyButtonLabel}</button>
           <button
@@ -3485,7 +3483,7 @@ export default function Trading() {
             onClick={() => openOrderConfirmation("sell")}
             disabled={sellDisabled}
             style={{
-              flex: isDesktopLayout ? 1 : "0 0 auto",
+              flex: 1,
               height: 36,
               background: COLORS.red,
               border: "none",
@@ -3495,16 +3493,9 @@ export default function Trading() {
               fontSize: 13,
               cursor: sellDisabled ? "not-allowed" : "pointer",
               opacity: sellDisabled ? 0.5 : 1,
-              padding: isDesktopLayout ? undefined : "0 24px",
-              display: !isDesktopLayout && orderSide !== "sell" ? "none" : undefined,
+              display: !isDesktopLayout && !isTablet && orderSide !== "sell" ? "none" : undefined,
             }}
           >Sell / Short</button>
-          <div className="trading-order-actions__balance" style={{ flex: isDesktopLayout ? 1 : "0 0 auto", display: !isDesktopLayout && orderSide !== "sell" ? "none" : "flex", flexDirection: "column", gap: 4 }}>
-            <div style={{ fontSize: 10, color: COLORS.textMuted }}>Available BTC</div>
-            <div style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace" }}>{availableBTC.toFixed(6)} BTC</div>
-            <div style={{ fontSize: 10, color: COLORS.textMuted }}>Estimated Max Sell</div>
-            <div style={{ fontSize: 12, color: COLORS.textBright, fontFamily: "monospace" }}>${estimatedMaxSellUSDT}</div>
-          </div>
           </>
           )}
         </div>
@@ -3974,7 +3965,6 @@ serverPositions.length === 0
             flex-wrap: wrap !important;
             padding: 8px 10px !important;
           }
-          .trading-order-actions__balance { display: none !important; }
           .trading-order-actions__button {
             flex: 1 1 calc(50% - 4px) !important;
             min-width: 120px !important;
