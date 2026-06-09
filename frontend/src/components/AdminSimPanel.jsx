@@ -440,7 +440,7 @@ const AdminSimPanel = ({ visible, onClose, onCandle = () => {}, inline = false }
   }
   const targetPrice = hasOpenTrade ? basePriceForPreview * multiplierPreview : 0;
   const estimatedPnlImpact = hasOpenTrade && normalizedTrade?.quantity
-    ? calculateUnrealizedPnL(normalizedTrade, targetPrice).pnl
+    ? calculateUnrealizedPnL(normalizedTrade, targetPrice).rawPnl
     : 0;
   const serverPosition = normalizedTrade && serverPositions.find((pos) => {
     const serverId = pos.positionId || pos._id || pos.id;
