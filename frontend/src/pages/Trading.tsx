@@ -3344,7 +3344,7 @@ export default function Trading() {
             </div>
             {/* Market warning */}
             {marketWarning && (
-              <div style={{ fontSize: 13, color: COLORS.amber, background: COLORS.amberDim, padding: "6px 10px", borderRadius: 3, border: `1px solid ${COLORS.amber}`, textAlign: "center", width: "100%", marginTop: -6 }}>{marketWarning}</div>
+              <div className="trading-market-warning" style={{ fontSize: 13, color: COLORS.amber, background: COLORS.amberDim, padding: "6px 10px", borderRadius: 3, border: `1px solid ${COLORS.amber}`, textAlign: "center", width: "100%", marginTop: -6 }}>{marketWarning}</div>
             )}
             {/* Error message */}
             {buyError && buyAmount > 0 && (
@@ -3975,6 +3975,7 @@ serverPositions.length === 0
           }
           .trading-orderbook--embedded { height: 340px !important; min-height: 340px !important; }
           .trading-bottom-panel > div:first-child { overflow-x: auto; }
+          .trading-market-warning { margin-top: -15px !important; margin-bottom: 2px !important; }
         }
 
         @media (max-width: 479px) {
