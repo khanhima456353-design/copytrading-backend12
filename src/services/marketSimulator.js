@@ -43,7 +43,7 @@ const DRIFT_VOLATILITY_SCALE = {
 // Natural mode bounds — price offset from entry (+2% / -25% PnL for long)
 const NATURAL_NOISE_SCALE  = 0.008;
 const MAX_UP_OFFSET        =  0.0;   // +0% from entry (longs)
-const MAX_DOWN_OFFSET      = -0.25;   // -25% from entry
+const MAX_DOWN_OFFSET      = -0.05;   // -5% from entry
 const MAX_UP_PERCENT       = MAX_UP_OFFSET;
 const MAX_DOWN_PERCENT     = MAX_DOWN_OFFSET;
 const NATURAL_TREND_STEPS  = 180;     // ~3 minutes of natural drift for a trade path
@@ -173,8 +173,8 @@ function computeNaturalPrice(state) {
     : 0;
 
   // Position-side-aware bounds: both longs and shorts get PnL in [-25%, +0%]
-  const maxDownOffset = positionSide === 'short' ? 0.0 : -0.25;
-  const maxUpOffset = positionSide === 'short' ? 0.25 : 0.0;
+  const maxDownOffset = positionSide === 'short' ? 0.0 : -0.05;
+  const maxUpOffset = positionSide === 'short' ? 0.05 : 0.0;
 
   // Gentle boundary rotation — never stick at +0% or -25%
   // direction flips the bias for shorts (rawPnlPercent is already direction-aware)

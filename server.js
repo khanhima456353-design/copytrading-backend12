@@ -684,7 +684,7 @@ app.get('/api/account/summary', authMiddleware, async (req, res) => {
       totalUnreal += pnlView.unrealizedPnl;
     });
 
-    const openOrders = await Order.find({ userId, status: { $in: ['open','partially_filled'] } });
+    const openOrders = await Order.find({ userId, status: { $in: ['open', 'partially_filled', 'pending'] } });
 
     const now = new Date();
     const since24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -792,7 +792,7 @@ app.get('/api/account/open-orders', authMiddleware, async (req, res) => {
       await Order.deleteMany({ userId });
       return res.json([]);
     }
-    const orders = await Order.find({ userId, status: { $in: ['open','partially_filled'] } }).sort({ createdAt: -1 });
+    const orders = await Order.find({ userId, status: { $in: ['open', 'partially_filled', 'pending'] } }).sort({ createdAt: -1 });
     res.json(orders);
   } catch (err) { res.status(500).json({ message: 'Server error', error: err.message }); }
 });
