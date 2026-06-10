@@ -2127,7 +2127,7 @@ export default function Trading() {
   const bidPct = totalBidVol + totalAskVol > 0 ? (totalBidVol / (totalBidVol + totalAskVol) * 100).toFixed(1) : "50.0";
   const askPct = totalBidVol + totalAskVol > 0 ? (totalAskVol / (totalBidVol + totalAskVol) * 100).toFixed(1) : "50.0";
   
-  const activeOrders = userOrders.filter(o => (o.status === "open" || o.status === "pending") && (o.pair === symbol || o.pair?.replace("/", "") === symbol?.replace("/", "")));
+  const activeOrders = userOrders.filter(o => o.status === "pending" && (o.pair === symbol || o.pair?.replace("/", "") === symbol?.replace("/", "")));
   
   const pendingLocked = useMemo(() => userOrders
     .filter(o => (o.status === "open" || o.status === "pending") && o.side === "buy" && o.pair === symbol)
@@ -3544,19 +3544,17 @@ serverPositions.length === 0
               activeOrders.length === 0
                 ? <div style={{ padding: 20, textAlign: "center", color: COLORS.textMuted, fontSize: 12 }}>No open orders</div>
                 : <>
-                  <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr 0.8fr 0.7fr 0.7fr 0.6fr 0.5fr 70px", padding: "8px 14px", fontSize: 10, fontFamily: "monospace", color: COLORS.textMuted, borderBottom: `1px solid ${COLORS.border}` }}>
-                    <span>Time</span><span>Pair</span><span>Type</span><span>Price</span><span>Amount</span><span>Filled</span><span>Status</span><span></span>
+                  <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr 0.8fr 0.7fr 0.7fr 0.5fr 70px", padding: "8px 14px", fontSize: 10, fontFamily: "monospace", color: COLORS.textMuted, borderBottom: `1px solid ${COLORS.border}` }}>
+                    <span>Time</span><span>Pair</span><span>Type</span><span>Price</span><span>Amount</span><span>Status</span><span></span>
                   </div>
                   {activeOrders.map(o => {
-                    const filledPct = o.amount > 0 ? Math.min(100, Math.round((o.filled / o.amount) * 100)) : 0;
                     return (
-                      <div key={o.id} style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr 0.8fr 0.7fr 0.7fr 0.6fr 0.5fr 70px", padding: "6px 14px", fontSize: 11, fontFamily: "monospace", borderBottom: `1px solid ${COLORS.border}`, alignItems: "center" }}>
+                      <div key={o.id} style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr 0.8fr 0.7fr 0.7fr 0.5fr 70px", padding: "6px 14px", fontSize: 11, fontFamily: "monospace", borderBottom: `1px solid ${COLORS.border}`, alignItems: "center" }}>
                         <span style={{ color: COLORS.text, fontSize: 10 }}>{new Date(o.createdAt * 1000).toLocaleString()}</span>
                         <span style={{ color: COLORS.textBright }}>{o.pair}</span>
                         <span style={{ color: o.side === "buy" ? COLORS.green : COLORS.red, textTransform: "capitalize" }}>{o.type} {o.side}</span>
                         <span style={{ color: COLORS.textBright }}>{o.price.toFixed(2)}</span>
                         <span style={{ color: COLORS.textBright }}>{o.amount.toFixed(4)}</span>
-                        <span style={{ color: filledPct >= 100 ? COLORS.green : COLORS.textBright }}>{filledPct}%</span>
                         <span style={{ color: o.status === "pending" ? "#f0b90b" : o.status === "open" ? COLORS.green : COLORS.textBright, fontSize: 10, textTransform: "uppercase" }}>{o.status}</span>
                         <button onClick={() => cancelOrder(o.id)} style={{ background: "transparent", border: `1px solid ${COLORS.red}`, color: COLORS.red, borderRadius: 3, cursor: "pointer", fontSize: 10, padding: "2px 6px" }}>Cancel</button>
                       </div>
