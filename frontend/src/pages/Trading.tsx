@@ -3921,7 +3921,7 @@ serverPositions.length === 0
           .trading-balance-strip > div > div { font-size: 10px !important; }
           .trading-balance-strip > div > div:last-child { font-size: 13px !important; }
           .trading-order-form__columns { overflow: visible !important; min-height: 0 !important; }
-          .trading-bottom-panel { order: 4 !important; overflow: visible !important; }
+          .trading-bottom-panel { order: 0 !important; overflow: visible !important; }
           .trading-bottom-panel > div:last-child { max-height: none !important; overflow: visible !important; }
           .trading-orderbook--embedded {
             display: flex !important;
@@ -3956,19 +3956,19 @@ serverPositions.length === 0
           .trading-order-total { margin-top: -4px !important; }
           .trading-chart-stage { height: 240px !important; min-height: 240px !important; }
           .trading-order-form { height: auto !important; min-height: 0 !important; }
-          .trading-order-form__columns { flex-direction: column !important; }
-          .trading-order-form__side {
+          .trading-dashboard .trading-order-form__columns { flex-direction: column !important; padding: 4px 10px 0 !important; }
+          .trading-dashboard .trading-order-form__side {
             flex: 0 0 auto !important;
             min-height: 0 !important;
-            padding: 8px 10px !important;
+            padding: 8px 10px 0 !important;
           }
           .trading-order-form__side--buy {
             border-right: none !important;
             border-bottom: 1px solid #2a2e35 !important;
           }
-          .trading-order-actions {
+          .trading-dashboard .trading-order-actions {
             flex-wrap: wrap !important;
-            padding: 8px 10px !important;
+            padding: 0 10px 8px !important;
           }
           .trading-order-actions__button {
             flex: 1 1 calc(50% - 4px) !important;
