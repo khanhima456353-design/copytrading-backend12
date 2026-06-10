@@ -41,7 +41,7 @@ const DRIFT_VOLATILITY_SCALE = {
 };
 
 // Natural mode bounds — price offset from entry (0% / -5% PnL for long, ~1hr to traverse)
-const NATURAL_NOISE_SCALE  = 0.0005;
+const NATURAL_NOISE_SCALE  = 0.002;
 const MAX_UP_OFFSET        =  0.0;   // +0% from entry (longs)
 const MAX_DOWN_OFFSET      = -0.05;   // -5% from entry
 const MAX_UP_PERCENT       = MAX_UP_OFFSET;
@@ -176,25 +176,25 @@ function computeNaturalPrice(state) {
   const maxDownOffset = positionSide === 'short' ? 0.0 : -0.05;
   const maxUpOffset = positionSide === 'short' ? 0.05 : 0.0;
 
-  // Slow gentle boundary rotation — ~1 hour to traverse 0% → -5%
+  // Slow drift (~1hr 0%→-5%) with realistic micro-fluctuations
   let boundaryBias = 0;
   if (rawPnlPercent > -0.3) {
-    boundaryBias -= (rawPnlPercent + 0.3) * 0.00003 * direction;
+    boundaryBias -= (rawPnlPercent + 0.3) * 0.00005 * direction;
   } else if (rawPnlPercent < -4.7) {
-    boundaryBias += (-4.7 - rawPnlPercent) * 0.00002 * direction;
+    boundaryBias += (-4.7 - rawPnlPercent) * 0.00003 * direction;
   }
 
   const midOffset = (maxUpOffset + maxDownOffset) / 2;
-  const meanReversion = (midOffset - currentOffset) * 0.00001;
-  const tickNoise = (Math.random() - 0.5) * noiseScale * 0.05;
+  const meanReversion = (midOffset - currentOffset) * 0.00002;
+  const tickNoise = (Math.random() - 0.5) * noiseScale * 0.15;
 
-  state.velocity = (Number(state.velocity) || 0) * 0.97 + gaussianNoise(noiseScale * 0.06) + boundaryBias + meanReversion + tickNoise;
+  state.velocity = (Number(state.velocity) || 0) * 0.96 + gaussianNoise(noiseScale * 0.12) + boundaryBias + meanReversion + tickNoise;
   currentOffset = clamp(currentOffset + state.velocity, maxDownOffset, maxUpOffset);
   state.naturalOffset = currentOffset;
 
   let nextPrice = anchorPrice * (1 + currentOffset);
-  // Micro wick realism
-  nextPrice += (Math.random() - 0.5) * Math.max(nextPrice * 0.00001, 0.0005);
+  // Realistic wick noise for candle micro-structure
+  nextPrice += (Math.random() - 0.5) * Math.max(nextPrice * 0.00004, 0.001);
   return formatPrice(Math.max(nextPrice, 0.00000001));
 }
 
