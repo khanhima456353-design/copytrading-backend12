@@ -3302,7 +3302,7 @@ export default function Trading() {
             <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 34 }}>
               <span style={{ fontSize: 11, color: COLORS.textMuted, width: 50 }}>Amount</span>
               <input type="number" value={buyAmountInput} onChange={e => updateBuyAmount(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="0.0000" />
-              <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>BTC <ChevronDown size={10} /></span>
+              <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>BTC</span>
             </div>
             {/* Slider */}
             <div style={{ padding: "2px 0" }}>
@@ -3317,7 +3317,6 @@ export default function Trading() {
             <div className="trading-order-total" style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 32 }}>
               <span style={{ fontSize: 11, color: COLORS.textMuted, width: 40 }}>Total</span>
               <input type="number" value={buyTotalInput} onChange={e => updateBuyTotal(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="Minimum 5 USDT" />
-              <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT <ChevronDown size={10} /></span>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2, fontSize: 12, color: COLORS.textMuted, padding: "0 2px" }}>
               <div>Available {accountSummary.available.toFixed(2)} USDT</div>
@@ -3367,7 +3366,7 @@ export default function Trading() {
             <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 34 }}>
               <span style={{ fontSize: 11, color: COLORS.textMuted, width: 50 }}>Amount</span>
               <input type="number" value={sellAmountInput} onChange={e => updateSellAmount(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="0.0000" />
-              <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>BTC <ChevronDown size={10} /></span>
+              <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>BTC</span>
             </div>
             <div style={{ padding: "2px 0" }}>
               <input type="range" min={0} max={100} value={sellSliderPct} onChange={e => applySellPct(Number(e.target.value))} style={{ width: "100%", accentColor: COLORS.red }} />
@@ -3380,7 +3379,7 @@ export default function Trading() {
             <div className="trading-order-total" style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 32 }}>
               <span style={{ fontSize: 11, color: COLORS.textMuted, width: 40 }}>Total</span>
               <input type="number" value={sellTotalInput} onChange={e => updateSellTotal(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="0.00" />
-              <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT <ChevronDown size={10} /></span>
+              <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT</span>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 12, color: COLORS.textMuted, padding: "0 2px" }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
@@ -3953,7 +3952,7 @@ serverPositions.length === 0
           .trading-header > div:nth-child(2) { width: 100%; overflow-x: auto !important; padding-bottom: 2px; }
           .trading-header > div:nth-child(2) > div:nth-child(n+5) { display: none !important; }
           .trading-order-type-tabs { margin-top: -6px !important; }
-          .trading-order-total { margin-top: -4px !important; }
+          .trading-dashboard .trading-order-total { margin-top: -9px !important; }
           .trading-chart-stage { height: 240px !important; min-height: 240px !important; }
           .trading-order-form { height: auto !important; min-height: 0 !important; }
           .trading-dashboard .trading-order-form__columns { flex-direction: column !important; padding: 4px 10px 0 !important; }
