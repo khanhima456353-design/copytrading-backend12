@@ -18,7 +18,7 @@ function calculatePnl(entryPrice, currentPrice, quantity, positionSide, leverage
 
 async function openOrder(userId, pair, side, type, entryPrice, quantity, lockedAmount, stopPrice, stopLoss, takeProfit) {
   const positionSide = side === "sell" ? "short" : "long";
-  const isPending = ["stop-limit", "oco"].includes(type);
+  const isPending = ["limit", "stop-limit", "oco"].includes(type);
   const order = await Order.create({
     userId,
     pair,
@@ -36,6 +36,11 @@ async function openOrder(userId, pair, side, type, entryPrice, quantity, lockedA
     status: isPending ? "pending" : "open",
     openedAt: new Date(),
   });
+
+  if (!order.orderId) {
+    order.orderId = order._id.toString();
+    await order.save();
+  }
 
   try {
     await walletService.lockBalance(userId, lockedAmount, order._id);
@@ -102,8 +107,25 @@ async function cancelOrder(orderId) {
   return order;
 }
 
+async function fillPendingOrder(orderId, currentPrice) {
+  const order = await Order.findById(orderId);
+  if (!order) throw new Error("Order not found");
+  if (order.status !== "pending") throw new Error("Order is not pending");
+
+  const fillPrice = order.side === "buy"
+    ? Math.min(order.price, currentPrice)
+    : Math.max(order.price, currentPrice);
+
+  order.entryPrice = fillPrice;
+  order.status = "open";
+  order.openedAt = new Date();
+  await order.save();
+
+  return order;
+}
+
 async function getUserOpenOrders(userId) {
-  return Order.find({ userId, status: "open" }).sort({ openedAt: -1 });
+  return Order.find({ userId, status: { $in: ["open", "pending"] } }).sort({ openedAt: -1 });
 }
 
 async function getUserClosedOrders(userId) {
@@ -115,6 +137,7 @@ module.exports = {
   updateOrderPnl,
   closeOrder,
   cancelOrder,
+  fillPendingOrder,
   getUserOpenOrders,
   getUserClosedOrders,
   calculatePnl,

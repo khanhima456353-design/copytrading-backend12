@@ -53,27 +53,40 @@ async function reconcileOpenPositions() {
 }
 
 async function checkPendingTriggers() {
-  const pending = await Order.find({ status: "pending", type: { $in: ["stop-limit", "oco"] } });
+  const pending = await Order.find({ status: "pending", type: { $in: ["limit", "stop-limit", "oco"] } });
   if (!pending.length) return;
 
   for (const order of pending) {
     const currentPrice = getPrice(order.pair);
     if (!currentPrice || currentPrice <= 0) continue;
 
-    const triggered =
-      (order.side === "buy" && currentPrice >= order.stopPrice) ||
-      (order.side === "sell" && currentPrice <= order.stopPrice);
+    let triggered = false;
+
+    if (order.type === "limit") {
+      triggered =
+        (order.side === "buy" && currentPrice <= order.price) ||
+        (order.side === "sell" && currentPrice >= order.price);
+    } else {
+      triggered =
+        (order.side === "buy" && currentPrice >= order.stopPrice) ||
+        (order.side === "sell" && currentPrice <= order.stopPrice);
+    }
 
     if (!triggered) continue;
 
     try {
+      const fillPrice = order.type === "limit"
+        ? (order.side === "buy" ? Math.min(order.price, currentPrice) : Math.max(order.price, currentPrice))
+        : currentPrice;
+
       order.status = "open";
+      order.entryPrice = fillPrice;
       order.openedAt = new Date();
       await order.save();
-      console.log(`[OrderMonitor] Triggered ${order.type} ${order._id} at ${currentPrice}`);
+      console.log(`[OrderMonitor] Triggered ${order.type} ${order._id} at ${fillPrice}`);
 
       if (typeof onActivate === "function") {
-        await onActivate(order, currentPrice);
+        await onActivate(order, fillPrice);
       }
     } catch (err) {
       console.error(`[OrderMonitor] Failed to activate order ${order._id}:`, err.message);

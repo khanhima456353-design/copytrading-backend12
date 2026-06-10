@@ -32,7 +32,7 @@ type AccountSummary = {
 };
 type UserOrder = {
   id: string; pair: string; type: "market" | "limit" | "stop-loss" | "take-profit" | "oco";
-  side: "buy" | "sell"; price: number; amount: number; status: "open" | "filled" | "cancelled";
+  side: "buy" | "sell"; price: number; amount: number; filled: number; status: "open" | "filled" | "cancelled" | "pending";
   stopLoss?: number; takeProfit?: number; createdAt: number;
 };
 
@@ -379,8 +379,8 @@ const createFallbackAccountSummary = (): AccountSummary => ({
   holdings: [{ asset: "BTC", amount: 0, value: 0 }, { asset: "ETH", amount: 0, value: 0 }, { asset: "USDT", amount: 0, value: 0 }],
 });
 const createFallbackUserOrders = (): UserOrder[] => [
-  { id: "o-1", pair: "BTC/USDT", type: "limit", side: "buy", price: 79750, amount: 0.12, status: "open", createdAt: Math.floor(Date.now() / 1000) - 4300 },
-  { id: "o-2", pair: "BTC/USDT", type: "stop-loss", side: "sell", price: 81200, amount: 0.05, stopLoss: 80000, takeProfit: 82400, status: "open", createdAt: Math.floor(Date.now() / 1000) - 7800 },
+  { id: "o-1", pair: "BTC/USDT", type: "limit", side: "buy", price: 79750, amount: 0.12, filled: 0, status: "open", createdAt: Math.floor(Date.now() / 1000) - 4300 },
+  { id: "o-2", pair: "BTC/USDT", type: "stop-loss", side: "sell", price: 81200, amount: 0.05, filled: 0.02, stopLoss: 80000, takeProfit: 82400, status: "open", createdAt: Math.floor(Date.now() / 1000) - 7800 },
 
 ];
 const createFallbackTradeHistory = (): TradeHistoryItem[] => [
@@ -1785,6 +1785,7 @@ export default function Trading() {
           side: o.side,
           price: Number(o.price) || 0,
           amount: Number(o.amount) || 0,
+          filled: Number(o.filled) || 0,
           status: o.status,
           createdAt: Math.floor(new Date(o.createdAt).getTime() / 1000),
         }));
@@ -2126,14 +2127,14 @@ export default function Trading() {
   const bidPct = totalBidVol + totalAskVol > 0 ? (totalBidVol / (totalBidVol + totalAskVol) * 100).toFixed(1) : "50.0";
   const askPct = totalBidVol + totalAskVol > 0 ? (totalAskVol / (totalBidVol + totalAskVol) * 100).toFixed(1) : "50.0";
   
-  const activeOrders = userOrders.filter(o => o.status === "open" && (o.pair === symbol || o.pair?.replace("/", "") === symbol?.replace("/", "")));
+  const activeOrders = userOrders.filter(o => (o.status === "open" || o.status === "pending") && (o.pair === symbol || o.pair?.replace("/", "") === symbol?.replace("/", "")));
   
   const pendingLocked = useMemo(() => userOrders
-    .filter(o => o.status === "open" && o.side === "buy" && o.pair === symbol)
+    .filter(o => (o.status === "open" || o.status === "pending") && o.side === "buy" && o.pair === symbol)
     .reduce((sum, order) => sum + order.price * order.amount, 0), [userOrders, symbol]);
     
   const pendingSellLockedBTC = useMemo(() => userOrders
-    .filter(o => o.status === "open" && o.side === "sell" && o.pair === symbol)
+    .filter(o => (o.status === "open" || o.status === "pending") && o.side === "sell" && o.pair === symbol)
     .reduce((sum, order) => sum + order.amount, 0), [userOrders]);
 
   // ─── UNIFIED BALANCES & RECONCILIATION ─────────────────────────────────────
@@ -3542,16 +3543,26 @@ serverPositions.length === 0
 {bottomTab === "openorders" && (
               activeOrders.length === 0
                 ? <div style={{ padding: 20, textAlign: "center", color: COLORS.textMuted, fontSize: 12 }}>No open orders</div>
-                : activeOrders.map(o => (
-                  <div key={o.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr 80px", padding: "6px 14px", fontSize: 11, fontFamily: "monospace", borderBottom: `1px solid ${COLORS.border}` }}>
-                    <span style={{ color: COLORS.text }}>{new Date(o.createdAt * 1000).toLocaleString()}</span>
-                    <span style={{ color: COLORS.textBright }}>{o.pair}</span>
-                    <span style={{ color: o.side === "buy" ? COLORS.green : COLORS.red }}>{o.type} {o.side.toUpperCase()}</span>
-                    <span style={{ color: COLORS.textBright }}>{o.price.toFixed(2)}</span>
-                    <span style={{ color: COLORS.textBright }}>{o.amount.toFixed(4)}</span>
-                    <button onClick={() => cancelOrder(o.id)} style={{ background: "transparent", border: `1px solid ${COLORS.red}`, color: COLORS.red, borderRadius: 3, cursor: "pointer", fontSize: 10, padding: "2px 6px" }}>Cancel</button>
+                : <>
+                  <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr 0.8fr 0.7fr 0.7fr 0.6fr 0.5fr 70px", padding: "8px 14px", fontSize: 10, fontFamily: "monospace", color: COLORS.textMuted, borderBottom: `1px solid ${COLORS.border}` }}>
+                    <span>Time</span><span>Pair</span><span>Type</span><span>Price</span><span>Amount</span><span>Filled</span><span>Status</span><span></span>
                   </div>
-                ))
+                  {activeOrders.map(o => {
+                    const filledPct = o.amount > 0 ? Math.min(100, Math.round((o.filled / o.amount) * 100)) : 0;
+                    return (
+                      <div key={o.id} style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr 0.8fr 0.7fr 0.7fr 0.6fr 0.5fr 70px", padding: "6px 14px", fontSize: 11, fontFamily: "monospace", borderBottom: `1px solid ${COLORS.border}`, alignItems: "center" }}>
+                        <span style={{ color: COLORS.text, fontSize: 10 }}>{new Date(o.createdAt * 1000).toLocaleString()}</span>
+                        <span style={{ color: COLORS.textBright }}>{o.pair}</span>
+                        <span style={{ color: o.side === "buy" ? COLORS.green : COLORS.red, textTransform: "capitalize" }}>{o.type} {o.side}</span>
+                        <span style={{ color: COLORS.textBright }}>{o.price.toFixed(2)}</span>
+                        <span style={{ color: COLORS.textBright }}>{o.amount.toFixed(4)}</span>
+                        <span style={{ color: filledPct >= 100 ? COLORS.green : COLORS.textBright }}>{filledPct}%</span>
+                        <span style={{ color: o.status === "pending" ? "#f0b90b" : o.status === "open" ? COLORS.green : COLORS.textBright, fontSize: 10, textTransform: "uppercase" }}>{o.status}</span>
+                        <button onClick={() => cancelOrder(o.id)} style={{ background: "transparent", border: `1px solid ${COLORS.red}`, color: COLORS.red, borderRadius: 3, cursor: "pointer", fontSize: 10, padding: "2px 6px" }}>Cancel</button>
+                      </div>
+                    );
+                  })}
+                </>
             )}
             {bottomTab === "orderhistory" && (
               tradeHistory.length === 0

@@ -910,9 +910,9 @@ app.post('/api/trade/place', authMiddleware, async (req, res) => {
     const stopPrice = ["stop-limit", "oco"].includes(type) ? entryPrice : undefined;
     const order = await orderService.openOrder(req.userId, pair, side, type, entryPrice, quantity, lockedAmount, stopPrice, stopLoss, takeProfit);
 
-    // For non-pending orders (market/limit), immediately create position and start simulation
-    if (order.status === "open" && !["stop-limit", "oco"].includes(type)) {
-      const fillPrice = type === "market" ? (cachedMarketPrices[pair] || entryPrice) : entryPrice;
+    // For non-pending orders (market), immediately create position and start simulation
+    if (order.status === "open" && type === "market") {
+      const fillPrice = cachedMarketPrices[pair] || entryPrice;
       const positionSide = side === "sell" ? "short" : "long";
 
       let pos = await Position.findOne({ userId: req.userId, pair });
