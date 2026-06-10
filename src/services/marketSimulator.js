@@ -112,6 +112,12 @@ function createNaturalState(userId, pair, positionId) {
     velocity: 0,
     activeDrift: null,
     snapBack: null,
+    volScale: 1,
+    momentumBurst: null,
+    consecutiveDir: 0,
+    lastVelSign: 0,
+    _driftCd: 0,
+    _dropActive: false,
     updatedAt: Date.now(),
     createdAt: Date.now(),
   };
@@ -136,9 +142,15 @@ function startNaturalSimulation({ userId, pair, positionId, entryPrice, position
   state.naturalTrendStep = 0;
   state.naturalTrendSteps = Math.max(1, durationSteps);
   state.naturalTargetOffset = 0;
-  state.velocity = Number(gaussianNoise(0.0006).toFixed(8));
+  state.velocity = Number(gaussianNoise(0.00015).toFixed(8));
   state.activeDrift = null;
   state.snapBack = null;
+  state.volScale = 1;
+  state.momentumBurst = null;
+  state.consecutiveDir = 0;
+  state.lastVelSign = 0;
+  state._driftCd = 30 + Math.floor(Math.random() * 61);
+  state._dropActive = false;
   state.updatedAt = Date.now();
 
   emitSimulatedPrice(state);
@@ -154,7 +166,12 @@ function ensureState(userId, pair, positionId) {
 }
 
 // ─── Natural price tick ───────────────────────────────────────────────────────
-// Realistic micro-movements capped at +2% / -25% PnL from entry with boundary bounce.
+// Simulates realistic crypto price action using a stair-step drift:
+//   - Most ticks: flat with micro-noise (consolidation).
+//   - Occasionally: a quick 0.3–0.8% drop over 5–15 ticks (sell-off leg).
+//   - Combined with momentum bursts, mini pullbacks, and volatility clustering
+//     so the path looks like a real exchange chart.
+// Long‑term average: ~0% → -5% PnL over ~1 hour.
 function computeNaturalPrice(state) {
   const anchorPrice = Number.isFinite(state.entryPrice) && state.entryPrice > 0
     ? state.entryPrice
@@ -172,29 +189,111 @@ function computeNaturalPrice(state) {
     ? (((currentPrice - anchorPrice) / anchorPrice) * 100) * direction
     : 0;
 
-  // Position-side-aware bounds: both longs and shorts get PnL in [-25%, +0%]
   const maxDownOffset = positionSide === 'short' ? 0.0 : -0.05;
-  const maxUpOffset = positionSide === 'short' ? 0.05 : 0.0;
+  const maxUpOffset   = positionSide === 'short' ? 0.05 : 0.0;
 
-  // Slow drift (~1hr 0%→-5%) with realistic micro-fluctuations
+  // ── Volatility clustering (GARCH-like) ──────────────────────────────
+  let volScale = state.volScale || 1;
+  volScale += (Math.random() - 0.5) * 0.12;
+  volScale += (1 - volScale) * 0.002;
+  volScale = clamp(volScale, 0.2, 3.5);
+  state.volScale = volScale;
+  const effNoise = noiseScale * volScale;
+
+  // ── Stair-step drift (direct offset change) ─────────────────────────
+  // Drift happens in discrete sell-off legs instead of a constant trickle,
+  // creating the characteristic stair-step pattern of real crypto.
+  // The drift is applied DIRECTLY to the offset (not through velocity) so
+  // drops don't carry unnatural momentum into the consolidation phase.
+  let driftBias = 0;
+  let cd  = Number(state._driftCd) || 0;
+  let drop = state._dropActive || false;
+
+  // 40 % chance per cycle → drops roughly every ~2.5 min.
+  // Each drop: -0.0002/tick × 6–14 s = 0.12–0.28 % per leg.
+  // Average drift: ~-0.00125 %/tick → -5 % in ~1 hour.
+  if (cd <= 0) {
+    if (drop) {
+      drop = false;
+      cd = 30 + Math.floor(Math.random() * 61);
+    } else {
+      if (Math.random() < 0.40) {
+        drop = true;
+        cd = 6 + Math.floor(Math.random() * 9);
+        driftBias = -0.0002 * direction;
+      } else {
+        cd = 30 + Math.floor(Math.random() * 61);
+      }
+    }
+  } else {
+    cd--;
+    if (drop) driftBias = -0.0002 * direction;
+  }
+  state._driftCd  = cd;
+  state._dropActive = drop;
+
+  // ── Boundary bias (soft caps at top / bottom) ───────────────────────
   let boundaryBias = 0;
   if (rawPnlPercent > -0.3) {
-    boundaryBias -= (rawPnlPercent + 0.3) * 0.00005 * direction;
+    boundaryBias = -(rawPnlPercent + 0.3) * 0.00001 * direction;
   } else if (rawPnlPercent < -4.7) {
-    boundaryBias += (-4.7 - rawPnlPercent) * 0.00003 * direction;
+    boundaryBias = (-4.7 - rawPnlPercent) * 0.000005 * direction;
   }
 
   const midOffset = (maxUpOffset + maxDownOffset) / 2;
-  const meanReversion = (midOffset - currentOffset) * 0.00002;
-  const tickNoise = (Math.random() - 0.5) * noiseScale * 0.15;
+  const meanReversion = (midOffset - currentOffset) * 0.000005;
 
-  state.velocity = (Number(state.velocity) || 0) * 0.96 + gaussianNoise(noiseScale * 0.12) + boundaryBias + meanReversion + tickNoise;
-  currentOffset = clamp(currentOffset + state.velocity, maxDownOffset, maxUpOffset);
+  // ── Velocity (persistent component) ─────────────────────────────────
+  // Note: driftBias is applied directly to the offset below, NOT here.
+  state.velocity = ((state.velocity || 0) * 0.92)
+    + gaussianNoise(effNoise * 0.02)
+    + boundaryBias
+    + meanReversion;
+
+  // ── Momentum bursts (occasional 0.1–0.4% spikes) ────────────────────
+  let burst = state.momentumBurst || null;
+  if (!burst && Math.random() < 0.008) {
+    burst = {
+      dir: Math.random() > 0.5 ? 1 : -1,
+      strength: effNoise * (0.3 + Math.random() * 0.5),
+      remaining: 3 + Math.floor(Math.random() * 5),
+    };
+  }
+  if (burst) {
+    state.velocity += burst.dir * burst.strength;
+    burst.remaining -= 1;
+    burst.strength *= 0.82;
+    if (burst.remaining <= 0) burst = null;
+  }
+  state.momentumBurst = burst;
+
+  // ── Mini pullbacks ──────────────────────────────────────────────────
+  const velSign = Math.sign(state.velocity || 0);
+  if (Math.abs(state.velocity || 0) > effNoise * 0.02) {
+    state.consecutiveDir = (velSign === (state.lastVelSign || 0))
+      ? (state.consecutiveDir || 0) + 1
+      : 0;
+  } else {
+    state.consecutiveDir = 0;
+  }
+  state.lastVelSign = velSign;
+
+  if ((state.consecutiveDir || 0) > 5 && Math.random() < 0.25) {
+    state.velocity -= velSign * effNoise * 0.15;
+    state.consecutiveDir = 0;
+  }
+
+  // ── Per-tick noise (fast microstructure) ────────────────────────────
+  const tickNoise = (Math.random() - 0.5) * effNoise * 0.06;
+
+  // ── Apply all layers ────────────────────────────────────────────────
+  currentOffset = currentOffset + (state.velocity || 0) + tickNoise + driftBias;
+  currentOffset = clamp(currentOffset, maxDownOffset, maxUpOffset);
   state.naturalOffset = currentOffset;
 
   let nextPrice = anchorPrice * (1 + currentOffset);
-  // Realistic wick noise for candle micro-structure
-  nextPrice += (Math.random() - 0.5) * Math.max(nextPrice * 0.00004, 0.001);
+  // Wick noise for candle shadows
+  nextPrice += (Math.random() - 0.5) * Math.max(nextPrice * 0.00006, 0.002);
   return formatPrice(Math.max(nextPrice, 0.00000001));
 }
 

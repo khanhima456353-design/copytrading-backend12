@@ -684,7 +684,7 @@ app.get('/api/account/summary', authMiddleware, async (req, res) => {
       totalUnreal += pnlView.unrealizedPnl;
     });
 
-    const openOrders = await Order.find({ userId, status: { $in: ['open', 'partially_filled', 'pending'] } });
+    const openOrders = await Order.find({ userId, status: { $in: ['open', 'partially_filled'] } });
 
     const now = new Date();
     const since24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -792,7 +792,7 @@ app.get('/api/account/open-orders', authMiddleware, async (req, res) => {
       await Order.deleteMany({ userId });
       return res.json([]);
     }
-    const orders = await Order.find({ userId, status: { $in: ['open', 'partially_filled', 'pending'] } }).sort({ createdAt: -1 });
+    const orders = await Order.find({ userId, status: { $in: ['open', 'partially_filled'] } }).sort({ createdAt: -1 });
     res.json(orders);
   } catch (err) { res.status(500).json({ message: 'Server error', error: err.message }); }
 });
@@ -911,7 +911,7 @@ app.post('/api/trade/place', authMiddleware, async (req, res) => {
     const order = await orderService.openOrder(req.userId, pair, side, type, entryPrice, quantity, lockedAmount, stopPrice, stopLoss, takeProfit);
 
     // For non-pending orders (market), immediately create position and start simulation
-    if (order.status === "open" && type === "market") {
+    if (order.status === "open" && !["stop-limit","oco"].includes(type)) {
       const fillPrice = cachedMarketPrices[pair] || entryPrice;
       const positionSide = side === "sell" ? "short" : "long";
 

@@ -53,7 +53,7 @@ async function reconcileOpenPositions() {
 }
 
 async function checkPendingTriggers() {
-  const pending = await Order.find({ status: "pending", type: { $in: ["limit", "stop-limit", "oco"] } });
+  const pending = await Order.find({ status: "pending", type: { $in: ["stop-limit", "oco"] } });
   if (!pending.length) return;
 
   for (const order of pending) {
