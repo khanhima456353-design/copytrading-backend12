@@ -948,7 +948,10 @@ const Registration: React.FC = () => {
           </div>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "8px 14px", borderRadius: 10, background: "#ff8c32", border: "1px solid #ff8c32", marginBottom: 28 }}>
             <img src={logo} alt="SwanCore" style={{ width: 32, height: 32, borderRadius: 4, objectFit: "contain", background: "#0b0e11", padding: 2 }} />
-            <span style={{ color: "var(--text-current)", fontSize: 18, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Inter', 'SF Pro Display', -apple-system, sans-serif" }}>SwanCore</span>
+            <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.1 }}>
+                  <span style={{ color: "#ffffff", fontSize: 18, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Inter', 'SF Pro Display', -apple-system, sans-serif" }}>SwanCore</span>
+                  <span style={{ color: "#0a0a0a", fontSize: 10 }}>Simplified Trading</span>
+                </div>
           </div>
           <div style={{ animation: "fadeUp .6s ease" }}>
             <h1 style={S.welcomeH1}>Welcome to SwanCore! 🎉</h1>
@@ -1090,7 +1093,10 @@ const Registration: React.FC = () => {
               <div style={S.brand}>
                 <div style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "8px 14px", borderRadius: 10, background: "#ff8c32", border: "1px solid #ff8c32" }}>
                   <img src={logo} alt="SwanCore" style={{ width: 32, height: 32, borderRadius: 4, objectFit: "contain", background: "#0b0e11", padding: 2 }} />
-                  <span style={{ color: "var(--text-current)", fontSize: 18, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Inter', 'SF Pro Display', -apple-system, sans-serif" }}>SwanCore</span>
+                  <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.1 }}>
+                  <span style={{ color: "#ffffff", fontSize: 18, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Inter', 'SF Pro Display', -apple-system, sans-serif" }}>SwanCore</span>
+                  <span style={{ color: "#0a0a0a", fontSize: 10 }}>Simplified Trading</span>
+                </div>
                 </div>
               </div>
 

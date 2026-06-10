@@ -3067,8 +3067,8 @@ export default function Trading() {
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", borderRadius: 10, background: "#ff8c32", border: "1px solid #ff8c32" }}>
           <img src={logo} alt="SwanCore" style={{ width: 28, height: 28, borderRadius: 4, objectFit: "contain", background: "#0b0e11", padding: 2 }} />
           <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.1 }}>
-            <span style={{ color: COLORS.textBright, fontSize: 16, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Inter', 'SF Pro Display', -apple-system, sans-serif" }}>SwanCore</span>
-            <span style={{ color: COLORS.textMuted, fontSize: 10 }}>Simplified Trading</span>
+            <span style={{ color: "#ffffff", fontSize: 16, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Inter', 'SF Pro Display', -apple-system, sans-serif" }}>SwanCore</span>
+            <span style={{ color: "#0a0a0a", fontSize: 10 }}>Simplified Trading</span>
           </div>
         </div>
       </div>
