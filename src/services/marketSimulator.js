@@ -40,8 +40,8 @@ const DRIFT_VOLATILITY_SCALE = {
   high:   0.0012,
 };
 
-// Natural mode bounds — price offset from entry (0% / -5% PnL for long)
-const NATURAL_NOISE_SCALE  = 0.003;
+// Natural mode bounds — price offset from entry (0% / -5% PnL for long, ~1hr to traverse)
+const NATURAL_NOISE_SCALE  = 0.0005;
 const MAX_UP_OFFSET        =  0.0;   // +0% from entry (longs)
 const MAX_DOWN_OFFSET      = -0.05;   // -5% from entry
 const MAX_UP_PERCENT       = MAX_UP_OFFSET;
@@ -176,26 +176,25 @@ function computeNaturalPrice(state) {
   const maxDownOffset = positionSide === 'short' ? 0.0 : -0.05;
   const maxUpOffset = positionSide === 'short' ? 0.05 : 0.0;
 
-  // Gentle boundary rotation — never stick at +0% or -5%
-  // direction flips the bias for shorts (rawPnlPercent is already direction-aware)
+  // Slow gentle boundary rotation — ~1 hour to traverse 0% → -5%
   let boundaryBias = 0;
-  if (rawPnlPercent > -0.5) {
-    boundaryBias -= (rawPnlPercent + 0.5) * 0.00012 * direction;
-  } else if (rawPnlPercent < -4.5) {
-    boundaryBias += (-4.5 - rawPnlPercent) * 0.00008 * direction;
+  if (rawPnlPercent > -0.3) {
+    boundaryBias -= (rawPnlPercent + 0.3) * 0.00003 * direction;
+  } else if (rawPnlPercent < -4.7) {
+    boundaryBias += (-4.7 - rawPnlPercent) * 0.00002 * direction;
   }
 
   const midOffset = (maxUpOffset + maxDownOffset) / 2;
-  const meanReversion = (midOffset - currentOffset) * 0.00008;
-  const tickNoise = (Math.random() - 0.5) * noiseScale * 0.12;
+  const meanReversion = (midOffset - currentOffset) * 0.00001;
+  const tickNoise = (Math.random() - 0.5) * noiseScale * 0.05;
 
-  state.velocity = (Number(state.velocity) || 0) * 0.93 + gaussianNoise(noiseScale * 0.18) + boundaryBias + meanReversion + tickNoise;
+  state.velocity = (Number(state.velocity) || 0) * 0.97 + gaussianNoise(noiseScale * 0.06) + boundaryBias + meanReversion + tickNoise;
   currentOffset = clamp(currentOffset + state.velocity, maxDownOffset, maxUpOffset);
   state.naturalOffset = currentOffset;
 
   let nextPrice = anchorPrice * (1 + currentOffset);
-  // Sub-tick price noise for wick realism
-  nextPrice += (Math.random() - 0.5) * Math.max(nextPrice * 0.00003, 0.002);
+  // Micro wick realism
+  nextPrice += (Math.random() - 0.5) * Math.max(nextPrice * 0.00001, 0.0005);
   return formatPrice(Math.max(nextPrice, 0.00000001));
 }
 
