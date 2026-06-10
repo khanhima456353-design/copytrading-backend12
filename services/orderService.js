@@ -18,7 +18,7 @@ function calculatePnl(entryPrice, currentPrice, quantity, positionSide, leverage
 
 async function openOrder(userId, pair, side, type, entryPrice, quantity, lockedAmount, stopPrice, stopLoss, takeProfit) {
   const positionSide = side === "sell" ? "short" : "long";
-  const isPending = ["stop-limit", "oco"].includes(type);
+  const isPending = ["limit", "stop-limit", "oco"].includes(type);
   const order = await Order.create({
     userId,
     pair,
