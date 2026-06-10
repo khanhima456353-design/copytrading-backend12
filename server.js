@@ -686,6 +686,18 @@ app.get('/api/account/summary', authMiddleware, async (req, res) => {
 
     const openOrders = await Order.find({ userId, status: { $in: ['open','partially_filled'] } });
 
+    const now = new Date();
+    const since24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const since7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    const [closed24h, closed7d] = await Promise.all([
+      Order.find({ userId, status: { $in: ['filled','closed'] }, closedAt: { $gte: since24h } }),
+      Order.find({ userId, status: { $in: ['filled','closed'] }, closedAt: { $gte: since7d } }),
+    ]);
+
+    const realized24h = closed24h.reduce((s, o) => s + (o.realizedPnl || o.clampedPnl || o.rawPnl || 0), 0);
+    const realized7d = closed7d.reduce((s, o) => s + (o.realizedPnl || o.clampedPnl || o.rawPnl || 0), 0);
+
     const summary = {
       available: availableBalance,
       locked: lockedBalance,
@@ -693,7 +705,8 @@ app.get('/api/account/summary', authMiddleware, async (req, res) => {
       unrealizedPnl: totalUnreal,
       usedMargin: positions.reduce((s, p) => s + (p.margin || 0), 0),
       freeMargin: availableBalance,
-      dailyPnL: 0,
+      dailyPnL: realized24h + totalUnreal,
+      weeklyPnL: realized7d + totalUnreal,
       winRate: 0,
       openOrdersCount: openOrders.length,
     };
@@ -744,6 +757,15 @@ app.post('/api/trade/close-position', authMiddleware, async (req, res) => {
     const openOrders = await Order.find({ userId, pair, status: 'open' });
     for (const order of openOrders) {
       await orderService.closeOrder(order._id, closePrice);
+    }
+
+    // Record realized PnL on the most recent filled entry order
+    const pnl = orderService.calculatePnl(pos.entryPrice, closePrice, pos.size, pos.side, pos.leverage);
+    const entryOrder = await Order.findOne({ userId, pair, status: 'filled' }).sort({ createdAt: -1 });
+    if (entryOrder) {
+      entryOrder.realizedPnl = pnl.clampedPnl ?? pnl.rawPnl ?? 0;
+      entryOrder.closedAt = new Date();
+      await entryOrder.save();
     }
 
     // Delete the position

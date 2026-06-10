@@ -174,6 +174,9 @@ export default function HomeDashboard() {
   const [availableBal, setAvailableBal] = useState(0);
   const [lockedBal, setLockedBal] = useState(0);
   const [unrealizedPnl, setUnrealizedPnl] = useState(0);
+  const [openPositions, setOpenPositions] = useState<number>(0);
+  const [dailyPnL, setDailyPnL] = useState<number>(0);
+  const [weeklyPnL, setWeeklyPnL] = useState<number>(0);
   const [userProfile, setUserProfile] = useState<{ kycVerified: boolean; kycStatus: string } | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -194,11 +197,16 @@ export default function HomeDashboard() {
 
   const fetchBalance = async () => {
     try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL || "http://localhost:5000"}/api/account/summary`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
+      const [sumRes, posRes] = await Promise.all([
+        fetch(`${process.env.REACT_APP_API_URL || "http://localhost:5000"}/api/account/summary`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        }),
+        fetch(`${process.env.REACT_APP_API_URL || "http://localhost:5000"}/api/account/positions`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        }),
+      ]);
+      if (sumRes.ok) {
+        const data = await sumRes.json();
         const avail = Number(data.available) || 0;
         const locked = Number(data.locked) || 0;
         const upnl = Number(data.unrealizedPnl) || 0;
@@ -206,6 +214,13 @@ export default function HomeDashboard() {
         setLockedBal(locked);
         setUnrealizedPnl(upnl);
         setBalance(avail + locked + upnl);
+        setDailyPnL(Number(data.dailyPnL) || 0);
+        setWeeklyPnL(Number(data.weeklyPnL) || 0);
+      }
+      if (posRes.ok) {
+        const positions = await posRes.json();
+        const posArr = Array.isArray(positions) ? positions : Array.isArray(positions?.data) ? positions.data : [];
+        setOpenPositions(posArr.length);
       }
     } catch {}
   };
@@ -302,9 +317,10 @@ export default function HomeDashboard() {
     if (cached) { try { const p = JSON.parse(cached); if (Array.isArray(p) && p.length) setNewsFeed(p); } catch {} }
     const tickerInt = setInterval(fetchLiveTickers, 30000);
     const insightInt = setInterval(fetchMarketInsights, 60000);
+    const balanceInt = setInterval(fetchBalance, 1000);
     const socket = (window as any).socket;
-    if (socket) { socket.on("balanceUpdated", () => fetchBalance()); return () => { socket.off("balanceUpdated"); clearInterval(tickerInt); clearInterval(insightInt); }; }
-    return () => { clearInterval(tickerInt); clearInterval(insightInt); };
+    if (socket) { socket.on("balanceUpdated", () => fetchBalance()); return () => { socket.off("balanceUpdated"); clearInterval(tickerInt); clearInterval(insightInt); clearInterval(balanceInt); }; }
+    return () => { clearInterval(tickerInt); clearInterval(insightInt); clearInterval(balanceInt); };
   }, []);
 
   const displayedNews = newsFeed.length > 0 ? newsFeed.slice(0, 4).map(i => ({ id: i.id, src: "Swancore's News", title: i.title, time: i.time || "Just now" })) : SAMPLE_NEWS;
@@ -944,13 +960,13 @@ export default function HomeDashboard() {
             <div style={{ background: "var(--surface, #1E2329)", border: "1px solid var(--border, #1e293b)", borderRadius: 12, padding: 14 }}>
               <div style={{ fontSize: 10, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 10 }}>Account</div>
               {[
-                { label: "24h P&L", val: "—" },
-                { label: "7d P&L", val: "—" },
-                { label: "Open positions", val: "0" },
+                { label: "24h P&L", val: (dailyPnL >= 0 ? "+" : "") + "$" + fmt(dailyPnL), cls: dailyPnL >= 0 ? "#0ecb81" : "#f6465d" },
+                { label: "7d P&L", val: (weeklyPnL >= 0 ? "+" : "") + "$" + fmt(weeklyPnL), cls: weeklyPnL >= 0 ? "#0ecb81" : "#f6465d" },
+                { label: "Open positions", val: String(openPositions) },
               ].map(r => (
                 <div key={r.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid var(--border, #1e293b)" }}>
                   <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{r.label}</span>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)" }}>{r.val}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: (r as any).cls || "var(--text-primary)" }}>{r.val}</span>
                 </div>
               ))}
             </div>

@@ -3046,11 +3046,13 @@ export default function Trading() {
       </div>
 
       {/* ── COLLAPSIBLE WALLET PANEL ── */}
-      <div style={{ maxHeight: showWallet ? 600 : 0, overflow: "hidden", transition: "max-height 0.35s ease", borderBottom: showWallet ? `1px solid ${COLORS.border}` : "1px solid transparent" }}>
-        <div style={{ padding: "12px 16px", background: COLORS.bg }}>
-          <TradingBalanceCard />
+      {showWallet && (
+        <div style={{ borderBottom: `1px solid ${COLORS.border}` }}>
+          <div style={{ padding: "12px 16px", background: COLORS.bg }}>
+            <TradingBalanceCard />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── MAIN VIEW TABS (between left & right panels) ── */}
       <div className="trading-main-tabs" style={{ display: "flex", alignItems: "center", height: 38, borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, padding: "0 12px", gap: 0, flexShrink: 0 }}>
@@ -3062,10 +3064,10 @@ export default function Trading() {
         ] as const).map(tab => (
           <button key={tab.id} onClick={() => setActiveViewTab(tab.id)} style={{ padding: "0 16px", height: "100%", background: "transparent", border: "none", cursor: "pointer", fontSize: 13, color: activeViewTab === tab.id ? COLORS.textBright : COLORS.text, borderBottom: activeViewTab === tab.id ? `2px solid ${"#f0b90b"}` : "2px solid transparent", fontWeight: activeViewTab === tab.id ? 600 : 400 }}>{tab.label}</button>
         ))}
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", borderRadius: 10, background: COLORS.bgAlt, border: `1px solid ${COLORS.border}` }}>
-          <img src={logo} alt="SwanCore logo" style={{ width: 32, height: 32, borderRadius: 4, objectFit: "contain", imageRendering: "auto", background: COLORS.bg, padding: 2 }} />
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", borderRadius: 10, background: "#ff8c32", border: "1px solid #ff8c32" }}>
+          <img src={logo} alt="SwanCore" style={{ width: 28, height: 28, borderRadius: 4, objectFit: "contain", background: "#0b0e11", padding: 2 }} />
           <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.1 }}>
-            <span style={{ color: "#f0b90b", fontSize: 14, fontWeight: 800 }}>SwanCore</span>
+            <span style={{ color: COLORS.textBright, fontSize: 16, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Inter', 'SF Pro Display', -apple-system, sans-serif" }}>SwanCore</span>
             <span style={{ color: COLORS.textMuted, fontSize: 10 }}>Simplified Trading</span>
           </div>
         </div>
@@ -3800,7 +3802,7 @@ serverPositions.length === 0
 
         @media (min-width: 1024px) {
           .trading-dashboard { --left-width: 340px; --right-width: 340px; }
-          .trading-page { height: 100dvh !important; min-height: 0 !important; overflow: hidden !important; }
+          .trading-page { height: 100dvh !important; min-height: 0 !important; overflow-x: hidden !important; overflow-y: auto !important; }
           .trading-body { flex: 1 1 auto !important; flex-wrap: nowrap !important; gap: 0 !important; min-height: 0 !important; overflow: hidden !important; }
           .trading-page.trading-dashboard .trading-body.trading-dashboard__body { display: flex !important; grid-template-columns: none !important; gap: 0 !important; padding: 0 !important; overflow: hidden !important; }
           .trading-toolbar { flex: 0 0 44px !important; width: 44px !important; }

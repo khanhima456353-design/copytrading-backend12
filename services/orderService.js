@@ -80,6 +80,7 @@ async function closeOrder(orderId, closePrice) {
   order.rawPnl = pnl.rawPnl;
   order.clampedPnlPercent = pnl.clampedPnlPercent;
   order.clampedPnl = pnl.clampedPnl;
+  order.realizedPnl = pnl.clampedPnl ?? pnl.rawPnl ?? 0;
   order.closePrice = closePrice;
   order.status = "closed";
   order.closedAt = new Date();
@@ -116,4 +117,5 @@ module.exports = {
   cancelOrder,
   getUserOpenOrders,
   getUserClosedOrders,
+  calculatePnl,
 };
