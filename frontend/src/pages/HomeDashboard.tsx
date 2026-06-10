@@ -171,6 +171,9 @@ export default function HomeDashboard() {
   const [screen, setScreen] = useState<Screen>("home");
   const [activeMarketTab, setActiveMarketTab] = useState("All");
   const [balance, setBalance] = useState(0);
+  const [availableBal, setAvailableBal] = useState(0);
+  const [lockedBal, setLockedBal] = useState(0);
+  const [unrealizedPnl, setUnrealizedPnl] = useState(0);
   const [userProfile, setUserProfile] = useState<{ kycVerified: boolean; kycStatus: string } | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -191,11 +194,19 @@ export default function HomeDashboard() {
 
   const fetchBalance = async () => {
     try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL || "http://localhost:5000"}/api/profile`, {
+      const res = await fetch(`${process.env.REACT_APP_API_URL || "http://localhost:5000"}/api/account/summary`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
-      const data = await res.json();
-      if (data.success) setBalance(data.user.balance || 0);
+      if (res.ok) {
+        const data = await res.json();
+        const avail = Number(data.available) || 0;
+        const locked = Number(data.locked) || 0;
+        const upnl = Number(data.unrealizedPnl) || 0;
+        setAvailableBal(avail);
+        setLockedBal(locked);
+        setUnrealizedPnl(upnl);
+        setBalance(avail + locked + upnl);
+      }
     } catch {}
   };
 
@@ -292,7 +303,7 @@ export default function HomeDashboard() {
     const tickerInt = setInterval(fetchLiveTickers, 30000);
     const insightInt = setInterval(fetchMarketInsights, 60000);
     const socket = (window as any).socket;
-    if (socket) { socket.on("balanceUpdated", (d: any) => setBalance(d.balance)); return () => { socket.off("balanceUpdated"); clearInterval(tickerInt); clearInterval(insightInt); }; }
+    if (socket) { socket.on("balanceUpdated", () => fetchBalance()); return () => { socket.off("balanceUpdated"); clearInterval(tickerInt); clearInterval(insightInt); }; }
     return () => { clearInterval(tickerInt); clearInterval(insightInt); };
   }, []);
 
@@ -335,15 +346,15 @@ export default function HomeDashboard() {
           <div className="hd-hero-stats">
             <div className="hd-hero-stat">
               <span className="hd-hero-stat-label">Available</span>
-                    <span className="hd-hero-stat-val">${fmt(balance)}</span>
+                    <span className="hd-hero-stat-val">${fmt(availableBal)}</span>
             </div>
             <div className="hd-hero-stat">
               <span className="hd-hero-stat-label">In Trade</span>
-              <span className="hd-hero-stat-val">$0.00</span>
+              <span className="hd-hero-stat-val">${fmt(lockedBal + Math.max(0, unrealizedPnl))}</span>
             </div>
             <div className="hd-hero-stat">
-              <span className="hd-hero-stat-label">24h P&L</span>
-              <span className="hd-hero-stat-val mute">—</span>
+              <span className="hd-hero-stat-label">Unreal. P&L</span>
+              <span className="hd-hero-stat-val" style={{ color: unrealizedPnl >= 0 ? "#0ecb81" : "#f6465d" }}>{unrealizedPnl >= 0 ? "+" : ""}${fmt(unrealizedPnl)}</span>
             </div>
           </div>
         </div>
