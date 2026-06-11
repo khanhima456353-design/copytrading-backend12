@@ -26,7 +26,8 @@ function AppLayout() {
     location.pathname !== "/register" &&
     location.pathname !== "/login" &&
     location.pathname !== "/news" &&
-    !(isTradingPage && isAuthenticated);
+    !(isTradingPage && isAuthenticated) &&
+    !location.state?.embed;
 
   return (
     <MobileMenuProvider>

@@ -414,3 +414,57 @@
     max-height: calc(100vh - 290px);
   }
 }
+
+/* ─── Embedded Bottom Nav ─── */
+
+.mk-bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background: var(--surface, #1E2329);
+  border-top: 1px solid var(--border, #1e293b);
+  z-index: 100;
+  padding: 4px 0 env(safe-area-inset-bottom);
+}
+
+.mk-bottom-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary, #94a3b8);
+  cursor: pointer;
+  font-size: 10px;
+  font-family: inherit;
+  padding: 0;
+}
+
+.mk-bottom-nav-item.active {
+  color: #ff8c32;
+}
+
+.mk-bottom-nav-item span:first-child {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.mk-bottom-nav-item.active span:first-child {
+  color: #ff8c32;
+}
+
+@media (max-width: 1023px) {
+  .mk-bottom-nav {
+    display: flex;
+  }
+
+  .mk-embedded {
+    padding-bottom: 56px;
+  }
+}

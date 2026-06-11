@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import authService from "../services/authService";
 import { useMobileMenu } from "../components/theme/MobileMenuContext";
 import { BookCheck, AlertTriangle, XCircle, Megaphone, Bell, ShieldCheck, ShieldAlert, LockKeyhole, LogOut, Globe, BriefcaseBusiness, Store, House, ShieldUser, Lightbulb } from "lucide-react";
@@ -168,8 +168,17 @@ function NotificationPanel({ notifications, isVisible, onClose, onMarkAsRead, on
 
 export default function HomeDashboard() {
   const navigate = useNavigate();
+  const loc = useLocation();
 
   const [screen, setScreen] = useState<Screen>("home");
+
+  useEffect(() => {
+    const target = loc.state?.targetScreen;
+    if (target && (target === "home" || target === "portfolio" || target === "account")) {
+      setScreen(target);
+    }
+  }, []);
+
   const [activeMarketTab, setActiveMarketTab] = useState("All");
   const [balance, setBalance] = useState(0);
   const [availableBal, setAvailableBal] = useState(0);
@@ -326,7 +335,7 @@ export default function HomeDashboard() {
   const displayedNews = newsFeed.length > 0 ? newsFeed.slice(0, 4).map(i => ({ id: i.id, src: "Swancore's News", title: i.title, time: i.time || "Just now" })) : SAMPLE_NEWS;
 
   const handleScreenChange = (s: Screen | "trade") => {
-    if (s === "markets") { navigate("/markets"); return; }
+    if (s === "markets") { navigate("/markets", { state: { embed: true } }); return; }
     if (s === "trade") { navigate("/trade"); return; }
     setScreen(s);
   };
@@ -436,7 +445,7 @@ export default function HomeDashboard() {
       <div className="hd-section">
         <div className="hd-section-hdr">
           <span className="hd-section-title">Markets</span>
-          <button className="hd-section-link" onClick={() => navigate("/markets")}>See all →</button>
+          <button className="hd-section-link" onClick={() => navigate("/markets", { state: { embed: true } })}>See all →</button>
         </div>
         <div className="hd-section-tabs">
           {["All", "Gainers", "Losers"].map(t => (
@@ -448,7 +457,7 @@ export default function HomeDashboard() {
             const mkts = liveMarkets.length > 0 ? liveMarkets : ALL_MARKETS;
             const filtered = activeMarketTab === "All" ? mkts : activeMarketTab === "Gainers" ? mkts.filter((m: MarketRow) => m.change > 0) : mkts.filter((m: MarketRow) => m.change < 0);
             return filtered.map((m: MarketRow) => (
-            <button key={m.pair} className="hd-mkt-row" onClick={() => navigate("/markets")}>
+            <button key={m.pair} className="hd-mkt-row" onClick={() => navigate("/markets", { state: { embed: true } })}>
               <img src={COIN_IMAGES[m.pair.split(" / ")[0]]} alt={m.pair.split(" / ")[0]} style={{ width: 20, height: 20, objectFit: "contain", borderRadius: "50%" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="hd-mkt-name">{m.pair}</div>

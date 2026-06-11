@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+import { House, BriefcaseBusiness, Store, ShieldUser } from "lucide-react";
 import "./markets.css";
 import { subscribeAllTickers } from "./services/marketState";
 
@@ -121,6 +122,8 @@ const parseAsset = (sym) => {
 
 export default function Markets() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const embedded = location.state?.embed;
   const [tickers, setTickers] = useState({});
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState("volume24h");
@@ -205,7 +208,7 @@ export default function Markets() {
   ];
 
   return (
-    <div className="mk-container">
+    <div className={`mk-container${embedded ? " mk-embedded" : ""}`}>
       <div className="mk-inner">
 
         <div className="mk-top-bar">
@@ -310,6 +313,27 @@ export default function Markets() {
         </div>
 
       </div>
+
+      {embedded && (
+        <nav className="mk-bottom-nav">
+          <button className="mk-bottom-nav-item" onClick={() => navigate("/", { state: { targetScreen: "home" } })}>
+            <span><House size={18} /></span>
+            <span>Home</span>
+          </button>
+          <button className="mk-bottom-nav-item" onClick={() => navigate("/", { state: { targetScreen: "portfolio" } })}>
+            <span><BriefcaseBusiness size={18} /></span>
+            <span>Portfolio</span>
+          </button>
+          <button className="mk-bottom-nav-item active">
+            <span><Store size={18} /></span>
+            <span>Markets</span>
+          </button>
+          <button className="mk-bottom-nav-item" onClick={() => navigate("/", { state: { targetScreen: "account" } })}>
+            <span><ShieldUser size={18} /></span>
+            <span>Account</span>
+          </button>
+        </nav>
+      )}
     </div>
   );
 }
