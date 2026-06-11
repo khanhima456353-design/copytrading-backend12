@@ -35,11 +35,29 @@ async function reconcileOpenPositions() {
     }
     for (const [key, orders] of Object.entries(grouped)) {
       const [userId, pair] = key.split("|");
-      const existing = await mongoose.model("Position").findOne({ userId, pair });
-      if (existing) continue;
       const totalQty = orders.reduce((s, o) => s + o.quantity, 0);
-      const avgPrice = orders.reduce((s, o) => s + (o.entryPrice * o.quantity), 0) / totalQty;
       const totalMargin = orders.reduce((s, o) => s + o.lockedAmount, 0);
+      const avgPrice = orders.reduce((s, o) => s + (o.entryPrice * o.quantity), 0) / totalQty;
+
+      const existing = await mongoose.model("Position").findOne({ userId, pair });
+      if (existing) {
+        // Position exists — merge any unmatched order quantity
+        const qtyDiff = Math.abs(existing.size - totalQty);
+        if (qtyDiff > 0.0001) {
+          console.warn(`[OrderMonitor] Position size mismatch for ${key}: pos=${existing.size}, orders=${totalQty} — reconciling`);
+          if (typeof onActivate === "function") {
+            const fakeOrder = orders[0];
+            fakeOrder.quantity = totalQty;
+            fakeOrder.entryPrice = avgPrice;
+            fakeOrder.lockedAmount = totalMargin;
+            // onActivate will merge into existing position (else branch adds qty)
+            await onActivate(fakeOrder, avgPrice);
+            console.log(`[OrderMonitor] Reconciled position for ${userId} ${pair}`);
+          }
+        }
+        continue;
+      }
+
       if (typeof onActivate === "function") {
         const fakeOrder = orders[0];
         fakeOrder.quantity = totalQty;
@@ -82,15 +100,16 @@ async function checkPendingTriggers() {
         ? (order.side === "buy" ? Math.min(order.price, currentPrice) : Math.max(order.price, currentPrice))
         : currentPrice;
 
+      // Save order as "open" FIRST — prevents double-counting if onActivate fails
       order.status = "open";
       order.entryPrice = fillPrice;
       order.openedAt = new Date();
       await order.save();
-      console.log(`[OrderMonitor] Triggered ${order.type} ${order._id} at ${fillPrice}`);
 
       if (typeof onActivate === "function") {
         await onActivate(order, fillPrice);
       }
+      console.log(`[OrderMonitor] Triggered ${order.type} ${order._id} at ${fillPrice}`);
     } catch (err) {
       console.error(`[OrderMonitor] Failed to activate order ${order._id}:`, err.message);
     }

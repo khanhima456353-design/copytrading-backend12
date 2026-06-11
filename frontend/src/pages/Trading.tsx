@@ -1531,9 +1531,7 @@ export default function Trading() {
   const [sellAmountInput, setSellAmountInput] = useState("");
   const [sellTotalInput, setSellTotalInput] = useState("");
   const [lastPrice, setLastPrice] = useState(0);
-  const [displayPrice, setDisplayPrice] = useState(0);
   const [priceUpdateDirection, setPriceUpdateDirection] = useState<"up" | "down">("up");
-  const priceMovementRef = useRef({ direction: "up" as "up" | "down", streak: 0, targetGreenCount: 2 });
   const lastPriceRef = useRef(0);
   const symbolRef = useRef(symbol);
   symbolRef.current = symbol;
@@ -1953,7 +1951,6 @@ export default function Trading() {
             const p = Number(data.price);
             lastPriceRef.current = p;
             setLastPrice(p);
-            setDisplayPrice(p);
             setLastPriceUpdate(data.time || Date.now());
           }
         });
@@ -2037,7 +2034,6 @@ export default function Trading() {
             const direction = price >= prevPrice ? "up" : "down";
             lastPriceRef.current = price;
             setLastPrice(price);
-            setDisplayPrice(price);
             setPriceUpdateDirection(direction);
             setLastPriceUpdate(data.time || Date.now());
           }
@@ -2446,7 +2442,6 @@ export default function Trading() {
     const tickerPrice = allTickerPrices[binanceSym];
     if (tickerPrice && tickerPrice > 0) {
       setLastPrice(tickerPrice);
-      setDisplayPrice(tickerPrice);
       lastPriceRef.current = tickerPrice;
     }
   };
@@ -2808,40 +2803,7 @@ export default function Trading() {
       .catch(() => {});
   }, []);
 
-  const applyDisplayPriceUpdate = useCallback((rawPrice: number) => {
-    const state = priceMovementRef.current;
-    let direction = state.direction;
-    if (direction === "up") {
-      if (state.streak >= state.targetGreenCount) {
-        direction = "down";
-        state.direction = "down";
-        state.streak = 1;
-      } else {
-        state.streak += 1;
-      }
-    } else {
-      direction = "up";
-      state.direction = "up";
-      state.targetGreenCount = 2 + Math.floor(Math.random() * 2);
-      state.streak = 1;
-    }
 
-    const magnitude = direction === "up"
-      ? 0.0003 + Math.random() * 0.00045
-      : 0.00018 + Math.random() * 0.00032;
-    const nextPrice = direction === "up"
-      ? rawPrice * (1 + magnitude)
-      : rawPrice * (1 - magnitude);
-
-    setDisplayPrice(Number(nextPrice.toFixed(2)));
-    setPriceUpdateDirection(direction);
-  }, []);
-
-  useEffect(() => {
-    if (!lastPrice) return;
-    const interval = window.setInterval(() => applyDisplayPriceUpdate(lastPrice), 1000);
-    return () => window.clearInterval(interval);
-  }, [lastPrice, applyDisplayPriceUpdate]);
 
   const getSideConfig = (side: "buy" | "sell") => {
     const amount = side === "buy" ? Number(buyAmountInput || 0) : Number(sellAmountInput || 0);
@@ -2990,10 +2952,10 @@ export default function Trading() {
           </div>
           <div>
             <div style={{ fontWeight: 700, fontSize: 15, letterSpacing: 0.3 }}>{symbol}</div>
-            <div style={{ fontSize: 10, color: isPriceUp ? COLORS.green : COLORS.red }}>{symbol.split("/")[0]} Price {isPriceUp ? "?" : "?"}</div>
+            <div style={{ fontSize: 10, color: isPriceUp ? COLORS.green : COLORS.red }}>{symbol.split("/")[0]} Price {isPriceUp ? "▲" : "▼"}</div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 2, marginLeft: 8 }}>
-            <div style={{ fontWeight: 700, fontSize: 22, color: isPriceUp ? COLORS.green : COLORS.red }}>{isValidPrice(displayPrice) ? formatPrice(displayPrice) : isValidPrice(lastPrice) ? formatPrice(lastPrice) : "Market price unavailable"}</div>
+            <div style={{ fontWeight: 700, fontSize: 22, color: isPriceUp ? COLORS.green : COLORS.red }}>{isValidPrice(lastPrice) ? formatPrice(lastPrice) : "Market price unavailable"}</div>
             <div style={{ fontSize: 10, color: COLORS.textMuted }}>{formatMsTime(lastPriceUpdate)}</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 12, flexShrink: 0 }}>

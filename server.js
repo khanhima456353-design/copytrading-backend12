@@ -907,6 +907,9 @@ app.post('/api/trade/place', authMiddleware, async (req, res) => {
     if (!pair || !side || !type || !quantity || quantity <= 0) {
       return res.status(400).json({ success: false, message: "pair, side, type, and amount are required" });
     }
+    if (["limit", "stop-limit", "oco"].includes(type) && (!price || entryPrice <= 0)) {
+      return res.status(400).json({ success: false, message: "price must be a positive number for limit orders" });
+    }
     const stopPrice = ["stop-limit", "oco"].includes(type) ? entryPrice : undefined;
     const order = await orderService.openOrder(req.userId, pair, side, type, entryPrice, quantity, lockedAmount, stopPrice, stopLoss, takeProfit);
 
@@ -1387,14 +1390,21 @@ function startPositionSimulation(userId, position, orderMeta = {}) {
   if (orderMeta.isDemo === true || position.isDemo === true) return;
   if (orderMeta.isGenuine === false || position.isGenuine === false) return;
   try {
-    marketSimulator.startNaturalSimulation({
-      userId,
-      pair: position.pair,
-      positionId: position._id.toString(),
-      entryPrice: position.entryPrice,
-      positionSide: position.side || 'long',
-      isDemo: false,
-    });
+    // If simulation already active, just update entry anchor (no price jump)
+    const updated = marketSimulator.updateSimulationEntry?.(
+      userId, position.pair, position._id.toString(), position.entryPrice
+    );
+    if (!updated) {
+      marketSimulator.startNaturalSimulation({
+        userId,
+        pair: position.pair,
+        positionId: position._id.toString(),
+        entryPrice: position.entryPrice,
+        positionSide: position.side || 'long',
+        isDemo: false,
+      });
+    }
+    io.to(`user:${userId}`).emit('balanceUpdate', {});
   } catch (err) {
     console.error('startPositionSimulation error:', err.message);
   }

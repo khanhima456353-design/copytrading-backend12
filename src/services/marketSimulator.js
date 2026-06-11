@@ -845,10 +845,34 @@ async function recoverSimulations(getOpenPositions) {
   }
 }
 
+/**
+ * Update simulation entry price after a limit order merge without resetting
+ * the current simulated price. Prevents unnatural price jumps on the chart.
+ */
+function updateSimulationEntry(userId, pair, positionId, newEntryPrice) {
+  if (!userId || !pair || !positionId) return false;
+  const key = getKey(userId, pair, positionId);
+  const state = USER_PAIR_STATES.get(key);
+  if (!state) return false;
+  if (!Number.isFinite(newEntryPrice) || newEntryPrice <= 0) return false;
+
+  // Preserve current lastPrice — recalculate offset relative to new anchor
+  const currentPrice = state.lastPrice;
+  state.entryPrice = formatPrice(newEntryPrice);
+  state.naturalAnchor = formatPrice(newEntryPrice);
+  if (currentPrice > 0 && newEntryPrice > 0) {
+    state.naturalOffset = (currentPrice - newEntryPrice) / newEntryPrice;
+  }
+  state.updatedAt = Date.now();
+  emitSimulatedPrice(state);
+  return true;
+}
+
 module.exports = {
   NATURAL_TREND_STEPS,
   initMarketSimulator,
   startNaturalSimulation,
+  updateSimulationEntry,
   startDrift,
   stopDrift,
   getDriftStatus,
