@@ -4,7 +4,7 @@ import logo from "../assets/logo.jpg";
 import "./Trading.css";
 import { getAxios } from "../api";
 import authService from "../services/authService";
-import { MarketState, subscribeConnectionStatus, subscribeMarketState, isValidPrice } from "../services/marketState";
+import { MarketState, subscribeConnectionStatus, subscribeMarketState, isValidPrice, subscribeAllTickers } from "../services/marketState";
 
 import { initializeCandles, resetCandles, updateLatestCandle, getCandles } from "../services/candleEngine";
 import PositionsPanel from "../components/PositionsPanel";
@@ -328,7 +328,7 @@ function formatMsTime(ts: number) {
 
 const generateSyntheticPairs = (available: string[]) => {
   if (available.length > 1) return available;
-  const bases = ["BTC", "ETH", "BNB", "SOL", "XRP", "ADA", "AVAX", "DOT", "DOGE", "LINK", "MATIC", "UNI", "ATOM", "LTC", "BCH", "TRX", "APT", "SUI", "OP", "ARB", "NEAR", "FIL", "ALGO", "FTM", "STX", "VET", "HBAR", "ICP", "AAVE", "EGLD", "SAND", "AXS", "MANA", "THETA", "EOS", "XTZ", "CRV", "SNX", "ENJ", "CHZ", "ONE", "KSM", "RNDR", "FET", "AGIX", "GALA", "IMX", "MKR", "COMP", "YFI", "ZIL", "BAT", "ZRX", "RVN", "IOTA", "ANKR", "HOT", "DENT", "OMG", "SC"];
+  const bases = ["BTC", "ETH", "SOL", "LTC", "ADA", "XRP", "DOGE", "AVAX", "DOT", "LINK", "MATIC", "BNB", "NEAR", "APT", "ARB"];
   const quotes = ["USDT", "BTC", "ETH"];
   const symbols = new Set<string>(available);
   for (const base of bases) for (const quote of quotes) {
@@ -337,6 +337,27 @@ const generateSyntheticPairs = (available: string[]) => {
   }
   return Array.from(symbols).sort();
 };
+
+const BLOCKED_PAIRS = new Set([
+  "0G/USDT","1000CAT/USDT","1000CHEEMS/USDT","1000SATS/USDT","A/USDT","ACM/USDT","ACT/USDT","ACX/USDT",
+  "AIGENSYN/USDT","AIXBT/USDT","ALLO/USDT","ASTER/USDT","AT/USDT","AVNT/USDT","AWE/USDT",
+  "AXL/USDT","BABY/USDT","BANANAS31/USDT","BARD/USDT","BANK/USDT","BNSOL/USDT","BOME/USDT","BREV/USDT",
+  "BROCCOLI714/USDT","CETUS/USDT","CFG/USDT","CGPT/USDT","CHIP/USDT","COOKIE/USDT","COW/USDT",
+  "D/USDT","DOLO/USDT","DYM/USDT","EDEN/USDT","ENSO/USDT","EPIC/USDT","ERA/USDT","ESP/USDT","EUL/USDT",
+  "F/USDT","FF/USDT","FOGO/USDT","FORM/USDT","FRAX/USDT","G/USDT","GENIUS/USDT","GIGGLE/USDT","GNO/USDT",
+  "GPS/USDT","HAEDAL/USDT","HEI/USDT","HEMI/USDT","HOLO/USDT","HOME/USDT","HYPER/USDT",
+  "JTO/USDT","JUP/USDT","KAIA/USDT","KAITO/USDT","KAT/USDT","KGST/USDT","KMNO/USDT",
+  "LA/USDT","LAYER/USDT","LINEA/USDT","LUMIA/USDT","ME/USDT","MEGA/USDT","MET/USDT","METIS/USDT",
+  "MIRA/USDT","MITO/USDT","MMT/USDT","MORPHO/USDT","MOVE/USDT","MUBARAK/USDT",
+  "NEWT/USDT","NIGHT/USDT","NOM/USDT","NXPC/USDT","ONDO/USDT","OPEN/USDT","OPG/USDT","ORCA/USDT",
+  "PARTI/USDT","PLUME/USDT","PNUT/USDT","PROVE/USDT","PUMP/USDT","PYTH/USDT",
+  "RENDER/USDT","RESOLV/USDT","RLUSD/USDT","ROBO/USDT","S/USDT","SAHARA/USDT","SAPIEN/USDT",
+  "SENT/USDT","SHELL/USDT","SIGN/USDT","SOMI/USDT","SOPH/USDT","SPK/USDT","STO/USDT","STRK/USDT",
+  "SYRUP/USDT","TNSR/USDT","TOWNS/USDT","TREE/USDT","TRUMP/USDT","TST/USDT","TURBO/USDT",
+  "TURTLE/USDT","TUT/USDT","USDE/USDT","VANRY/USDT","VELODROME/USDT","VIC/USDT","VIRTUAL/USDT",
+  "W/USDT","WIF/USDT","WLFI/USDT","XAUT/USDT","XPL/USDT","XUSD/USDT",
+  "ZAMA/USDT","ZBT/USDT","ZK/USDT","ZKC/USDT","ZKP/USDT","ZRO/USDT",
+]);
 
 // --- Fallback Data ------------------------------------------------------------
 
@@ -1523,6 +1544,7 @@ export default function Trading() {
   const [coinImages, setCoinImages] = useState<Record<string, string>>(DEFAULT_COIN_IMAGES);
   const [marketMovers, setMarketMovers] = useState<{ pair: string; change: number; volume: number; high: number; low: number }[]>([]);
   const [allTickerPrices, setAllTickerPrices] = useState<Record<string, number>>({});
+  const [allSymbols, setAllSymbols] = useState<string[]>([]);
   const [marketState, setMarketState] = useState<MarketState | null>(null);
   const [priceInput, setPriceInput] = useState("");
   const [savedManualPriceInput, setSavedManualPriceInput] = useState("");
@@ -1644,6 +1666,16 @@ export default function Trading() {
   const [rightTab, setRightTab] = useState<"market" | "mytrades">("market");
   const [bottomTab, setBottomTab] = useState<"openorders" | "positions" | "orderhistory" | "bots">("openorders");
   const [pairTab, setPairTab] = useState<"usdt" | "fav">("usdt");
+  const [favorites, setFavorites] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem("trading-favs") || "[]"); } catch { return []; }
+  });
+  const toggleFav = useCallback((pair: string) => {
+    setFavorites(prev => {
+      const next = prev.includes(pair) ? prev.filter(p => p !== pair) : [...prev, pair];
+      localStorage.setItem("trading-favs", JSON.stringify(next));
+      return next;
+    });
+  }, []);
   const [activeTool, setActiveTool] = useState<DrawingTool>("cursor");
   const [drawings, setDrawings] = useState<DrawingObject[]>([]);
   const [drawingColor, setDrawingColor] = useState("#f0b90b");
@@ -2002,6 +2034,7 @@ export default function Trading() {
           const priceMap: Record<string, number> = {};
           const movers: { pair: string; change: number; volume: number; high: number; low: number }[] = [];
           const currentSym = symbolRef.current.replace("/", "");
+          const symbolSet = new Set<string>();
           for (const t of tickers) {
             const price = Number(t.price) || Number(t.lastPrice) || 0;
             const sym = t.symbol;
@@ -2009,8 +2042,11 @@ export default function Trading() {
             if (sym !== currentSym && price > 0) priceMap[sym] = price;
             if (sym.endsWith('USDT')) {
               const base = sym.replace('USDT', '');
+              const pair = `${base}/USDT`;
+              if (BLOCKED_PAIRS.has(pair)) continue;
+              symbolSet.add(pair);
               movers.push({
-                pair: `${base}/USDT`,
+                pair,
                 change: Number(t.changePct) || 0,
                 volume: Number(t.quoteVol) || Number(t.volume24h) || 0,
                 high: Number(t.high24h) || 0,
@@ -2020,6 +2056,7 @@ export default function Trading() {
           }
           if (Object.keys(priceMap).length) setAllTickerPrices(prev => ({ ...prev, ...priceMap }));
           if (movers.length) setMarketMovers(movers);
+          if (symbolSet.size > 0) setAllSymbols(Array.from(symbolSet).sort());
         });
 
         // priceUpdate � real-time price for tracked pairs
@@ -2498,16 +2535,17 @@ export default function Trading() {
 
       {/* Pair tabs */}
       <div style={{ display: "flex", borderBottom: "1px solid var(--clr-border)", padding: "0 6px" }}>
-        {(["fav", "usdt"] as const).map(tab => (
+        {(["usdt", "fav"] as const).map(tab => (
           <button key={tab} onClick={() => setPairTab(tab)} style={{ flex: 1, padding: "6px 0", background: "transparent", border: "none", cursor: "pointer", fontSize: 11, color: pairTab === tab ? "#f0b90b" : CV.text, borderBottom: pairTab === tab ? `2px solid ${"#f0b90b"}` : "2px solid transparent", fontWeight: pairTab === tab ? 700 : 400 }}>
-            {tab === "fav" ? <Star size={11} style={{ color: "#f0b90b", fill: "#f0b90b" }} /> : tab.toUpperCase()}
+            {tab === "fav" ? <Star size={11} style={{ color: "#f0b90b", fill: "#f0b90b" }} /> : "Pairs/USDT"}
           </button>
         ))}
       </div>
 
       {/* Pair list header */}
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", padding: "4px 10px", fontSize: 10, color: CV.textMuted, borderBottom: "1px solid var(--clr-border)" }}>
-        <button onClick={() => setSortBy("name")} style={{ background: "none", border: "none", color: CV.textMuted, cursor: "pointer", textAlign: "left", fontSize: 10 }}>Pair {sortBy === "name" ? "?" : ""}</button>
+      <div style={{ display: "grid", gridTemplateColumns: "24px 2fr 1fr 1fr", padding: "4px 6px", fontSize: 10, color: CV.textMuted, borderBottom: "1px solid var(--clr-border)" }}>
+        <div />
+        <button onClick={() => setSortBy("name")} style={{ background: "none", border: "none", color: CV.textMuted, cursor: "pointer", textAlign: "left", fontSize: 10 }}>Pairs</button>
         <button onClick={() => setSortBy("change")} style={{ background: "none", border: "none", color: CV.textMuted, cursor: "pointer", textAlign: "right", fontSize: 10 }}>Last Price {sortBy === "change" ? "?" : ""}</button>
         <button onClick={() => setSortBy("volume")} style={{ background: "none", border: "none", color: CV.textMuted, cursor: "pointer", textAlign: "right", fontSize: 10 }}>24h Chg% {sortBy === "volume" ? "?" : ""}</button>
       </div>
@@ -2519,10 +2557,13 @@ export default function Trading() {
           const chg = mover?.change || 0;
           const symbolLabel = pair.split("/")[0];
           return (
-            <div key={pair} onClick={() => switchSymbol(pair)} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", padding: "3px 6px", minHeight: 36, cursor: "pointer", background: pair === symbol ? CV.bgHover : "transparent", borderLeft: pair === symbol ? `2px solid ${"#f0b90b"}` : "2px solid transparent" }}
+            <div key={pair} onClick={() => switchSymbol(pair)} style={{ display: "grid", gridTemplateColumns: "24px 2fr 1fr 1fr", padding: "3px 6px", minHeight: 36, cursor: "pointer", background: pair === symbol ? CV.bgHover : "transparent", borderLeft: pair === symbol ? `2px solid ${"#f0b90b"}` : "2px solid transparent" }}
               onMouseEnter={e => { if (pair !== symbol) (e.currentTarget as HTMLElement).style.background = CV.bgAlt; }}
               onMouseLeave={e => { if (pair !== symbol) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
             >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }} onClick={e => { e.stopPropagation(); toggleFav(pair); }}>
+                <Star size={11} style={{ color: favorites.includes(pair) ? "#f0b90b" : CV.textMuted, fill: favorites.includes(pair) ? "#f0b90b" : "transparent", cursor: "pointer" }} />
+              </div>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: -6 }}>
                 <div style={{ width: 22, height: 22, borderRadius: 999, background: CV.bgAlt, display: "grid", placeItems: "center", overflow: "hidden", flexShrink: 0 }}>
                   <CoinIcon symbol={symbolLabel} size={16} images={coinImages} />
@@ -2585,75 +2626,43 @@ export default function Trading() {
   );
 
   const fetchSymbols = async () => {
-  // A comprehensive list of your system altcoins to ensure your layout 
-  // never collapses into a pure Bitcoin clone if a network drift hits.
-  const EMERGENCY_FALLBACK_PAIRS = [
-    "BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "XRP/USDT", "ADA/USDT",
-    "AVAX/USDT", "DOT/USDT", "DOGE/USDT", "LINK/USDT", "MATIC/USDT", "UNI/USDT",
-    "ATOM/USDT", "LTC/USDT", "BCH/USDT", "TRX/USDT", "APT/USDT", "SUI/USDT",
-    "OP/USDT", "ARB/USDT", "NEAR/USDT", "FIL/USDT", "ALGO/USDT", "FTM/USDT",
-    "STX/USDT", "VET/USDT", "HBAR/USDT", "ICP/USDT", "AAVE/USDT", "EGLD/USDT",
-    "SAND/USDT", "AXS/USDT", "MANA/USDT", "THETA/USDT", "EOS/USDT", "XTZ/USDT",
-    "CRV/USDT", "SNX/USDT", "ENJ/USDT", "CHZ/USDT", "ONE/USDT", "KSM/USDT",
-    "RNDR/USDT", "FET/USDT", "AGIX/USDT", "GALA/USDT", "IMX/USDT", "MKR/USDT",
-    "COMP/USDT", "YFI/USDT", "ZIL/USDT", "BAT/USDT", "ZRX/USDT", "RVN/USDT",
-    "IOTA/USDT", "ANKR/USDT", "HOT/USDT", "DENT/USDT", "OMG/USDT", "SC/USDT"
-  ];
-
-  // Helper function to safely extract realistic High/Low points based on asset type
-  const getDynamicHighLow = (pair: string) => {
-    const isBtc = pair.startsWith("BTC/");
-    const baseHigh = isBtc ? 76000 : 100; // Realistic placeholder seed range
-    const baseLow  = isBtc ? 74000 : 90;
-    return {
-      high: +(baseHigh + Math.random() * (isBtc ? 1000 : 10)).toFixed(2),
-      low:  +(baseLow - Math.random() * (isBtc ? 1000 : 10)).toFixed(2)
-    };
+    const EMERGENCY_FALLBACK = [
+      "BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "XRP/USDT", "ADA/USDT",
+      "AVAX/USDT", "DOT/USDT", "DOGE/USDT", "LINK/USDT", "MATIC/USDT", "UNI/USDT",
+      "ATOM/USDT", "LTC/USDT", "BCH/USDT", "TRX/USDT", "APT/USDT", "SUI/USDT",
+      "OP/USDT", "ARB/USDT", "NEAR/USDT", "FIL/USDT", "ALGO/USDT", "FTM/USDT",
+      "STX/USDT", "VET/USDT", "HBAR/USDT", "ICP/USDT", "AAVE/USDT", "EGLD/USDT",
+    ];
+    try {
+      const api = await getAxios();
+      const res = await api.get("/api/market/symbols");
+      const source = (res.data?.symbols?.length > 0) ? res.data.symbols : EMERGENCY_FALLBACK;
+      const available = generateSyntheticPairs(source).filter((p: string) => p.endsWith("/USDT") && !BLOCKED_PAIRS.has(p));
+      setSymbols(available);
+      setFilteredSymbols(available);
+      setMarketMovers(available.map((pair: string) => {
+        const isBtc = pair.startsWith("BTC/");
+        return {
+          pair,
+          change: +((Math.random() - 0.5) * 12).toFixed(2),
+          volume: +(Math.random() * 150 + 10).toFixed(2),
+          high: +(isBtc ? 77000 : 100 + Math.random() * 10).toFixed(2),
+          low:  +(isBtc ? 73000 : 90 - Math.random() * 10).toFixed(2),
+        };
+      }));
+    } catch (err) {
+      const available = generateSyntheticPairs(EMERGENCY_FALLBACK).filter((p: string) => p.endsWith("/USDT") && !BLOCKED_PAIRS.has(p));
+      setSymbols(available);
+      setFilteredSymbols(available);
+      setMarketMovers(available.map((pair: string) => ({
+        pair,
+        change: +((Math.random() - 0.5) * 12).toFixed(2),
+        volume: +(Math.random() * 150 + 10).toFixed(2),
+        high: +(pair.startsWith("BTC/") ? 77000 : 100 + Math.random() * 10).toFixed(2),
+        low:  +(pair.startsWith("BTC/") ? 73000 : 90 - Math.random() * 10).toFixed(2),
+      })));
+    }
   };
-
-  try {
-    const api = await getAxios();
-    const res = await api.get("/api/market/symbols");
-    
-    // Fall back to our extensive array if the backend array returns empty or corrupted
-    const sourceSymbols = (res.data?.symbols && res.data.symbols.length > 0) 
-      ? res.data.symbols 
-      : EMERGENCY_FALLBACK_PAIRS;
-
-    const available = generateSyntheticPairs(sourceSymbols).filter(pair => pair.endsWith("/USDT"));
-    setSymbols(available); 
-    setFilteredSymbols(available);
-    
-    setMarketMovers(available.map((pair: string) => {
-      const bounds = getDynamicHighLow(pair);
-      return {
-        pair,
-        change: +((Math.random() - 0.5) * 12).toFixed(2),
-        volume: +(Math.random() * 150 + 10).toFixed(2),
-        high: bounds.high,
-        low: bounds.low
-      };
-    }));
-
-  } catch (error) {
-    console.warn("?? Market API drift detected. Injecting robust UI recovery symbols:", error);
-    
-    const available = generateSyntheticPairs(EMERGENCY_FALLBACK_PAIRS).filter(pair => pair.endsWith("/USDT"));
-    setSymbols(available); 
-    setFilteredSymbols(available);
-    
-    setMarketMovers(available.slice(0, 30).map((pair: string) => {
-      const bounds = getDynamicHighLow(pair);
-      return {
-        pair,
-        change: +((Math.random() - 0.5) * 12).toFixed(2),
-        volume: +(Math.random() * 150 + 10).toFixed(2),
-        high: bounds.high,
-        low: bounds.low
-      };
-    }));
-  }
-};
 
   const updateOrderPrice = (value: string) => {
     if (orderType === "market") return;
@@ -2808,6 +2817,15 @@ export default function Trading() {
 
   useEffect(() => { fetchSymbols(); }, []);
 
+  // Fallback: if API failed, populate symbols from allTickers WebSocket data
+  useEffect(() => {
+    if (symbols.length === 0 && allSymbols.length > 0) {
+      const filtered = allSymbols.filter((p) => !BLOCKED_PAIRS.has(p));
+      setSymbols(filtered);
+      setFilteredSymbols(filtered);
+    }
+  }, [allSymbols, symbols.length]);
+
   useEffect(() => {
     fetch("/api/coin-images")
       .then(r => r.json())
@@ -2923,7 +2941,7 @@ export default function Trading() {
 
   // Pair tab filter
   const pairFilter = pairTab === "fav" ? [] : "USDT";
-  const displayedPairs = filteredSymbols.filter(p => pairTab === "fav" || p.endsWith("/" + pairFilter)).slice(0, 50);
+  const displayedPairs = filteredSymbols.filter(p => pairTab === "fav" ? favorites.includes(p) : p.endsWith("/USDT"));
   
   const headerStats = useMemo(() => [
     { label: "24h Chg", value: `${changePct.toFixed(2)}%`, color: changePct >= 0 ? COLORS.green : COLORS.red },

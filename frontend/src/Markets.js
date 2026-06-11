@@ -1,52 +1,14 @@
-import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import "./markets.css";
 import { subscribeAllTickers } from "./services/marketState";
 
-const TOP_PAIRS = [
-  "BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT","XRPUSDT","ADAUSDT",
-  "AVAXUSDT","DOTUSDT","DOGEUSDT","LINKUSDT","MATICUSDT","UNIUSDT",
-  "ATOMUSDT","LTCUSDT","BCHUSDT","TRXUSDT","APTUSDT","SUIUSDT",
-  "OPUSDT","ARBUSDT","NEARUSDT","FILUSDT","ALGOUSDT","FTMUSDT",
-  "STXUSDT","VETUSDT","HBARUSDT","ICPUSDT","AAVEUSDT","EGLDUSDT",
-  "SANDUSDT","AXSUSDT","MANAUSDT","THETAUSDT","EOSUSDT","XTZUSDT",
-  "CRVUSDT","SNXUSDT","ENJUSDT","CHZUSDT","ONEUSDT","KSMUSDT",
-  "RNDRUSDT","FETUSDT","AGIXUSDT","GALAUSDT","IMXUSDT","MKRUSDT",
-  "COMPUSDT","YFIUSDT","ZILUSDT","BATUSDT","ZRXUSDT","RVNUSDT",
-  "IOTAUSDT","ANKRUSDT","HOTUSDT","DENTUSDT","OMGUSDT","SCUSDT",
-];
-
-const ASSET_NAMES = {
-  BTC:"Bitcoin",ETH:"Ethereum",BNB:"BNB",SOL:"Solana",XRP:"XRP",
-  ADA:"Cardano",AVAX:"Avalanche",DOT:"Polkadot",DOGE:"Dogecoin",
-  LINK:"Chainlink",MATIC:"Polygon",UNI:"Uniswap",ATOM:"Cosmos",
-  LTC:"Litecoin",BCH:"Bitcoin Cash",TRX:"TRON",APT:"Aptos",
-  SUI:"Sui",OP:"Optimism",ARB:"Arbitrum",NEAR:"NEAR Protocol",
-  FIL:"Filecoin",ALGO:"Algorand",FTM:"Fantom",STX:"Stacks",
-  VET:"VeChain",HBAR:"Hedera",ICP:"Internet Computer",
-  AAVE:"Aave",EGLD:"Elrond",SAND:"The Sandbox",AXS:"Axie Infinity",
-  MANA:"Decentraland",THETA:"Theta Network",EOS:"EOS",XTZ:"Tezos",
-  CRV:"Curve DAO",SNX:"Synthetix",ENJ:"Enjin Coin",CHZ:"Chiliz",
-  ONE:"Harmony",KSM:"Kusama",RNDR:"Render",FET:"Fetch.ai",
-  AGIX:"SingularityNET",GALA:"Gala",IMX:"Immutable X",
-  MKR:"Maker",COMP:"Compound",YFI:"yearn.finance",ZIL:"Zilliqa",
-  BAT:"Basic Attention",ZRX:"0x",RVN:"Ravencoin",IOTA:"IOTA",
-  ANKR:"Ankr",HOT:"Holo",DENT:"Dent",OMG:"OMG Network",
-  SC:"Siacoin",
-};
-
-const COIN_IMG = (asset) => `https://assets.coincap.io/assets/icons/${asset.toLowerCase()}@2x.png`;
-
-const TOTAL_VOL_QUOTE = "USDT";
-
 const fmtPrice = (v, sym) => {
   if (v == null || !Number.isFinite(Number(v))) return "-";
   const p = Number(v);
-  const isBTC = sym?.startsWith("BTC");
-  return p.toLocaleString(undefined, {
-    minimumFractionDigits: isBTC ? 1 : 2,
-    maximumFractionDigits: isBTC ? 1 : 2,
-  });
+  if (p >= 1000) return p.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (p >= 1) return p.toFixed(4);
+  return p.toFixed(6);
 };
 
 const fmtCompact = (v) => {
@@ -62,8 +24,99 @@ const fmtCompact = (v) => {
 const fmtPct = (v) => {
   if (v == null || !Number.isFinite(Number(v))) return "-";
   const n = Number(v);
-  const sign = n >= 0 ? "+" : "";
-  return sign + n.toFixed(2) + "%";
+  return (n >= 0 ? "+" : "") + n.toFixed(2) + "%";
+};
+
+const QUOTE_ASSETS = ["USDT", "USD", "BTC", "ETH", "BNB"];
+
+const COIN_IMAGES = {
+  BTC: "https://assets.coingecko.com/coins/images/1/small/bitcoin.png",
+  ETH: "https://assets.coingecko.com/coins/images/279/small/ethereum.png",
+  BNB: "https://assets.coingecko.com/coins/images/825/small/bnb-icon2_2x.png",
+  SOL: "https://assets.coingecko.com/coins/images/4128/small/solana.png",
+  XRP: "https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png",
+  ADA: "https://assets.coingecko.com/coins/images/975/small/cardano.png",
+  AVAX: "https://assets.coingecko.com/coins/images/12559/small/Avalanche_Circle_RedWhite_Trans.png",
+  DOT: "https://assets.coingecko.com/coins/images/12171/small/polkadot.png",
+  DOGE: "https://assets.coingecko.com/coins/images/5/small/dogecoin.png",
+  LINK: "https://assets.coingecko.com/coins/images/877/small/chainlink-new-logo.png",
+  MATIC: "https://assets.coingecko.com/coins/images/4713/small/polygon.png",
+  UNI: "https://assets.coingecko.com/coins/images/12504/small/uniswap-logo.png",
+  ATOM: "https://assets.coingecko.com/coins/images/1481/small/cosmos_hub.png",
+  LTC: "https://assets.coingecko.com/coins/images/2/small/litecoin.png",
+  BCH: "https://assets.coingecko.com/coins/images/780/small/bitcoin-cash-circle.png",
+  TRX: "https://assets.coingecko.com/coins/images/1094/small/tron-logo.png",
+  APT: "https://assets.coingecko.com/coins/images/26455/small/aptos_round.png",
+  SUI: "https://assets.coingecko.com/coins/images/26375/small/sui_asset.png",
+  OP: "https://assets.coingecko.com/coins/images/25244/small/Optimism.png",
+  ARB: "https://assets.coingecko.com/coins/images/16547/small/photo_2023-03-29_21.47.00.jpeg",
+  NEAR: "https://assets.coingecko.com/coins/images/10365/small/near.jpg",
+  FIL: "https://assets.coingecko.com/coins/images/12817/small/filecoin.png",
+  ALGO: "https://assets.coingecko.com/coins/images/7598/small/algorand.png",
+  FTM: "https://assets.coingecko.com/coins/images/10090/small/Opera_Symbol_Circle_Black_Transparent.png",
+  STX: "https://assets.coingecko.com/coins/images/2062/small/Stacks_Logo_png.png",
+  VET: "https://assets.coingecko.com/coins/images/1167/small/VeChain-Logo-768x768.png",
+  HBAR: "https://assets.coingecko.com/coins/5/360px-Hedera_Hashgraph_logo.png",
+  ICP: "https://assets.coingecko.com/coins/images/14490/small/Internet_Computer_logo.png",
+  AAVE: "https://assets.coingecko.com/coins/images/12645/small/AAVE.png",
+  EGLD: "https://assets.coingecko.com/coins/images/12133/small/elrond.png",
+  SAND: "https://assets.coingecko.com/coins/images/12141/small/sandbox_logo.jpg",
+  AXS: "https://assets.coingecko.com/coins/images/25952/small/photo_2023-09-14_22.28.39.jpeg",
+  MANA: "https://assets.coingecko.com/coins/images/12813/small/manana_round.png",
+  THETA: "https://assets.coingecko.com/coins/images/25783/small/theta-token-logo.png",
+  EOS: "https://assets.coingecko.com/coins/images/738/small/eos-logo.png",
+  XTZ: "https://assets.coingecko.com/coins/images/976/small/tezos-logo.png",
+  CRV: "https://assets.coingecko.com/coins/images/12124/small/Curve.png",
+  SNX: "https://assets.coingecko.com/coins/images/2589/small/SNX.png",
+  ENJ: "https://assets.coingecko.com/coins/images/1102/small/enjin-coin-logo.png",
+  CHZ: "https://assets.coingecko.com/coins/images/11784/small/chz.png",
+  KSM: "https://assets.coingecko.com/coins/images/12171/small/polkadot.png",
+  RNDR: "https://assets.coingecko.com/coins/images/11636/small/rndr.png",
+  FET: "https://assets.coingecko.com/coins/images/5681/small/Fetch.jpg",
+  GALA: "https://assets.coingecko.com/coins/images/12493/small/GALA_token_icon.png",
+  IMX: "https://assets.coingecko.com/coins/images/17233/small/ImmutableX_round_2.png",
+  MKR: "https://assets.coingecko.com/coins/images/1364/small/Maker_logo.png",
+  COMP: "https://assets.coingecko.com/coins/images/10775/small/COMP.png",
+  YFI: "https://assets.coingecko.com/coins/images/11849/small/yfi-192x192.png",
+  ZIL: "https://assets.coingecko.com/coins/images/2687/small/Zilliqa-logo.png",
+  BAT: "https://assets.coingecko.com/coins/images/677/small/basic-attention-token.png",
+  ZRX: "https://assets.coingecko.com/coins/images/863/small/0x.png",
+  RVN: "https://assets.coingecko.com/coins/images/1012/small/Ravencoin.png",
+  IOTA: "https://assets.coingecko.com/coins/images/692/small/IOTA_White_logo.png",
+  ANKR: "https://assets.coingecko.com/coins/images/10717/small/ANKR.png",
+  HOT: "https://assets.coingecko.com/coins/images/2708/small/hot.png",
+  OMG: "https://assets.coingecko.com/coins/images/776/small/OMG_Network.png",
+  SC: "https://assets.coingecko.com/coins/images/1342/small/Sia.png",
+};
+
+const coinImgUrl = (asset) => COIN_IMAGES[asset] || `/api/coin-icon/${asset}`;
+
+const BLOCKED_SYMBOLS = new Set([
+  "0GUSDT","1000CATUSDT","1000CHEEMSUSDT","1000SATSUSDT","AUSDT","ACMUSDT","ACTUSDT","ACXUSDT",
+  "AIGENSYNUSDT","AIXBTUSDT","ALLOUSDT","ASTERUSDT","ATUSDT","AVNTUSDT","AWEUSDT",
+  "AXLUSDT","BABYUSDT","BANANAS31USDT","BARDUSDT","BANKUSDT","BNSOLUSDT","BOMEUSDT","BREVUSDT",
+  "BROCCOLI714USDT","CETUSUSDT","CFGUSDT","CGPTUSDT","CHIPUSDT","COOKIEUSDT","COWUSDT",
+  "DUSDT","DOLOUSDT","DYMUSDT","EDENUSDT","ENSOUSDT","EPICUSDT","ERAUSDT","ESPUSDT","EULUSDT",
+  "FUSDT","FFUSDT","FOGOUSDT","FORMUSDT","FRAXUSDT","GUSDT","GENIUSUSDT","GIGGLEUSDT","GNOUSDT",
+  "GPSUSDT","HAEDALUSDT","HEIUSDT","HEMIUSDT","HOLOUSDT","HOMEUSDT","HYPERUSDT",
+  "JTOUSDT","JUPUSDT","KAIAUSDT","KAITOUSDT","KATUSDT","KGSTUSDT","KMNOUSDT",
+  "LAUSDT","LAYERUSDT","LINEAUSDT","LUMIAUSDT","MEUSDT","MEGAUSDT","METUSDT","METISUSDT",
+  "MIRAUSDT","MITOUSDT","MMTUSDT","MORPHOUSDT","MOVEUSDT","MUBARAKUSDT",
+  "NEWTUSDT","NIGHTUSDT","NOMUSDT","NXPCUSDT","ONDOUSDT","OPENUSDT","OPGUSDT","ORCAUSDT",
+  "PARTIUSDT","PLUMEUSDT","PNUTUSDT","PROVEUSDT","PUMPUSDT","PYTHUSDT",
+  "RENDERUSDT","RESOLVUSDT","RLUSDUSDT","ROBOUSDT","SUSDT","SAHARAUSDT","SAPIENUSDT",
+  "SENTUSDT","SHELLUSDT","SIGNUSDT","SOMIUSDT","SOPHUSDT","SPKUSDT","STOUSDT","STRKUSDT",
+  "SYRUPUSDT","TNSRUSDT","TOWNSUSDT","TREEUSDT","TRUMPUSDT","TSTUSDT","TURBOUSDT",
+  "TURTLEUSDT","TUTUSDT","USDEUSDT","VANRYUSDT","VELODROMEUSDT","VICUSDT","VIRTUALUSDT",
+  "WUSDT","WIFUSDT","WLFIUSDT","XAUTUSDT","XPLUSDT","XUSDUSDT",
+  "ZAMAUSDT","ZBTUSDT","ZKUSDT","ZKCUSDT","ZKPUSDT","ZROUSDT",
+]);
+
+const parseAsset = (sym) => {
+  for (const q of QUOTE_ASSETS) {
+    if (sym.endsWith(q)) return sym.slice(0, -q.length);
+  }
+  return sym;
 };
 
 export default function Markets() {
@@ -79,7 +132,8 @@ export default function Markets() {
       const map = {};
       for (const t of data) {
         const sym = t.symbol;
-        if (TOP_PAIRS.includes(sym)) {
+        const asset = parseAsset(sym);
+        if (asset && asset.length <= 10 && !BLOCKED_SYMBOLS.has(sym)) {
           map[sym] = t;
         }
       }
@@ -90,27 +144,26 @@ export default function Markets() {
   }, []);
 
   const pairs = useMemo(() => {
-    const base = TOP_PAIRS.map((sym) => {
-      const asset = sym.replace("USDT", "");
-      const t = tickers[sym];
-      const vol = t ? Number(t.quoteVol) || Number(t.volume24h) || 0 : 0;
+    const base = Object.entries(tickers).map(([sym, t]) => {
+      const asset = parseAsset(sym);
+      const vol = Number(t.quoteVol) || Number(t.volume24h) || 0;
       return {
         sym,
         asset,
-        name: ASSET_NAMES[asset] || asset,
-        price: t ? Number(t.price) : 0,
-        change24h: t ? Number(t.change24h) : 0,
-        changePct: t ? Number(t.changePct) : 0,
-        high24h: t ? Number(t.high24h) : 0,
-        low24h: t ? Number(t.low24h) : 0,
+        name: asset,
+        price: Number(t.price) || 0,
+        change24h: Number(t.change24h) || 0,
+        changePct: Number(t.changePct) || 0,
+        high24h: Number(t.high24h) || 0,
+        low24h: Number(t.low24h) || 0,
         volume24h: vol,
-        img: COIN_IMG(asset),
+        img: coinImgUrl(asset),
       };
     });
 
     const q = search.toLowerCase().trim();
-    const filtered = q
-      ? base.filter((p) => p.asset.toLowerCase().includes(q) || p.name.toLowerCase().includes(q) || p.sym.toLowerCase().includes(q))
+    let filtered = q
+      ? base.filter((p) => p.asset.toLowerCase().includes(q) || p.sym.toLowerCase().includes(q))
       : base;
 
     filtered.sort((a, b) => {
@@ -126,7 +179,7 @@ export default function Markets() {
   const handleSort = useCallback((key) => {
     setSortKey((prev) => {
       if (prev === key) { setSortDir((d) => (d === "asc" ? "desc" : "asc")); return prev; }
-      setSortDir(key === "asset" || key === "name" ? "asc" : "desc");
+      setSortDir(key === "asset" ? "asc" : "desc");
       return key;
     });
   }, []);
@@ -219,14 +272,13 @@ export default function Markets() {
                 >
                   <div className="mk-cell mk-cell-left mk-cell-name">
                     <div className="mk-idx">{i + 1}</div>
-                    {p.img ? (
-                      <img className="mk-coin-icon" src={p.img} alt={p.asset} loading="lazy" />
-                    ) : (
-                      <div className="mk-coin-icon mk-coin-fallback">{p.asset[0]}</div>
-                    )}
+                    <div className="mk-icon-wrap">
+                      <img className="mk-coin-icon" src={p.img} alt={p.asset} loading="lazy" onError={function(e){var t=e.target;if(!t.dataset.retried){t.dataset.retried="1";t.src="/api/coin-icon/"+p.asset}else{t.style.display="none";var n=t.nextElementSibling;if(n)n.classList.remove("mk-icon-fallback-hidden")}}} />
+                      <div className="mk-coin-icon mk-icon-fallback mk-icon-fallback-hidden">{p.asset[0]}</div>
+                    </div>
                     <div className="mk-name-wrap">
                       <span className="mk-sym">{p.asset}/USDT</span>
-                      <span className="mk-name-text">{p.name}</span>
+                      <span className="mk-name-text">{p.sym}</span>
                     </div>
                   </div>
 

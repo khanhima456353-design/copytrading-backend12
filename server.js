@@ -172,8 +172,7 @@ async function fetchBinanceSymbols() {
     if (!data?.symbols?.length) throw new Error("Invalid response");
     return data.symbols
       .filter((i) => i.status === "TRADING" && i.quoteAsset === "USDT")
-      .map((i) => `${i.baseAsset}/${i.quoteAsset}`)
-      .slice(0, 120);
+      .map((i) => `${i.baseAsset}/${i.quoteAsset}`);
   } catch (err) {
     console.error("Binance symbols fetch failed:", err.message);
     return ["BTC/USDT"];
