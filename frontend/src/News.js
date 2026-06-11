@@ -61,11 +61,8 @@ function News() {
         return (
           <div key={item.id} className="news-wrapper">
 
-            <div className="outside-header">
-              <span className="time">{item.time}</span>
-            </div>
-
             <div className="card">
+              <span className="time">{item.time}</span>
 
               {!isOpen && item.image && (
                 <img className="card-img" src={item.image} alt="" />

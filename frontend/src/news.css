@@ -166,15 +166,6 @@ body {
   box-sizing: border-box;
 }
 
-/* OUTSIDE HEADER */
-.outside-header {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  margin-bottom: 6px;
-  padding: 0 4px;
-}
-
 /* TIME RIGHT SIDE */
 .time {
   font-size: 12px;
@@ -190,6 +181,16 @@ body {
   height: auto;
   width: 650px;
   max-width: 100%;
+  position: relative;
+}
+
+.time {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  font-size: 11px;
+  color: var(--text-muted, #888);
+  z-index: 1;
 }
 
 :root[data-theme="light"] .card {
@@ -277,9 +278,9 @@ body {
   color: var(--text-primary, #ddd);
 }
 .expanded-scroll {
-  max-height: 300px; 
+  max-height: 300px;
   overflow-y: auto;
-  padding: 0 16px 65px;
+  padding: 0 16px 16px;
   color: var(--text-primary);
 }
 
