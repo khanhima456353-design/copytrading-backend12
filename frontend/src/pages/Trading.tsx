@@ -1533,6 +1533,7 @@ export default function Trading() {
   const [lastPrice, setLastPrice] = useState(0);
   const [priceUpdateDirection, setPriceUpdateDirection] = useState<"up" | "down">("up");
   const lastPriceRef = useRef(0);
+  const marketStatePrevRef = useRef(0);
   const symbolRef = useRef(symbol);
   symbolRef.current = symbol;
   const [baseSymbol, quoteSymbol] = symbol.includes("/") ? symbol.split("/") as [string, string] : [symbol, "USDT"] as [string, string];
@@ -2058,6 +2059,14 @@ export default function Trading() {
     setOrderbook({ buy: marketState.orderbook.bids, sell: marketState.orderbook.asks });
     setTrades(marketState.trades);
     // Keep local mirror for display only; single source of truth remains marketState.lastPrice
+    // Update direction from marketState when simulation is active (socket events are blocked)
+    if (isValidPrice(marketState.lastPrice) && simulationFeedActiveRef.current) {
+      const prev = marketStatePrevRef.current;
+      if (prev > 0 && marketState.lastPrice !== prev) {
+        setPriceUpdateDirection(marketState.lastPrice >= prev ? "up" : "down");
+      }
+      marketStatePrevRef.current = marketState.lastPrice;
+    }
     setLastPrice(marketState.lastPrice);
     setHigh24h(marketState.high24h);
     setLow24h(marketState.low24h);
