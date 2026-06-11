@@ -479,11 +479,11 @@ export default function HomeDashboard() {
       <div className="hd-section">
         <div className="hd-section-hdr">
           <span className="hd-section-title">News</span>
-          <button className="hd-section-link" onClick={() => navigate("/news")}>More →</button>
+          <button className="hd-section-link" onClick={() => navigate("/news", { state: { embed: true } })}>More →</button>
         </div>
         <div className="hd-news-grid">
           {displayedNews.map(n => (
-            <button key={n.id} className="hd-news-card" onClick={() => navigate("/news")}>
+            <button key={n.id} className="hd-news-card" onClick={() => navigate("/news", { state: { embed: true } })}>
               <div className="hd-news-src">{n.src}</div>
               <div className="hd-news-title">{n.title}</div>
               <div className="hd-news-time">{n.time}</div>

@@ -1,9 +1,14 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { House, BriefcaseBusiness, Store, ShieldUser } from "lucide-react";
 import "./news.css";
 import { getSocket } from "./api";
 import swancoreLogo from "./assets/logo.jpg";
 
 function News() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const embedded = location.state?.embed;
   const [news, setNews] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
 
@@ -40,9 +45,15 @@ function News() {
 
   return (
     <div className="feed">
-      <h2 className="feed-title">
-        <span style={{ color: "#F0B90B" }}>Swancore</span>'s News
-      </h2>
+      <header className="news-header">
+        <div className="news-header-left">
+          <img src={swancoreLogo} alt="SwanCore" className="news-header-logo" />
+          <div className="news-header-text">
+            <span className="news-header-brand">SwanCore</span>
+            <span className="news-header-label">News</span>
+          </div>
+        </div>
+      </header>
 
       {news.map((item) => {
         const isOpen = expandedId === item.id;
@@ -51,15 +62,6 @@ function News() {
           <div key={item.id} className="news-wrapper">
 
             <div className="outside-header">
-              <div className="header-left">
-                <img
-                  src={swancoreLogo}
-                  className="avatar"
-                  alt="source"
-                />
-                <span className="source">Swancore's News</span>
-              </div>
-
               <span className="time">{item.time}</span>
             </div>
 
@@ -91,6 +93,27 @@ function News() {
           </div>
         );
       })}
+
+      {embedded && (
+        <nav className="mk-bottom-nav">
+          <button className="mk-bottom-nav-item" onClick={() => navigate("/", { state: { targetScreen: "home" } })}>
+            <span><House size={18} /></span>
+            <span>Home</span>
+          </button>
+          <button className="mk-bottom-nav-item" onClick={() => navigate("/", { state: { targetScreen: "portfolio" } })}>
+            <span><BriefcaseBusiness size={18} /></span>
+            <span>Portfolio</span>
+          </button>
+          <button className="mk-bottom-nav-item" onClick={() => navigate("/markets", { state: { embed: true } })}>
+            <span><Store size={18} /></span>
+            <span>Markets</span>
+          </button>
+          <button className="mk-bottom-nav-item" onClick={() => navigate("/", { state: { targetScreen: "account" } })}>
+            <span><ShieldUser size={18} /></span>
+            <span>Account</span>
+          </button>
+        </nav>
+      )}
     </div>
   );
 }
