@@ -2,11 +2,13 @@ const mongoose = require("mongoose");
 const Order = require("../models/Order");
 
 let getPrice = (pair) => null;
+let getSimulatedPrice = (userId, pair) => null;
 let closeOrder = null;
 let onActivate = null;
 
 function startMonitor(opts) {
   getPrice = opts.getPrice || getPrice;
+  getSimulatedPrice = opts.getSimulatedPrice || getSimulatedPrice;
   closeOrder = opts.closeOrder || closeOrder;
   onActivate = opts.onActivate || onActivate;
   setTimeout(() => reconcileOpenPositions(), 1000);
@@ -57,7 +59,8 @@ async function checkPendingTriggers() {
   if (!pending.length) return;
 
   for (const order of pending) {
-    const currentPrice = getPrice(order.pair);
+    // Use simulated price if user has an active simulation for this pair, else Binance price
+    const currentPrice = getSimulatedPrice(order.userId, order.pair) || getPrice(order.pair);
     if (!currentPrice || currentPrice <= 0) continue;
 
     let triggered = false;

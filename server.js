@@ -1112,6 +1112,7 @@ marketSimulator.recoverSimulations(async () => {
 
 orderMonitor.startMonitor({
   getPrice: (pair) => cachedMarketPrices[pair],
+  getSimulatedPrice: (userId, pair) => marketSimulator.getSimulatedPriceForPair?.(userId, pair),
   closeOrder: async (orderId, closePrice) => {
     await orderService.closeOrder(orderId, closePrice);
   },

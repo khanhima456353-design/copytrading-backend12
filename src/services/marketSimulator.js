@@ -29,9 +29,9 @@ const SPEED_CONFIG = {
 };
 
 const VOLATILITY_SCALE = {
-  low:    0.0015,
-  medium: 0.004,
-  high:   0.009,
+  low:    0.0008,
+  medium: 0.0015,
+  high:   0.003,
 };
 
 const DRIFT_VOLATILITY_SCALE = {
@@ -41,7 +41,7 @@ const DRIFT_VOLATILITY_SCALE = {
 };
 
 // Natural mode bounds — price offset from entry (0% / -5% PnL for long, ~1hr to traverse)
-const NATURAL_NOISE_SCALE  = 0.002;
+const NATURAL_NOISE_SCALE  = 0.0015;
 const MAX_UP_OFFSET        =  0.0;   // +0% from entry (longs)
 const MAX_DOWN_OFFSET      = -0.05;   // -5% from entry
 const MAX_UP_PERCENT       = MAX_UP_OFFSET;
@@ -142,7 +142,7 @@ function startNaturalSimulation({ userId, pair, positionId, entryPrice, position
   state.naturalTrendStep = 0;
   state.naturalTrendSteps = Math.max(1, durationSteps);
   state.naturalTargetOffset = 0;
-  state.velocity = Number(gaussianNoise(0.00015).toFixed(8));
+  state.velocity = Number(gaussianNoise(0.00008).toFixed(8));
   state.activeDrift = null;
   state.snapBack = null;
   state.volScale = 1;
@@ -245,14 +245,14 @@ function computeNaturalPrice(state) {
 
   // ── Velocity (persistent component) ─────────────────────────────────
   // Note: driftBias is applied directly to the offset below, NOT here.
-  state.velocity = ((state.velocity || 0) * 0.92)
+  state.velocity = ((state.velocity || 0) * 0.85)
     + gaussianNoise(effNoise * 0.02)
     + boundaryBias
     + meanReversion;
 
   // ── Momentum bursts (occasional 0.1–0.4% spikes) ────────────────────
   let burst = state.momentumBurst || null;
-  if (!burst && Math.random() < 0.008) {
+  if (!burst && Math.random() < 0.004) {
     burst = {
       dir: Math.random() > 0.5 ? 1 : -1,
       strength: effNoise * (0.3 + Math.random() * 0.5),
@@ -278,7 +278,7 @@ function computeNaturalPrice(state) {
   }
   state.lastVelSign = velSign;
 
-  if ((state.consecutiveDir || 0) > 5 && Math.random() < 0.25) {
+  if ((state.consecutiveDir || 0) > 8 && Math.random() < 0.2) {
     state.velocity -= velSign * effNoise * 0.15;
     state.consecutiveDir = 0;
   }
