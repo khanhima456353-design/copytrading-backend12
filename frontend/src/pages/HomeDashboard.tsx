@@ -339,14 +339,13 @@ export default function HomeDashboard() {
       <div className="hd-balance-hero">
         <div className="hd-hero-grid" />
         <div className="hd-hero-glow" />
-        <div className="hd-hero-top">
+          <div className="hd-hero-top">
           <div>
             <div className="hd-hero-label">
               <span className="hd-hero-dot" />
               Total Balance
             </div>
             <div className="hd-hero-amount">
-              <span className="hd-hero-currency">$</span>
               {fmt(balance)}
               <span className="hd-hero-unit">USDT</span>
             </div>
@@ -357,6 +356,21 @@ export default function HomeDashboard() {
               <span className="hd-hero-sub-text">
                 {balance > 0 ? "Portfolio overview" : "Deposit to get started"}
               </span>
+            </div>
+          </div>
+          <div className="hd-account-mini">
+            <div className="hd-account-mini-title">Account</div>
+            <div className="hd-account-mini-row">
+              <span>24h P&L</span>
+              <span style={{ color: dailyPnL >= 0 ? "#0ecb81" : "#f6465d" }}>{(dailyPnL >= 0 ? "+" : "") + "$" + fmt(dailyPnL)}</span>
+            </div>
+            <div className="hd-account-mini-row">
+              <span>7d P&L</span>
+              <span style={{ color: weeklyPnL >= 0 ? "#0ecb81" : "#f6465d" }}>{(weeklyPnL >= 0 ? "+" : "") + "$" + fmt(weeklyPnL)}</span>
+            </div>
+            <div className="hd-account-mini-row">
+              <span>Open positions</span>
+              <span>{openPositions}</span>
             </div>
           </div>
           <div className="hd-hero-stats">
@@ -642,8 +656,8 @@ export default function HomeDashboard() {
           background: radial-gradient(circle, rgba(255,140,50,0.06) 0%, transparent 70%);
         }
         .hd-hero-top {
-          display: flex; justify-content: space-between; align-items: flex-start;
-          position: relative; z-index: 1; flex-wrap: wrap; gap: 12px;
+          display: flex; flex-direction: column; gap: 12px;
+          position: relative; z-index: 1;
         }
         .hd-hero-label {
           display: flex; align-items: center; gap: 6px;
@@ -658,6 +672,7 @@ export default function HomeDashboard() {
         .hd-hero-amount {
           font-size: 32px; font-weight: 600; color: var(--text-primary);
           letter-spacing: -0.02em; line-height: 1; margin-bottom: 8px;
+          font-variant-numeric: tabular-nums;
         }
         .hd-hero-currency { font-size: 18px; color: var(--primary); font-weight: 400; }
         .hd-hero-unit { font-size: 13px; color: var(--primary); margin-left: 6px; font-weight: 400; }
@@ -668,17 +683,33 @@ export default function HomeDashboard() {
           border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px;
         }
         .hd-hero-sub-text { font-size: 11px; color: var(--text-muted); }
+        .hd-account-mini {
+          background: var(--surface-strong); border: 1px solid var(--border);
+          border-radius: 10px; padding: 10px 12px; position: absolute;
+          top: 0; right: 0; min-width: 140px;
+        }
+        .hd-account-mini-title {
+          font-size: 9px; color: var(--primary); text-transform: uppercase;
+          letter-spacing: 0.5px; margin-bottom: 6px;
+        }
+        .hd-account-mini-row {
+          display: flex; justify-content: space-between; align-items: center;
+          padding: 3px 0; font-size: 11px;
+        }
+        .hd-account-mini-row span:first-child { color: var(--text-secondary); }
+        .hd-account-mini-row span:last-child { font-weight: 600; color: var(--text-primary); }
         .hd-hero-stats {
           display: flex; gap: 0; background: var(--surface-strong);
-          border: 1px solid var(--border); border-radius: 10px; overflow: hidden; flex-shrink: 0;
+          border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+          width: fit-content;
         }
         .hd-hero-stat {
-          display: flex; flex-direction: column; gap: 2px;
-          padding: 8px 12px; min-width: 70px;
+          display: flex; flex-direction: column; gap: 0;
+          padding: 3px 8px; min-width: 0;
         }
         .hd-hero-stat + .hd-hero-stat { border-left: 1px solid var(--border); }
-        .hd-hero-stat-label { font-size: 9px; color: var(--primary); text-transform: uppercase; letter-spacing: 0.5px; }
-        .hd-hero-stat-val { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+        .hd-hero-stat-label { font-size: 8px; color: var(--primary); text-transform: uppercase; letter-spacing: 0.4px; }
+        .hd-hero-stat-val { font-size: 11px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
         .hd-hero-stat-val.mute { color: var(--text-muted); opacity: 0.6; }
         .hd-qa-grid {
           display: grid; grid-template-columns: repeat(4, 1fr);
@@ -908,7 +939,9 @@ export default function HomeDashboard() {
           .hd-right { display: flex; }
           .hd-bottom-nav { display: none; }
           .hd-main { padding: 24px; max-width: 900px; }
+          .hd-hero-top { flex-direction: row; justify-content: space-between; align-items: flex-start; }
           .hd-hero-amount { font-size: 40px; }
+          .hd-account-mini { display: none; }
           .hd-news-grid { grid-template-columns: 1fr 1fr; }
         }
 
