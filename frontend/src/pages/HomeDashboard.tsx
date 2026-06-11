@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import authService from "../services/authService";
 import { useMobileMenu } from "../components/theme/MobileMenuContext";
-import { BookCheck, AlertTriangle, XCircle, Megaphone, Bell, ShieldCheck, ShieldAlert, LockKeyhole, LogOut, Globe, BriefcaseBusiness, Store, House, ShieldUser } from "lucide-react";
+import { BookCheck, AlertTriangle, XCircle, Megaphone, Bell, ShieldCheck, ShieldAlert, LockKeyhole, LogOut, Globe, BriefcaseBusiness, Store, House, ShieldUser, Lightbulb } from "lucide-react";
+import { subscribeAllTickers } from "../services/marketState";
 
 type Screen = "home" | "portfolio" | "markets" | "account";
 
@@ -253,38 +254,38 @@ export default function HomeDashboard() {
     } catch {}
   };
 
-  const fetchLiveTickers = async () => {
-    try {
-      const symbols = ["BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT","AVAXUSDT"];
-      const res = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbols=${JSON.stringify(symbols)}`);
-      if (res.ok) {
-        const data = await res.json();
-        const displayMap: Record<string, { sym: string; pair: string; color: string }> = {
-          BTC:  { sym: "₿", pair: "BTC / USDT", color: "#F7931A" },
-          ETH:  { sym: "Ξ", pair: "ETH / USDT", color: "#627EEA" },
-          BNB:  { sym: "BNB", pair: "BNB / USDT", color: "#F3BA2F" },
-          SOL:  { sym: "SOL", pair: "SOL / USDT", color: "#14F195" },
-          AVAX: { sym: "AVAX", pair: "AVAX / USDT", color: "#E84142" },
-        };
-        const tickers: { symbol: string; price: string; change: string; up: boolean }[] = [];
-        const markets: MarketRow[] = [];
-        data.forEach((d: any) => {
-          const base = d.symbol.replace("USDT", "");
-          const info = displayMap[base];
-          if (!info) return;
-          const p = parseFloat(d.lastPrice);
-          const c = parseFloat(d.priceChangePercent);
-          const v = parseFloat(d.quoteVolume);
-          const pStr = p >= 100 ? `$${p.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : `$${p.toFixed(2)}`;
-          const vStr = v >= 1e9 ? `Vol $${(v / 1e9).toFixed(1)}B` : v >= 1e6 ? `Vol $${(v / 1e6).toFixed(1)}M` : `Vol $${(v / 1e3).toFixed(0)}K`;
-          tickers.push({ symbol: base, price: pStr, change: `${c >= 0 ? "+" : ""}${c.toFixed(2)}%`, up: c >= 0 });
-          markets.push({ symbol: info.sym, pair: info.pair, volume: vStr, price: pStr, change: c, sparkUp: c >= 0 });
-        });
+  useEffect(() => {
+    const unsub = subscribeAllTickers((data) => {
+      const targets = ["BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT","AVAXUSDT"];
+      const displayMap: Record<string, { sym: string; pair: string; color: string }> = {
+        BTC:  { sym: "₿", pair: "BTC / USDT", color: "#F7931A" },
+        ETH:  { sym: "Ξ", pair: "ETH / USDT", color: "#627EEA" },
+        BNB:  { sym: "BNB", pair: "BNB / USDT", color: "#F3BA2F" },
+        SOL:  { sym: "SOL", pair: "SOL / USDT", color: "#14F195" },
+        AVAX: { sym: "AVAX", pair: "AVAX / USDT", color: "#E84142" },
+      };
+      const tickers: { symbol: string; price: string; change: string; up: boolean }[] = [];
+      const markets: MarketRow[] = [];
+      for (const t of data) {
+        if (!targets.includes(t.symbol)) continue;
+        const base = t.symbol.replace("USDT", "");
+        const info = displayMap[base];
+        if (!info) continue;
+        const p = t.price;
+        const c = t.changePct;
+        const v = t.quoteVol || t.volume24h || 0;
+        const pStr = p >= 100 ? `$${p.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : `$${p.toFixed(2)}`;
+        const vStr = v >= 1e9 ? `Vol $${(v / 1e9).toFixed(1)}B` : v >= 1e6 ? `Vol $${(v / 1e6).toFixed(1)}M` : `Vol $${(v / 1e3).toFixed(0)}K`;
+        tickers.push({ symbol: base, price: pStr, change: `${c >= 0 ? "+" : ""}${c.toFixed(2)}%`, up: c >= 0 });
+        markets.push({ symbol: info.sym, pair: info.pair, volume: vStr, price: pStr, change: c, sparkUp: c >= 0 });
+      }
+      if (tickers.length > 0) {
         setLiveTickers(tickers);
         setLiveMarkets(markets);
       }
-    } catch {}
-  };
+    });
+    return unsub;
+  }, []);
 
   const fetchMarketInsights = async () => {
     try {
@@ -312,15 +313,14 @@ export default function HomeDashboard() {
   };
 
   useEffect(() => {
-    fetchBalance(); fetchUserProfile(); fetchNotifications(); fetchUnreadCount(); fetchLiveTickers(); fetchMarketInsights();
+    fetchBalance(); fetchUserProfile(); fetchNotifications(); fetchUnreadCount(); fetchMarketInsights();
     const cached = localStorage.getItem("news-cache");
     if (cached) { try { const p = JSON.parse(cached); if (Array.isArray(p) && p.length) setNewsFeed(p); } catch {} }
-    const tickerInt = setInterval(fetchLiveTickers, 30000);
     const insightInt = setInterval(fetchMarketInsights, 60000);
     const balanceInt = setInterval(fetchBalance, 1000);
     const socket = (window as any).socket;
-    if (socket) { socket.on("balanceUpdated", () => fetchBalance()); return () => { socket.off("balanceUpdated"); clearInterval(tickerInt); clearInterval(insightInt); clearInterval(balanceInt); }; }
-    return () => { clearInterval(tickerInt); clearInterval(insightInt); clearInterval(balanceInt); };
+    if (socket) { socket.on("balanceUpdated", () => fetchBalance()); return () => { socket.off("balanceUpdated"); clearInterval(insightInt); clearInterval(balanceInt); }; }
+    return () => { clearInterval(insightInt); clearInterval(balanceInt); };
   }, []);
 
   const displayedNews = newsFeed.length > 0 ? newsFeed.slice(0, 4).map(i => ({ id: i.id, src: "Swancore's News", title: i.title, time: i.time || "Just now" })) : SAMPLE_NEWS;
@@ -588,6 +588,31 @@ export default function HomeDashboard() {
           cursor: pointer; font-size: 13px; font-family: inherit; text-align: left;
         }
         .hd-mobile-menu-item:hover { background: rgba(255,255,255,0.06); }
+        .hd-mobile-divider { height: 1px; background: var(--border, #1e293b); margin: 6px 8px; }
+        .hd-mobile-section-title {
+          font-size: 10px; color: var(--primary); text-transform: uppercase;
+          letter-spacing: 0.5px; padding: 6px 12px 4px;
+        }
+        .hd-mobile-mkt-row {
+          display: flex; justify-content: space-between; align-items: center;
+          padding: 4px 12px; font-size: 12px;
+        }
+        .hd-mobile-mkt-row span:first-child { color: var(--text-secondary); }
+        .hd-mobile-mkt-row span:last-child { font-weight: 600; color: var(--text-primary); }
+        .hd-mobile-price-row {
+          display: flex; justify-content: space-between; align-items: center;
+          padding: 3px 12px;
+        }
+        .hd-mobile-price-left { display: flex; align-items: center; gap: 6px; }
+        .hd-mobile-price-sym {
+          font-size: 11px; font-weight: 700; color: var(--text-primary);
+          width: 20px; height: 20px; border-radius: 50%; background: var(--surface-strong);
+          display: flex; align-items: center; justify-content: center;
+        }
+        .hd-mobile-price-name { font-size: 11px; color: var(--text-secondary); }
+        .hd-mobile-price-right { display: flex; align-items: center; gap: 8px; }
+        .hd-mobile-price-val { font-size: 11px; font-weight: 600; color: var(--text-primary); }
+        .hd-mobile-price-chg { font-size: 10px; font-weight: 600; }
         .hd-body {
           display: flex; flex: 1;
           padding: 0;
@@ -955,13 +980,27 @@ export default function HomeDashboard() {
         <div style={{ position: "relative" }}>
           {isMobileMenuOpen && (
             <div className="hd-mobile-menu" style={{ right: 16, top: 8 }}>
-              {NAV_ITEMS.map(item => (
-                <button key={item.id} className="hd-mobile-menu-item" onClick={() => { setIsMobileMenuOpen(false); handleScreenChange(item.id); }}>
-                  <span>{item.icon}</span> <span>{item.label}</span>
-                </button>
+              <div className="hd-mobile-section-title">Live Prices</div>
+              {[["BTC","$62,764.29","+1.82%"],["ETH","$1,656.61","+1.21%"],["BNB","$599.29","+2.14%"],["SOL","$65.10","+1.42%"],["AVAX","$6.59","+1.03%"]].map(([sym,price,chg]) => (
+                <div key={sym} className="hd-mobile-price-row">
+                  <div className="hd-mobile-price-left">
+                    <span className="hd-mobile-price-sym">{sym}</span>
+                    <span className="hd-mobile-price-name">{sym}</span>
+                  </div>
+                  <div className="hd-mobile-price-right">
+                    <span className="hd-mobile-price-val">{price}</span>
+                    <span className="hd-mobile-price-chg" style={{color:chg.startsWith("+")?"#0ecb81":"#f6465d"}}>{chg}</span>
+                  </div>
+                </div>
               ))}
+              <div className="hd-mobile-divider" />
+              <div className="hd-mobile-section-title">Market Insights</div>
+              <div className="hd-mobile-mkt-row"><span>Market momentum</span><span>Strong ↑</span></div>
+              <div className="hd-mobile-mkt-row"><span>BTC dominance</span><span>49.7%</span></div>
+              <div className="hd-mobile-mkt-row"><span>Fear & Greed</span><span style={{color:"#0ecb81"}}>87 · Greed</span></div>
+              <div className="hd-mobile-mkt-row"><span>24h Volume</span><span>$2.2B</span></div>
               <button className="hd-mobile-menu-item" onClick={() => { setIsMobileMenuOpen(false); navigate("/about"); }}>
-                <span>ℹ️</span> <span>About</span>
+                <Lightbulb size={14} /> <span>About</span>
               </button>
             </div>
           )}

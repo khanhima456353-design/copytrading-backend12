@@ -328,7 +328,7 @@ function formatMsTime(ts: number) {
 
 const generateSyntheticPairs = (available: string[]) => {
   if (available.length > 1) return available;
-  const bases = ["BTC", "ETH", "SOL", "LTC", "ADA", "XRP", "DOGE", "AVAX", "DOT", "LINK", "MATIC", "BNB", "NEAR", "APT", "ARB"];
+  const bases = ["BTC", "ETH", "BNB", "SOL", "XRP", "ADA", "AVAX", "DOT", "DOGE", "LINK", "MATIC", "UNI", "ATOM", "LTC", "BCH", "TRX", "APT", "SUI", "OP", "ARB", "NEAR", "FIL", "ALGO", "FTM", "STX", "VET", "HBAR", "ICP", "AAVE", "EGLD", "SAND", "AXS", "MANA", "THETA", "EOS", "XTZ", "CRV", "SNX", "ENJ", "CHZ", "ONE", "KSM", "RNDR", "FET", "AGIX", "GALA", "IMX", "MKR", "COMP", "YFI", "ZIL", "BAT", "ZRX", "RVN", "IOTA", "ANKR", "HOT", "DENT", "OMG", "SC"];
   const quotes = ["USDT", "BTC", "ETH"];
   const symbols = new Set<string>(available);
   for (const base of bases) for (const quote of quotes) {
@@ -2588,9 +2588,16 @@ export default function Trading() {
   // A comprehensive list of your system altcoins to ensure your layout 
   // never collapses into a pure Bitcoin clone if a network drift hits.
   const EMERGENCY_FALLBACK_PAIRS = [
-    "BTC/USDT", "ETH/USDT", "BNB/USDT", "ADA/USDT", "SOL/USDT", "XRP/USDT",
-    "DOT/USDT", "AVAX/USDT", "LINK/USDT", "1INCH/USDT", "AAVE/USDT", "ALGO/USDT",
-    "ANKR/USDT", "ARDR/USDT", "ARPA/USDT", "ASR/USDT", "ATM/USDT", "ATOM/USDT"
+    "BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "XRP/USDT", "ADA/USDT",
+    "AVAX/USDT", "DOT/USDT", "DOGE/USDT", "LINK/USDT", "MATIC/USDT", "UNI/USDT",
+    "ATOM/USDT", "LTC/USDT", "BCH/USDT", "TRX/USDT", "APT/USDT", "SUI/USDT",
+    "OP/USDT", "ARB/USDT", "NEAR/USDT", "FIL/USDT", "ALGO/USDT", "FTM/USDT",
+    "STX/USDT", "VET/USDT", "HBAR/USDT", "ICP/USDT", "AAVE/USDT", "EGLD/USDT",
+    "SAND/USDT", "AXS/USDT", "MANA/USDT", "THETA/USDT", "EOS/USDT", "XTZ/USDT",
+    "CRV/USDT", "SNX/USDT", "ENJ/USDT", "CHZ/USDT", "ONE/USDT", "KSM/USDT",
+    "RNDR/USDT", "FET/USDT", "AGIX/USDT", "GALA/USDT", "IMX/USDT", "MKR/USDT",
+    "COMP/USDT", "YFI/USDT", "ZIL/USDT", "BAT/USDT", "ZRX/USDT", "RVN/USDT",
+    "IOTA/USDT", "ANKR/USDT", "HOT/USDT", "DENT/USDT", "OMG/USDT", "SC/USDT"
   ];
 
   // Helper function to safely extract realistic High/Low points based on asset type

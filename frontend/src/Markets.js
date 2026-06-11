@@ -1,269 +1,263 @@
-import React, { useEffect, useState } from "react";
-import axios from "axios";
+import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import "./markets.css";
-import { getAPI, LOCAL_URL, CLOUD_URL, setSavedAPI } from "./api"; // ✅ FIXED IMPORT
+import { subscribeAllTickers } from "./services/marketState";
+
+const TOP_PAIRS = [
+  "BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT","XRPUSDT","ADAUSDT",
+  "AVAXUSDT","DOTUSDT","DOGEUSDT","LINKUSDT","MATICUSDT","UNIUSDT",
+  "ATOMUSDT","LTCUSDT","BCHUSDT","TRXUSDT","APTUSDT","SUIUSDT",
+  "OPUSDT","ARBUSDT","NEARUSDT","FILUSDT","ALGOUSDT","FTMUSDT",
+  "STXUSDT","VETUSDT","HBARUSDT","ICPUSDT","AAVEUSDT","EGLDUSDT",
+  "SANDUSDT","AXSUSDT","MANAUSDT","THETAUSDT","EOSUSDT","XTZUSDT",
+  "CRVUSDT","SNXUSDT","ENJUSDT","CHZUSDT","ONEUSDT","KSMUSDT",
+  "RNDRUSDT","FETUSDT","AGIXUSDT","GALAUSDT","IMXUSDT","MKRUSDT",
+  "COMPUSDT","YFIUSDT","ZILUSDT","BATUSDT","ZRXUSDT","RVNUSDT",
+  "IOTAUSDT","ANKRUSDT","HOTUSDT","DENTUSDT","OMGUSDT","SCUSDT",
+];
+
+const ASSET_NAMES = {
+  BTC:"Bitcoin",ETH:"Ethereum",BNB:"BNB",SOL:"Solana",XRP:"XRP",
+  ADA:"Cardano",AVAX:"Avalanche",DOT:"Polkadot",DOGE:"Dogecoin",
+  LINK:"Chainlink",MATIC:"Polygon",UNI:"Uniswap",ATOM:"Cosmos",
+  LTC:"Litecoin",BCH:"Bitcoin Cash",TRX:"TRON",APT:"Aptos",
+  SUI:"Sui",OP:"Optimism",ARB:"Arbitrum",NEAR:"NEAR Protocol",
+  FIL:"Filecoin",ALGO:"Algorand",FTM:"Fantom",STX:"Stacks",
+  VET:"VeChain",HBAR:"Hedera",ICP:"Internet Computer",
+  AAVE:"Aave",EGLD:"Elrond",SAND:"The Sandbox",AXS:"Axie Infinity",
+  MANA:"Decentraland",THETA:"Theta Network",EOS:"EOS",XTZ:"Tezos",
+  CRV:"Curve DAO",SNX:"Synthetix",ENJ:"Enjin Coin",CHZ:"Chiliz",
+  ONE:"Harmony",KSM:"Kusama",RNDR:"Render",FET:"Fetch.ai",
+  AGIX:"SingularityNET",GALA:"Gala",IMX:"Immutable X",
+  MKR:"Maker",COMP:"Compound",YFI:"yearn.finance",ZIL:"Zilliqa",
+  BAT:"Basic Attention",ZRX:"0x",RVN:"Ravencoin",IOTA:"IOTA",
+  ANKR:"Ankr",HOT:"Holo",DENT:"Dent",OMG:"OMG Network",
+  SC:"Siacoin",
+};
+
+const COIN_IMG = (asset) => `https://assets.coincap.io/assets/icons/${asset.toLowerCase()}@2x.png`;
+
+const TOTAL_VOL_QUOTE = "USDT";
+
+const fmtPrice = (v, sym) => {
+  if (v == null || !Number.isFinite(Number(v))) return "-";
+  const p = Number(v);
+  const isBTC = sym?.startsWith("BTC");
+  return p.toLocaleString(undefined, {
+    minimumFractionDigits: isBTC ? 1 : 2,
+    maximumFractionDigits: isBTC ? 1 : 2,
+  });
+};
+
+const fmtCompact = (v) => {
+  if (v == null || !Number.isFinite(Number(v))) return "-";
+  const n = Number(v);
+  if (n >= 1e12) return (n / 1e12).toFixed(2) + "T";
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
+  if (n >= 1e3) return (n / 1e3).toFixed(2) + "K";
+  return n.toFixed(2);
+};
+
+const fmtPct = (v) => {
+  if (v == null || !Number.isFinite(Number(v))) return "-";
+  const n = Number(v);
+  const sign = n >= 0 ? "+" : "";
+  return sign + n.toFixed(2) + "%";
+};
 
 export default function Markets() {
-  const [coins, setCoins] = useState([]);
-  const [hot, setHot] = useState([]);
-  const [gainers, setGainers] = useState([]);
-  const [volume, setVolume] = useState([]);
-  const [newCoins, setNewCoins] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [apiURL, setApiURL] = useState(null); // ✅ store working API
+  const navigate = useNavigate();
+  const [tickers, setTickers] = useState({});
+  const [search, setSearch] = useState("");
+  const [sortKey, setSortKey] = useState("volume24h");
+  const [sortDir, setSortDir] = useState("desc");
+  const [initialLoading, setInitialLoading] = useState(true);
 
-  const formatCurrency = (value) => {
-    if (value == null || Number.isNaN(Number(value))) return "-";
-    return Number(value).toLocaleString(undefined, {
-      style: "currency",
-      currency: "USD",
-      maximumFractionDigits: 2,
-    });
-  };
-
-  const formatPercent = (value) => {
-    if (value == null || Number.isNaN(Number(value))) return "-";
-    const num = Number(value);
-    const precision = Math.abs(num) < 0.1 ? 4 : 2;
-    return `${num.toFixed(precision)}%`;
-  };
-
-  const formatNumber = (value) => {
-    if (value == null || Number.isNaN(Number(value))) return "-";
-    return Number(value).toLocaleString(undefined, {
-      maximumFractionDigits: 0,
-    });
-  };
-
-  const formatCompactCurrency = (value) => {
-    if (value == null || Number.isNaN(Number(value))) return "-";
-    return Number(value).toLocaleString(undefined, {
-      style: "currency",
-      currency: "USD",
-      notation: "compact",
-      maximumFractionDigits: 2,
-    });
-  };
-
-  const trendClass = (value) => {
-    if (value == null || Number.isNaN(Number(value))) return "";
-    return Number(value) > 0 ? "green" : Number(value) < 0 ? "red" : "";
-  };
-
-  const trendSign = (value) => {
-    if (value == null || Number.isNaN(Number(value))) return "";
-    return Number(value) > 0 ? "+" : "";
-  };
-
-  const normalizeCoin = (coin) => ({
-    ...coin,
-    current_price: Number(coin?.current_price),
-    price_change_24h: Number(coin?.price_change_24h),
-    price_change_percentage_24h: Number(coin?.price_change_percentage_24h),
-    total_volume: Number(coin?.total_volume),
-    market_cap: Number(coin?.market_cap),
-  });
-
-  const loadData = async () => {
-    try {
-      if (!apiURL) return; // wait until API is ready
-
-      setError("");
-
-      // Try current API first, then fallback to the other
-      const urls = [apiURL, apiURL === LOCAL_URL ? CLOUD_URL : LOCAL_URL];
-      let data = null;
-      let workingUrl = null;
-
-      for (const url of urls) {
-        try {
-          const res = await axios.get(`${url}/api/coins`);
-          data = res.data;
-          workingUrl = url;
-          break; // success, stop trying
-        } catch {
-          // try next URL
+  useEffect(() => {
+    const unsub = subscribeAllTickers((data) => {
+      const map = {};
+      for (const t of data) {
+        const sym = t.symbol;
+        if (TOP_PAIRS.includes(sym)) {
+          map[sym] = t;
         }
       }
-
-      if (!data) {
-        throw new Error("Both local and cloud sources are unreachable");
-      }
-
-      // Update cached API if fallback worked
-      if (workingUrl !== apiURL) {
-        setApiURL(workingUrl);
-        setSavedAPI(workingUrl);
-      }
-
-      if (!Array.isArray(data)) {
-        setError("Invalid data from server");
-        setLoading(false);
-        return;
-      }
-
-      const normalized = data.map(normalizeCoin);
-
-      setCoins(normalized);
-      setHot(normalized.slice(0, 3));
-
-      const sortedGainers = [...normalized]
-        .filter(c => c?.price_change_percentage_24h != null)
-        .sort((a, b) => b.price_change_percentage_24h - a.price_change_percentage_24h);
-      setGainers(sortedGainers.slice(0, 3));
-
-      const sortedVolume = [...normalized]
-        .filter(c => c?.total_volume != null)
-        .sort((a, b) => b.total_volume - a.total_volume);
-      setVolume(sortedVolume.slice(0, 3));
-
-      const shuffled = [...normalized].sort(() => 0.5 - Math.random());
-      setNewCoins(shuffled.slice(0, 3));
-
-      setLoading(false);
-    } catch (err) {
-      console.log("Market error:", err.message);
-      if (coins.length === 0) {
-        setError("Backend not reachable");
-      } else {
-        setError("Unable to refresh market data");
-      }
-      setLoading(false);
-    }
-  };
-
-  // ✅ get working API once
-  useEffect(() => {
-    const initAPI = async () => {
-      const url = await getAPI();
-      setApiURL(url);
-    };
-    initAPI();
+      setTickers((prev) => Object.keys(map).length > 0 ? { ...prev, ...map } : prev);
+      setInitialLoading(false);
+    });
+    return unsub;
   }, []);
 
-  // ✅ load data when API is ready + refresh every 60s
-  useEffect(() => {
-    if (!apiURL) return;
+  const pairs = useMemo(() => {
+    const base = TOP_PAIRS.map((sym) => {
+      const asset = sym.replace("USDT", "");
+      const t = tickers[sym];
+      const vol = t ? Number(t.quoteVol) || Number(t.volume24h) || 0 : 0;
+      return {
+        sym,
+        asset,
+        name: ASSET_NAMES[asset] || asset,
+        price: t ? Number(t.price) : 0,
+        change24h: t ? Number(t.change24h) : 0,
+        changePct: t ? Number(t.changePct) : 0,
+        high24h: t ? Number(t.high24h) : 0,
+        low24h: t ? Number(t.low24h) : 0,
+        volume24h: vol,
+        img: COIN_IMG(asset),
+      };
+    });
 
-    loadData();
-    const interval = setInterval(loadData, 10000); // ✅ faster refresh (10s instead of 60s)
-    return () => clearInterval(interval);
-  }, [apiURL]);
+    const q = search.toLowerCase().trim();
+    const filtered = q
+      ? base.filter((p) => p.asset.toLowerCase().includes(q) || p.name.toLowerCase().includes(q) || p.sym.toLowerCase().includes(q))
+      : base;
+
+    filtered.sort((a, b) => {
+      const aV = a[sortKey] ?? 0;
+      const bV = b[sortKey] ?? 0;
+      if (typeof aV === "string") return sortDir === "asc" ? aV.localeCompare(bV) : bV.localeCompare(aV);
+      return sortDir === "asc" ? aV - bV : bV - aV;
+    });
+
+    return filtered;
+  }, [tickers, search, sortKey, sortDir]);
+
+  const handleSort = useCallback((key) => {
+    setSortKey((prev) => {
+      if (prev === key) { setSortDir((d) => (d === "asc" ? "desc" : "asc")); return prev; }
+      setSortDir(key === "asset" || key === "name" ? "asc" : "desc");
+      return key;
+    });
+  }, []);
+
+  const sortArrow = (key) => sortKey === key ? (sortDir === "asc" ? " ▲" : " ▼") : "";
+
+  const totalQuoteVol = useMemo(() => pairs.reduce((s, p) => s + p.volume24h, 0), [pairs]);
+
+  const totalVolStr = totalQuoteVol >= 1e9
+    ? "$" + (totalQuoteVol / 1e9).toFixed(2) + "B"
+    : "$" + (totalQuoteVol / 1e6).toFixed(2) + "M";
+
+  const gainers = pairs.filter(p => p.changePct > 0).length;
+  const losers = pairs.filter(p => p.changePct < 0).length;
+
+  const columns = [
+    { key: "asset", label: "Name", align: "left", sortable: true },
+    { key: "price", label: "Last Price", align: "right", sortable: true },
+    { key: "changePct", label: "24h Change", align: "right", sortable: true },
+    { key: "high24h", label: "24h High", align: "right", sortable: true, hideMobile: true },
+    { key: "low24h", label: "24h Low", align: "right", sortable: true, hideMobile: true },
+    { key: "volume24h", label: "Volume", align: "right", sortable: true },
+  ];
 
   return (
-    <div className="markets-container">
+    <div className="mk-container">
+      <div className="mk-inner">
 
-      {/* HEADER */}
-      <div className="markets-header">
-        <h1>📊 Markets</h1>
-      </div>
-
-      {error && (
-        <div style={{ color: "#f6465d", padding: "10px" }}>
-          ⚠️ {error}
-        </div>
-      )}
-
-      {/* ================= TOP CARDS ================= */}
-      <div className="top-cards">
-
-        <div className="card">
-          <div className="card-title">Hot</div>
-          {loading ? "Loading..." : hot.map(c => (
-            <div key={c.id} className="mini-row">
-              <span>{c?.symbol?.toUpperCase()}</span>
-              <span>{formatCurrency(c?.current_price)}</span>
-              <span className={trendClass(c?.price_change_percentage_24h)}>
-                {formatPercent(c?.price_change_percentage_24h)}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        <div className="card">
-          <div className="card-title">New</div>
-          {loading ? "Loading..." : newCoins.map(c => (
-            <div key={c.id} className="mini-row">
-              <span>{c?.symbol?.toUpperCase()}</span>
-              <span>{formatCurrency(c?.current_price)}</span>
-              <span className={trendClass(c?.price_change_percentage_24h)}>
-                {formatPercent(c?.price_change_percentage_24h)}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        <div className="card">
-          <div className="card-title">Top Gainer</div>
-          {loading ? "Loading..." : gainers.map(c => (
-            <div key={c.id} className="mini-row">
-              <span>{c?.symbol?.toUpperCase()}</span>
-              <span>{formatCurrency(c?.current_price)}</span>
-              <span className={trendClass(c?.price_change_percentage_24h)}>
-                {trendSign(c?.price_change_percentage_24h)}{formatPercent(c?.price_change_percentage_24h)}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        <div className="card">
-          <div className="card-title">Top Volume</div>
-          {loading ? "Loading..." : volume.map(c => (
-            <div key={c.id} className="mini-row">
-              <span>{c?.symbol?.toUpperCase()}</span>
-              <span>{formatCurrency(c?.current_price)}</span>
-              <span>{formatCompactCurrency(c?.total_volume)}</span>
-            </div>
-          ))}
-        </div>
-
-      </div>
-
-      {/* ================= TABLE HEADER ================= */}
-      <div className="table-header">
-        <div className="cell">Name</div>
-        <div className="cell right">Price</div>
-        <div className="cell right">24h %</div>
-        <div className="cell right">Volume</div>
-        <div className="cell right">Market Cap</div>
-      </div>
-
-      {/* ================= TABLE ================= */}
-      {loading ? (
-        <div style={{ padding: "20px" }}>Loading market data...</div>
-      ) : (
-        coins.map((coin) => (
-          <div className="row" key={coin.id}>
-
-            <div className="cell name">
-              <img src={coin?.image} alt={coin?.name} />
-              <div>
-                <div className="symbol">{coin?.symbol?.toUpperCase()}</div>
-                <div className="fullname">{coin?.name}</div>
-              </div>
-            </div>
-
-            <div className="cell right price">
-              {formatCurrency(coin?.current_price)}
-            </div>
-
-            <div className={`cell right ${trendClass(coin?.price_change_percentage_24h)}`}>
-              {formatPercent(coin?.price_change_percentage_24h)}
-            </div>
-
-            <div className="cell right volume">
-              {formatNumber(coin?.total_volume)}
-            </div>
-
-            <div className="cell right marketcap">
-              {formatNumber(coin?.market_cap)}
-            </div>
-
+        <div className="mk-top-bar">
+          <div className="mk-title-area">
+            <h1 className="mk-title">Markets</h1>
+            <span className="mk-subtitle">{pairs.length} pairs</span>
           </div>
-        ))
-      )}
+          <div className="mk-search-wrap">
+            <span className="mk-search-icon">🔍</span>
+            <input
+              className="mk-search-input"
+              type="text"
+              placeholder="Search pairs..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
 
+        <div className="mk-stats-bar">
+          <div className="mk-stat">
+            <span className="mk-stat-label">24h Volume</span>
+            <span className="mk-stat-val">{totalVolStr}</span>
+          </div>
+          <div className="mk-stat">
+            <span className="mk-stat-label">Gainers</span>
+            <span className="mk-stat-val mk-stat-green">{gainers}</span>
+          </div>
+          <div className="mk-stat">
+            <span className="mk-stat-label">Losers</span>
+            <span className="mk-stat-val mk-stat-red">{losers}</span>
+          </div>
+          <div className="mk-stat">
+            <span className="mk-stat-label">Live</span>
+            <span className="mk-stat-live"><span className="mk-live-dot" /> Real-time</span>
+          </div>
+        </div>
+
+        <div className="mk-table-wrap">
+          <div className="mk-table-header">
+            {columns.map((col) => (
+              <div
+                key={col.key}
+                className={`mk-th mk-th-${col.align}${col.hideMobile ? " mk-hide-mobile" : ""}${col.sortable ? " mk-sortable" : ""}`}
+                onClick={() => col.sortable && handleSort(col.key)}
+              >
+                {col.label}
+                {col.sortable && <span className="mk-sort-arrow">{sortArrow(col.key)}</span>}
+              </div>
+            ))}
+          </div>
+
+          <div className="mk-table-body">
+            {initialLoading ? (
+              <div className="mk-loading">Loading market data...</div>
+            ) : pairs.length === 0 ? (
+              <div className="mk-loading">No pairs found</div>
+            ) : (
+              pairs.map((p, i) => (
+                <div
+                  key={p.sym}
+                  className="mk-row"
+                  onClick={() => navigate(`/trade?pair=${p.asset}USDT`)}
+                >
+                  <div className="mk-cell mk-cell-left mk-cell-name">
+                    <div className="mk-idx">{i + 1}</div>
+                    {p.img ? (
+                      <img className="mk-coin-icon" src={p.img} alt={p.asset} loading="lazy" />
+                    ) : (
+                      <div className="mk-coin-icon mk-coin-fallback">{p.asset[0]}</div>
+                    )}
+                    <div className="mk-name-wrap">
+                      <span className="mk-sym">{p.asset}/USDT</span>
+                      <span className="mk-name-text">{p.name}</span>
+                    </div>
+                  </div>
+
+                  <div className="mk-cell mk-cell-right mk-cell-price">
+                    ${fmtPrice(p.price, p.sym)}
+                  </div>
+
+                  <div className="mk-cell mk-cell-right mk-cell-chg">
+                    <span className={p.changePct >= 0 ? "mk-green" : "mk-red"}>
+                      {fmtPct(p.changePct)}
+                    </span>
+                  </div>
+
+                  <div className="mk-cell mk-cell-right mk-hide-mobile">
+                    ${fmtPrice(p.high24h)}
+                  </div>
+
+                  <div className="mk-cell mk-cell-right mk-hide-mobile">
+                    ${fmtPrice(p.low24h)}
+                  </div>
+
+                  <div className="mk-cell mk-cell-right mk-cell-vol">
+                    ${fmtCompact(p.volume24h)}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 }
