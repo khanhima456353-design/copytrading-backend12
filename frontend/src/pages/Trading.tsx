@@ -3517,11 +3517,11 @@ export default function Trading() {
 serverPositions.length === 0
   ? <div style={{ padding: 20, textAlign: "center", color: COLORS.textMuted, fontSize: 12 }}>No open positions</div>
   : <>
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr 1fr 100px", padding: "8px 14px", fontSize: 10, fontFamily: "monospace", color: COLORS.textMuted, borderBottom: `1px solid ${COLORS.border}` }}>
+    <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.6fr 1fr 1fr 0.7fr 0.9fr 70px", padding: "8px 14px", fontSize: 10, fontFamily: "monospace", color: COLORS.textMuted, borderBottom: `1px solid ${COLORS.border}` }}>
       <span>Pair</span><span>Side</span><span>Entry</span><span>Mark</span><span>Size</span><span>PnL</span><span style={{ textAlign: "right" }}>Action</span>
     </div>
     {serverPositions.map((p, idx) => (
-      <div key={p.id || p._id || String(idx)} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr 1fr 100px", padding: "6px 14px", fontSize: 11, fontFamily: "monospace", borderBottom: `1px solid ${COLORS.border}` }}>
+      <div key={p.id || p._id || String(idx)} style={{ display: "grid", gridTemplateColumns: "1.2fr 0.6fr 1fr 1fr 0.7fr 0.9fr 70px", padding: "6px 14px", fontSize: 11, fontFamily: "monospace", borderBottom: `1px solid ${COLORS.border}`, alignItems: "center" }}>
         <span style={{ color: COLORS.textBright }}>{p.pair}</span>
         <span style={{ color: p.side === "long" ? COLORS.green : COLORS.red }}>{p.side.toUpperCase()}</span>
         <span style={{ color: COLORS.text }}>{Number(p.entryPrice || 0).toFixed(2)}</span>
@@ -3550,7 +3550,7 @@ serverPositions.length === 0
                   {activeOrders.map(o => {
                     return (
                       <div key={o.id} style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr 0.8fr 0.7fr 0.7fr 0.5fr 70px", padding: "6px 14px", fontSize: 11, fontFamily: "monospace", borderBottom: `1px solid ${COLORS.border}`, alignItems: "center" }}>
-                        <span style={{ color: COLORS.text, fontSize: 10 }}>{new Date(o.createdAt * 1000).toLocaleString()}</span>
+                        <div style={{ lineHeight: 1.4 }}><div style={{ color: COLORS.text, fontSize: 10 }}>{new Date(o.createdAt * 1000).toLocaleDateString()}</div><div style={{ color: COLORS.textMuted, fontSize: 9 }}>{new Date(o.createdAt * 1000).toLocaleTimeString()}</div></div>
                         <span style={{ color: COLORS.textBright }}>{o.pair}</span>
                         <span style={{ color: o.side === "buy" ? COLORS.green : COLORS.red, textTransform: "capitalize" }}>{o.type} {o.side}</span>
                         <span style={{ color: COLORS.textBright }}>{o.price.toFixed(2)}</span>
