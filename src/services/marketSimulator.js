@@ -700,9 +700,10 @@ function getDriftStatus(userId, pair, positionId) {
 function getSimulationStatesForUser(userId) {
   if (!userId) return [];
 
+  const uid = userId?.toString?.() || userId;
   const activeStates = [];
   for (const state of USER_PAIR_STATES.values()) {
-    if (state.userId !== userId) continue;
+    if ((state.userId?.toString?.() || state.userId) !== uid) continue;
     if (state.mode === 'idle') continue;
 
     activeStates.push({
@@ -758,8 +759,9 @@ function clearSimulation(userId, pair, positionId) {
 
 function hasActiveSimulation(userId, pair) {
   if (!userId) return false;
+  const uid = userId?.toString?.() || userId;
   for (const state of USER_PAIR_STATES.values()) {
-    if (state.userId !== userId) continue;
+    if ((state.userId?.toString?.() || state.userId) !== uid) continue;
     if (pair && state.pair !== pair) continue;
     if (state.snapBack || state.activeDrift || state.mode === 'natural' || state.mode === 'drift') {
       return true;
@@ -770,9 +772,10 @@ function hasActiveSimulation(userId, pair) {
 
 function getSimulatedPriceForPair(userId, pair) {
   if (!userId || !pair) return null;
+  const uid = userId?.toString?.() || userId;
   let bestState = null;
   for (const state of USER_PAIR_STATES.values()) {
-    if (state.userId !== userId || state.pair !== pair) continue;
+    if ((state.userId?.toString?.() || state.userId) !== uid || state.pair !== pair) continue;
     if (!state.lastPrice || !Number.isFinite(state.lastPrice) || state.lastPrice <= 0) continue;
     if (!state.activeDrift && !state.snapBack && state.mode === 'natural') {
       // natural mode simulation is still a controlled source when a trade is active
