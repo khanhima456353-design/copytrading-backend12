@@ -11,7 +11,7 @@ import PositionsPanel from "../components/PositionsPanel";
 import { calculateUnrealizedPnL } from "../services/tradingUtils";
 import { TradingBalanceCard } from "../components/TradingBalanceCard";
 import { useTheme } from "../components/theme/ThemeContext";
-import { Wallet, Trash, Magnet, PaintbrushVertical, RulerDimensionLine, Eraser, ChartCandlestick, ChartLine, BarChart3, ChartArea, ChevronLeft, ChevronRight, Search, Star, Menu, ChevronDown, ChevronUp, Check, X, Info } from "lucide-react";
+import { Wallet, Trash, Magnet, PaintbrushVertical, RulerDimensionLine, Eraser, ChartCandlestick, ChartLine, BarChart3, ChartArea, ChevronLeft, ChevronRight, Search, Star, Menu, ChevronDown, ChevronUp, Check, X, Info, MousePointer2, Crosshair, TrendingUp, Minus, SeparatorVertical, Square, GitBranch, ArrowUpDown, Type } from "lucide-react";
 
 // --- Types --------------------------------------------------------------------
 
@@ -122,15 +122,15 @@ const CV = {
 };
 
 const DRAWING_TOOLS: { id: DrawingTool; icon: React.ReactNode; label: string; group: string }[] = [
-  { id: "cursor",    icon: "?",  label: "Cursor",      group: "select" },
-  { id: "crosshair", icon: "?",  label: "Crosshair",   group: "select" },
-  { id: "trendline", icon: "?",  label: "Trend Line",  group: "lines" },
-  { id: "hline",     icon: "-",  label: "Horiz Line",  group: "lines" },
-  { id: "vline",     icon: "�",  label: "Vert Line",   group: "lines" },
-  { id: "rect",      icon: "?",  label: "Rectangle",   group: "shapes" },
-  { id: "fib",       icon: "?",  label: "Fibonacci",   group: "shapes" },
-  { id: "pitchfork", icon: "?",  label: "Pitchfork",   group: "shapes" },
-  { id: "text",      icon: "T",  label: "Text",        group: "annotate" },
+  { id: "cursor",    icon: <MousePointer2 size={16} />,  label: "Cursor",      group: "select" },
+  { id: "crosshair", icon: <Crosshair size={16} />,      label: "Crosshair",   group: "select" },
+  { id: "trendline", icon: <TrendingUp size={16} />,     label: "Trend Line",  group: "lines" },
+  { id: "hline",     icon: <Minus size={16} />,          label: "Horiz Line",  group: "lines" },
+  { id: "vline",     icon: <SeparatorVertical size={16} />, label: "Vert Line", group: "lines" },
+  { id: "rect",      icon: <Square size={16} />,         label: "Rectangle",   group: "shapes" },
+  { id: "fib",       icon: <GitBranch size={16} />,    label: "Fibonacci",   group: "shapes" },
+  { id: "pitchfork", icon: <ArrowUpDown size={16} />,    label: "Pitchfork",   group: "shapes" },
+  { id: "text",      icon: <Type size={16} />,           label: "Text",        group: "annotate" },
   { id: "brush",     icon: <PaintbrushVertical size={16} />,  label: "Brush",       group: "annotate" },
   { id: "eraser",    icon: <Eraser size={16} />,  label: "Eraser",      group: "annotate" },
   { id: "measure",   icon: <RulerDimensionLine size={16} />,  label: "Measure",     group: "measure" },
