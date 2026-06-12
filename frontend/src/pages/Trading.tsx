@@ -3299,7 +3299,7 @@ export default function Trading() {
             <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 34 }}>
               <span style={{ fontSize: 11, color: COLORS.textMuted, width: 50 }}>Amount</span>
               <input type="number" value={buyAmountInput} onChange={e => updateBuyAmount(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="0.0000" />
-              <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>BTC</span>
+              <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>{baseSymbol}</span>
             </div>
             {/* Slider */}
             <div style={{ padding: "2px 0" }}>
@@ -3363,7 +3363,7 @@ export default function Trading() {
             <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 34 }}>
               <span style={{ fontSize: 11, color: COLORS.textMuted, width: 50 }}>Amount</span>
               <input type="number" value={sellAmountInput} onChange={e => updateSellAmount(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="0.0000" />
-              <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>BTC</span>
+              <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>{baseSymbol}</span>
             </div>
             <div style={{ padding: "2px 0" }}>
               <input type="range" min={0} max={100} value={sellSliderPct} onChange={e => applySellPct(Number(e.target.value))} style={{ width: "100%", accentColor: COLORS.red }} />

@@ -57,6 +57,7 @@ export default function Navbar({ showAuth = true, minimal = false, homepage = fa
   );
 
   return (
+    <>
     <header className={`navbar${homepage ? " navbar-home" : ""}`} style={homepage ? { marginTop: 0, position: "fixed", top: 0, left: 0, right: 0, zIndex: 300 } : undefined}>
       <div className="container nav-content">
         <div className="nav-left">
@@ -128,11 +129,16 @@ export default function Navbar({ showAuth = true, minimal = false, homepage = fa
         </div>
       </div>
 
-      {/* Mobile menu drawer for non-homepage pages */}
+    </header>
       {!homepage && isMobileMenuOpen && (
         <div className="nav-mobile-overlay" onClick={() => setIsMobileMenuOpen(false)}>
-          <div className="nav-mobile-drawer" onClick={e => e.stopPropagation()} style={{ background: theme === "light" ? "#ffffff" : "#1E2329" }}>
+          <div className="nav-mobile-drawer" onClick={e => e.stopPropagation()}>
             <div className="nav-mobile-body">
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button onClick={() => setIsMobileMenuOpen(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-current)' }}>
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
               <nav className="nav-mobile-links">
                 <Link to="/trade" className="nav-mobile-item" onClick={() => setIsMobileMenuOpen(false)}>
                   Trade
@@ -140,6 +146,7 @@ export default function Navbar({ showAuth = true, minimal = false, homepage = fa
                 <Link to="/markets" className="nav-mobile-item" onClick={() => setIsMobileMenuOpen(false)}>Markets</Link>
                 <Link to="/earn" className="nav-mobile-item" onClick={() => setIsMobileMenuOpen(false)}>Earn</Link>
                 <Link to="/research" className="nav-mobile-item" onClick={() => setIsMobileMenuOpen(false)}>Research</Link>
+                <Link to="/" className="nav-mobile-item" onClick={() => setIsMobileMenuOpen(false)}>Dashboard</Link>
               </nav>
               {showAuth && !minimal && (
                 <div className="nav-mobile-auth">
@@ -151,6 +158,6 @@ export default function Navbar({ showAuth = true, minimal = false, homepage = fa
           </div>
         </div>
       )}
-    </header>
+    </>
   );
 }

@@ -175,6 +175,11 @@ export default function Landing() {
         <div className="lm-overlay" onClick={() => setMobileMenuOpen(false)}>
           <div className="lm-drawer" onClick={e => e.stopPropagation()}>
             <div className="lm-drawer-body">
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button onClick={() => setMobileMenuOpen(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-current)' }}>
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
               <nav className="lm-nav-links">
                 <Link to="/trade" className="lm-nav-item" onClick={() => setMobileMenuOpen(false)}>
                   <ChevronDown className="w-4 h-4" /> Trade
@@ -182,6 +187,7 @@ export default function Landing() {
                 <Link to="/markets" className="lm-nav-item" onClick={() => setMobileMenuOpen(false)}>Markets</Link>
                 <Link to="/earn" className="lm-nav-item" onClick={() => setMobileMenuOpen(false)}>Earn</Link>
                 <Link to="/research" className="lm-nav-item" onClick={() => setMobileMenuOpen(false)}>Research</Link>
+                <Link to="/" className="lm-nav-item" onClick={() => setMobileMenuOpen(false)}>Dashboard</Link>
               </nav>
               <div className="lm-nav-auth">
                 <button onClick={() => { navigate("/login"); setMobileMenuOpen(false); }} className="lm-btn-ghost">Log in</button>
