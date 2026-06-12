@@ -1121,6 +1121,8 @@ orderMonitor.startMonitor({
     await orderService.closeOrder(orderId, closePrice);
   },
   onActivate: async (order, currentPrice) => {
+    const fee = order.lockedAmount * orderService.MAKER_FEE;
+    orderService.deductFee(order.userId, fee, 'maker', order._id);
     let pos = await Position.findOne({ userId: order.userId, pair: order.pair });
     if (!pos) {
       pos = await Position.create({

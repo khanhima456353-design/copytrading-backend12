@@ -192,7 +192,7 @@ async function unlockBalance(userId, amount, pnlAmount, orderId) {
   return wallet;
 }
 
-async function debitBalance(userId, amount, description) {
+async function debitBalance(userId, amount, description, type = "withdrawal") {
   assertPositiveAmount(amount);
 
   const before = await Wallet.findOneAndUpdate(
@@ -212,7 +212,7 @@ async function debitBalance(userId, amount, description) {
   const wallet = await Wallet.findOne({ userId });
   await recordTransaction(null, {
     userId,
-    type: "withdrawal",
+    type,
     amount,
     balanceBefore: before.availableBalance,
     balanceAfter: wallet.availableBalance,

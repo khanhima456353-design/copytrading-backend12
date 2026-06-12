@@ -62,8 +62,8 @@ export function calculateOrderTotal(order) {
   const {
     quantity,
     price,
-    makerFee = 0.001,
-    takerFee = 0.002,
+    makerFee = 0.0002,
+    takerFee = 0.0004,
     isMarket = false
   } = order;
 

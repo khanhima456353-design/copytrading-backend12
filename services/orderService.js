@@ -2,6 +2,9 @@ const Order = require("../models/Order");
 const walletService = require("./walletService");
 const { clampPnL, calculatePositionPnL } = require("../utils/pnlClamp");
 
+const MAKER_FEE = 0.0002;
+const TAKER_FEE = 0.0004;
+
 function clampPnlPercent(rawPnlPercent) {
   return clampPnL(rawPnlPercent);
 }
@@ -14,6 +17,15 @@ function calculatePnl(entryPrice, currentPrice, quantity, positionSide, leverage
     clampedPnlPercent: pnl.clampedPnlPercent,
     clampedPnl: pnl.clampedPnl,
   };
+}
+
+async function deductFee(userId, amount, feeType, orderId) {
+  if (!amount || amount <= 0) return;
+  try {
+    await walletService.debitBalance(userId, amount, `${feeType} fee for order ${orderId}`, "fee");
+  } catch (err) {
+    console.error(`Fee deduction failed for user ${userId}, order ${orderId}:`, err.message);
+  }
 }
 
 async function openOrder(userId, pair, side, type, entryPrice, quantity, lockedAmount, stopPrice, stopLoss, takeProfit) {
@@ -47,6 +59,11 @@ async function openOrder(userId, pair, side, type, entryPrice, quantity, lockedA
   } catch (err) {
     await Order.findByIdAndDelete(order._id);
     throw err;
+  }
+
+  if (!isPending) {
+    const fee = lockedAmount * TAKER_FEE;
+    deductFee(userId, fee, "taker", order._id);
   }
 
   return order;
@@ -141,4 +158,7 @@ module.exports = {
   getUserOpenOrders,
   getUserClosedOrders,
   calculatePnl,
+  deductFee,
+  MAKER_FEE,
+  TAKER_FEE,
 };
