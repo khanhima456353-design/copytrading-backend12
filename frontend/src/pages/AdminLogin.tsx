@@ -1,15 +1,18 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaEye, FaEyeSlash, FaSpinner } from "react-icons/fa";
 import logo from "../assets/logo.jpg";
-import "../styles/Login.css";
 import { adminLogin } from "../services/adminService";
 
 const AdminLogin: React.FC = () => {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, []);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [messageType, setMessageType] = useState<"success" | "error" | null>(null);
@@ -64,74 +67,133 @@ const AdminLogin: React.FC = () => {
   };
 
   return (
-    <div className="login-page">
-      <div className="login-container">
-        <div className="login-card">
-          <div className="login-header">
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "8px 14px", borderRadius: 10, background: "#ff8c32", border: "1px solid #ff8c32" }}>
-              <img src={logo} alt="SwanCore Logo" style={{ width: 32, height: 32, borderRadius: 4, objectFit: "contain", background: "#0b0e11", padding: 2 }} />
-              <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.1 }}>
-                  <span style={{ color: "#ffffff", fontSize: 18, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Inter', 'SF Pro Display', -apple-system, sans-serif" }}>SwanCore</span>
-                  <span style={{ color: "#0a0a0a", fontSize: 10 }}>Simplified Trading</span>
-                </div>
-            </div>
-            <h1>Admin Login</h1>
-            <p>Secure admin access only</p>
-          </div>
-
-          {message && (
-            <div className={`login-alert ${messageType}`}>{message}</div>
-          )}
-
-          <form onSubmit={handleSubmit} className="login-form">
-            <div className="form-group">
-              <label htmlFor="email">Email Address</label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@swancore.com"
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="password">Password</label>
-              <div className="password-input">
-                <input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter admin password"
-                />
-                <button
-                  type="button"
-                  className="password-toggle"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <FaEyeSlash /> : <FaEye />}
-                </button>
-              </div>
-            </div>
-
-            <button className="login-btn" type="submit" disabled={loading}>
-              {loading ? (
-                <>
-                  <FaSpinner className="spinner" /> Signing In...
-                </>
-              ) : (
-                "Sign In"
-              )}
-            </button>
-          </form>
-
-          <div className="login-links">
-            <p>
-              Not an admin? <a href="/login" className="link">Go to user login</a>
-            </p>
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: '100vh',
+      overflow: 'hidden',
+      background: 'var(--bg, #0B0E11)',
+      fontFamily: "'Inter', sans-serif",
+      padding: '20px',
+    }}>
+      <div style={{
+        width: '100%',
+        maxWidth: '400px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '24px',
+      }}>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '4px',
+        }}>
+          <img
+            src={logo}
+            alt="SwanCore Logo"
+            style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'contain', background: '#0b0e11', padding: 4 }}
+          />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.2 }}>
+            <span style={{ color: '#ffffff', fontSize: 22, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>SwanCore</span>
+            <span style={{ color: '#94a3b8', fontSize: 11 }}>Simplified Trading</span>
           </div>
         </div>
+
+        <div style={{ textAlign: 'center' }}>
+          <h1 style={{ color: 'var(--text-primary, #f8fafc)', fontSize: 24, fontWeight: 700, margin: 0 }}>Admin Login</h1>
+          <p style={{ color: 'var(--text-secondary, #94a3b8)', fontSize: 13, margin: '6px 0 0 0' }}>Secure admin access only</p>
+        </div>
+
+        {message && (
+          <div style={{
+            width: '100%',
+            padding: '10px 14px',
+            borderRadius: 8,
+            fontSize: 13,
+            textAlign: 'center',
+            background: messageType === 'error' ? 'rgba(246,70,93,0.12)' : 'rgba(14,203,129,0.12)',
+            color: messageType === 'error' ? '#f6465d' : '#0ecb81',
+            border: `1px solid ${messageType === 'error' ? 'rgba(246,70,93,0.3)' : 'rgba(14,203,129,0.3)'}`,
+          }}>
+            {message}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} style={{
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary, #f8fafc)' }}>Email Address</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="admin@swancore.com"
+              style={{
+                width: '100%',
+                padding: '12px 14px',
+                borderRadius: 10,
+                border: '1px solid var(--border, #1e293b)',
+                background: 'var(--surface, #1E2329)',
+                color: 'var(--text-primary, #f8fafc)',
+                fontSize: 14,
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary, #f8fafc)' }}>Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter admin password"
+              style={{
+                width: '100%',
+                padding: '12px 14px',
+                borderRadius: 10,
+                border: '1px solid var(--border, #1e293b)',
+                background: 'var(--surface, #1E2329)',
+                color: 'var(--text-primary, #f8fafc)',
+                fontSize: 14,
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              width: '100%',
+              padding: '12px',
+              borderRadius: 10,
+              border: 'none',
+              background: '#ff8c32',
+              color: '#fff',
+              fontSize: 15,
+              fontWeight: 600,
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.7 : 1,
+              marginTop: '4px',
+            }}
+          >
+            {loading ? 'Signing In...' : 'Sign In'}
+          </button>
+        </form>
+
+        <p style={{ color: 'var(--text-secondary, #94a3b8)', fontSize: 13, margin: 0 }}>
+          Not an admin? <a href="/login" style={{ color: '#ff8c32', textDecoration: 'none', fontWeight: 600 }}>Go to user login</a>
+        </p>
       </div>
     </div>
   );

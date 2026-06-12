@@ -2039,7 +2039,16 @@ export default function Trading() {
             const price = Number(t.price) || Number(t.lastPrice) || 0;
             const sym = t.symbol;
             if (!sym) continue;
-            if (sym !== currentSym && price > 0) priceMap[sym] = price;
+            if (sym === currentSym && price > 0) {
+              if (!simulationFeedActiveRef.current) {
+                setPriceUpdateDirection(price >= lastPriceRef.current ? "up" : "down");
+                lastPriceRef.current = price;
+                setLastPrice(price);
+                setLastPriceUpdate(Date.now());
+              }
+            } else if (price > 0) {
+              priceMap[sym] = price;
+            }
             if (sym.endsWith('USDT')) {
               const base = sym.replace('USDT', '');
               const pair = `${base}/USDT`;
@@ -2096,8 +2105,8 @@ export default function Trading() {
     setOrderbook({ buy: marketState.orderbook.bids, sell: marketState.orderbook.asks });
     setTrades(marketState.trades);
     // Keep local mirror for display only; single source of truth remains marketState.lastPrice
-    // Update direction from marketState when simulation is active (socket events are blocked)
-    if (isValidPrice(marketState.lastPrice) && simulationFeedActiveRef.current) {
+    // Update direction from marketState (always — simulation blocks socket events, REST fallback goes through marketState)
+    if (isValidPrice(marketState.lastPrice)) {
       const prev = marketStatePrevRef.current;
       if (prev > 0 && marketState.lastPrice !== prev) {
         setPriceUpdateDirection(marketState.lastPrice >= prev ? "up" : "down");
