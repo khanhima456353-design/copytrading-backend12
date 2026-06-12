@@ -262,7 +262,7 @@ export default function Landing() {
                 <p>Monitor the heartbeat of the global crypto economy.</p>
               </div>
               <Link to="/markets" className="link-arrow">
-                View Full Markets <ArrowUpRight className="w-5 h-5" />
+                View Full Markets
               </Link>
             </div>
 
@@ -288,9 +288,7 @@ export default function Landing() {
                     </div>
                   </div>
                 ))
-              ) : (
-                <div className="no-data">Connect to see live markets.</div>
-              )}
+              ) : null}
             </div>
           </div>
         </section>
