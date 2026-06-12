@@ -66,10 +66,12 @@ const allowedOrigins = [
   "https://hitachi-intense-exciting-steve.trycloudflare.com",
 ];
 
-app.use((req, _res, next) => {
-  if (!req.url.includes("/health") && !req.url.includes("/orderbook")) {
-    console.log(`???? ${req.method} ${req.url}`);
-  }
+app.use((req, res, next) => {
+  res.on('finish', () => {
+    if (res.statusCode >= 400 && !req.url.includes("/health")) {
+      console.log(`???? ${req.method} ${req.url} ${res.statusCode}`);
+    }
+  });
   next();
 });
 

@@ -1,9 +1,30 @@
-◇ injected env (12) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+◇ injected env (12) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
 🚀 Starting Binance WebSocket price feed...
 🔌 Connecting to Binance combined stream...
 Connecting to MongoDB with URL: mongodb://127.0.0.1:27017/trading?retryWrites=false
+Port 5000 already in use ??? set PORT env var to override.
 ??? MongoDB connected
 ??? Redis connecting???
 ??? Redis ready
 ✅ Binance WebSocket connected
 📡 Subscribed to 10 streams (ticker + depth)
+⚠ allTickers: no WS data after 10s, starting REST fallback
+CoinGecko fallback poll failed: Request failed with status code 429
+  ??? CoinGecko rate-limited, backing off to 30000ms
+CoinGecko fallback poll failed: Request failed with status code 429
+  ??? CoinGecko rate-limited, backing off to 60000ms
+CoinGecko fallback poll failed: timeout of 8000ms exceeded
+???? Redis error: read ECONNRESET
+???? Redis: reconnecting in 100ms (attempt 1)
+???? Redis reconnecting???
+Redis update live candle failed: BTC/USDT@1m read ECONNRESET
+Redis update live candle failed: BTC/USDT@5m read ECONNRESET
+Redis update live candle failed: BTC/USDT@15m read ECONNRESET
+Redis update live candle failed: BTC/USDT@1h read ECONNRESET
+???? Redis: reconnecting in 100ms (attempt 1)
+???? Redis error: getaddrinfo ENOTFOUND redis-13568.c14.us-east-1-3.ec2.cloud.redislabs.com
+???? Redis reconnecting???
+allTickers REST fallback failed: timeout of 10000ms exceeded
+??? Redis connecting???
+??? Redis ready
+allTickers REST fallback failed: aborted
