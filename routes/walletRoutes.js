@@ -19,6 +19,7 @@ router.get("/", authenticateUser, async (req, res) => {
         frozenBalance: wallet.lockedBalance,
         currency: wallet.currency,
         userId: wallet.userId,
+        balances: wallet.balances || {},
       },
     });
   } catch (error) {

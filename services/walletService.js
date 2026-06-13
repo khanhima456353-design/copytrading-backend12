@@ -84,8 +84,8 @@ async function getWallet(userId) {
 }
 
 async function creditBalance(userId, amount, description, type) {
-  if (!["deposit", "manual_credit"].includes(type)) {
-    throw new Error("type must be 'deposit' or 'manual_credit'");
+  if (!["deposit", "manual_credit", "trade"].includes(type)) {
+    throw new Error("type must be 'deposit', 'manual_credit', or 'trade'");
   }
   assertPositiveAmount(amount);
 
@@ -258,6 +258,76 @@ async function ensureWallet(userId) {
   return wallet;
 }
 
+async function creditAsset(userId, asset, amount) {
+  assertPositiveAmount(amount);
+  const key = `balances.${asset}`;
+  const before = await Wallet.findOneAndUpdate(
+    { userId },
+    { $inc: { [key]: amount } },
+    { returnDocument: 'before' }
+  );
+  if (!before) throw new Error("Wallet not found");
+  const wallet = await Wallet.findOne({ userId });
+  const balMap = wallet.balances || {};
+  await recordTransaction(null, {
+    userId, type: "spot_credit", amount,
+    balanceBefore: before.availableBalance,
+    balanceAfter: wallet.availableBalance,
+    lockedBefore: before.lockedBalance,
+    lockedAfter: wallet.lockedBalance,
+    reference: null,
+    description: `Spot credit ${amount} ${asset}`,
+  });
+  return wallet;
+}
+
+async function debitAsset(userId, asset, amount) {
+  assertPositiveAmount(amount);
+  const key = `balances.${asset}`;
+  const before = await Wallet.findOneAndUpdate(
+    { userId, [`balances.${asset}`]: { $gte: amount } },
+    { $inc: { [key]: -amount } },
+    { returnDocument: 'before' }
+  );
+  if (!before) {
+    const existing = await Wallet.findOne({ userId });
+    if (!existing) throw new Error("Wallet not found");
+    const current = existing.balances?.get?.(asset) || existing.balances?.[asset] || 0;
+    if (current < amount) throw new Error(`Insufficient ${asset} balance`);
+    throw new Error("Insufficient balance");
+  }
+  const wallet = await Wallet.findOne({ userId });
+  await recordTransaction(null, {
+    userId, type: "spot_debit", amount,
+    balanceBefore: before.availableBalance,
+    balanceAfter: wallet.availableBalance,
+    lockedBefore: before.lockedBalance,
+    lockedAfter: wallet.lockedBalance,
+    reference: null,
+    description: `Spot debit ${amount} ${asset}`,
+  });
+  return wallet;
+}
+
+async function getAssetBalance(userId, asset) {
+  const wallet = await Wallet.findOne({ userId });
+  if (!wallet) return 0;
+  const bal = wallet.balances?.get?.(asset) ?? wallet.balances?.[asset] ?? 0;
+  return bal;
+}
+
+async function getAllBalances(userId) {
+  const wallet = await Wallet.findOne({ userId });
+  if (!wallet) return {};
+  const bal = wallet.balances || {};
+  const result = {};
+  for (const [key, val] of (bal instanceof Map ? bal.entries() : Object.entries(bal))) {
+    if (val > 0) result[key] = val;
+  }
+  result.USDT = (result.USDT || 0) + wallet.availableBalance;
+  return result;
+}
+
 module.exports = {
   createWallet,
   getWallet,
@@ -267,4 +337,8 @@ module.exports = {
   unlockBalance,
   debitBalance,
   getUserTransactions,
+  creditAsset,
+  debitAsset,
+  getAssetBalance,
+  getAllBalances,
 };

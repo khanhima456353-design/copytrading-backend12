@@ -957,6 +957,53 @@ app.post('/api/trade/cancel', authMiddleware, async (req, res) => {
   }
 });
 
+// Spot trade endpoint – immediate buy/sell execution (no leverage, no position, no simulation)
+app.post('/api/trade/spot', authMiddleware, async (req, res) => {
+  try {
+    const { symbol, pair, side, amount } = req.body;
+    if (!symbol || !side || !amount || amount <= 0) {
+      return res.status(400).json({ success: false, error: "symbol, side, and amount are required" });
+    }
+    const userId = req.user._id;
+    const tradingPair = pair || symbol;
+    const [base, quote] = tradingPair.includes("/") ? tradingPair.split("/") : [tradingPair.replace(/USDT$/, ""), "USDT"];
+
+    // Get current price from cache
+    const currentPrice = Number(cachedMarketPrices[tradingPair]?.price || 0);
+    if (!currentPrice || currentPrice <= 0) {
+      return res.status(400).json({ success: false, error: "No price available for this pair" });
+    }
+
+    const totalCost = amount * currentPrice;
+    const takerFee = totalCost * 0.0004; // 0.04%
+
+    await walletService.ensureWallet(userId);
+
+    if (side === "buy") {
+      await walletService.debitBalance(userId, totalCost, `Spot buy ${amount} ${base} @ ${currentPrice}`, "trade");
+      if (takerFee > 0) {
+        await walletService.debitBalance(userId, takerFee, `Fee for spot buy ${amount} ${base}`, "fee");
+      }
+      await walletService.creditAsset(userId, base, amount);
+    } else {
+      const assetBal = await walletService.getAssetBalance(userId, base);
+      if (assetBal < amount) {
+        return res.status(400).json({ success: false, error: `Insufficient ${base} balance: ${assetBal.toFixed(6)}` });
+      }
+      await walletService.debitAsset(userId, base, amount);
+      await walletService.creditBalance(userId, totalCost, `Spot sell ${amount} ${base} @ ${currentPrice}`, "trade");
+      if (takerFee > 0) {
+        await walletService.debitBalance(userId, takerFee, `Fee for spot sell ${amount} ${base}`, "fee");
+      }
+    }
+
+    return res.json({ success: true, data: { side, pair: tradingPair, amount, price: currentPrice, total: totalCost } });
+  } catch (error) {
+    console.error('Spot trade error:', error.message, error.stack);
+    return res.status(400).json({ success: false, error: error.message });
+  }
+});
+
 // Auth login (kept for backward-compat)
 const { comparePassword, generateAccessToken, generateRefreshToken } = require("./utils/auth");
 

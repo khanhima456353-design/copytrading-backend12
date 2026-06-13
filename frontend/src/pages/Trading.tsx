@@ -1548,6 +1548,9 @@ export default function Trading() {
   const [marketState, setMarketState] = useState<MarketState | null>(null);
   const [priceInput, setPriceInput] = useState("");
   const [savedManualPriceInput, setSavedManualPriceInput] = useState("");
+  const [tradingMode, setTradingMode] = useState<"spot" | "futures">("futures");
+  const [spotAmount, setSpotAmount] = useState("");
+  const [spotError, setSpotError] = useState("");
   const [buyAmountInput, setBuyAmountInput] = useState("");
   const [buyTotalInput, setBuyTotalInput] = useState("");
   const [sellAmountInput, setSellAmountInput] = useState("");
@@ -1641,6 +1644,7 @@ export default function Trading() {
   };
   const [liveStatus, setLiveStatus] = useState("offline");
   const [accountSummary, setAccountSummary] = useState<AccountSummary>(createFallbackAccountSummary());
+  const [walletBalances, setWalletBalances] = useState<Record<string, number>>({});
   const [userOrders, setUserOrders] = useState<UserOrder[]>(createFallbackUserOrders());
   const [lockedUSDT, setLockedUSDT] = useState(0);
   const [tradeHistory, setTradeHistory] = useState<TradeHistoryItem[]>(createFallbackTradeHistory());
@@ -1664,7 +1668,7 @@ export default function Trading() {
     }
   };
   const [rightTab, setRightTab] = useState<"market" | "mytrades">("market");
-  const [bottomTab, setBottomTab] = useState<"openorders" | "positions" | "orderhistory" | "bots">("openorders");
+  const [bottomTab, setBottomTab] = useState<"openorders" | "positions" | "orderhistory" | "bots" | "balances">("openorders");
   const [pairTab, setPairTab] = useState<"usdt" | "fav">("usdt");
   const [favorites, setFavorites] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem("trading-favs") || "[]"); } catch { return []; }
@@ -1842,7 +1846,9 @@ export default function Trading() {
       const walletAvailable = Number(walletData.availableBalance ?? walletData.available ?? walletData.balance) || 0;
       const walletLocked = Number(walletData.lockedBalance ?? walletData.locked ?? 0) || 0;
       const walletTotal = Number(walletData.totalBalance ?? walletData.totalPortfolio ?? walletAvailable + walletLocked) || walletAvailable + walletLocked;
+      const walletBalancesRaw = walletData.balances || {};
 
+      setWalletBalances(walletBalancesRaw);
       setLockedUSDT(walletLocked);
       setAccountSummary((prev) => ({
         ...prev,
@@ -2932,6 +2938,24 @@ export default function Trading() {
     setOrderError("");
     setIsPlacingOrder(false);
   };
+  const executeSpotOrder = async (side: "buy" | "sell") => {
+    if (isPlacingOrder) return;
+    const amount = parseFloat(spotAmount);
+    if (!amount || amount <= 0) { setSpotError("Enter an amount"); return; }
+    setIsPlacingOrder(true);
+    setSpotError("");
+    try {
+      const api = await getAxios();
+      await api.post("/api/trade/spot", { symbol, pair: symbol, side, amount });
+      showToast(`Spot ${side === "buy" ? "buy" : "sell"} executed!`, "success");
+      setSpotAmount("");
+      await refreshAccountData();
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || "Spot order failed";
+      setSpotError(msg);
+    }
+    setIsPlacingOrder(false);
+  };
   const cancelOrder = async (id: string) => {
     try {
       const api = await getAxios();
@@ -3272,10 +3296,29 @@ export default function Trading() {
           <div style={{ fontSize: 10, color: COLORS.text }}>Locked USDT</div>
           <div style={{ fontSize: 12, color: COLORS.textBright, fontWeight: 600, fontFamily: "monospace" }}>${lockedUSDT.toFixed(2)}</div>
         </div>
+        {tradingMode === "spot" ? (
+        <>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 10, color: COLORS.text }}>{baseSymbol} Balance</div>
+          <div style={{ fontSize: 12, color: COLORS.textBright, fontWeight: 600, fontFamily: "monospace" }}>{(walletBalances[baseSymbol] || 0).toFixed(6)}</div>
+        </div>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 10, color: COLORS.text }}>Est. USDT Value</div>
+          <div style={{ fontSize: 12, color: COLORS.textBright, fontWeight: 600, fontFamily: "monospace" }}>${((walletBalances[baseSymbol] || 0) * lastPrice).toFixed(2)}</div>
+        </div>
+        </>
+        ) : (
+        <>
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 10, color: COLORS.text }}>Total Portfolio</div>
           <div style={{ fontSize: 12, color: COLORS.textBright, fontWeight: 600, fontFamily: "monospace" }}>${portfolioTotal.toFixed(2)}</div>
         </div>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 10, color: COLORS.text }}>Unrealized PnL</div>
+          <div style={{ fontSize: 12, color: COLORS.textBright, fontWeight: 600, fontFamily: "monospace" }}>${(accountUnrealizedPnl || 0).toFixed(2)}</div>
+        </div>
+        </>
+        )}
       </div>
       )}
 
@@ -3283,6 +3326,33 @@ export default function Trading() {
       {isChartView && (
       <div className="trading-order-form trading-dashboard__ticket" style={{ height: "auto", minHeight: isDesktopLayout ? 320 : 210, borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, display: "flex", flexShrink: 0, overflow: "visible" }}>
         <div className="trading-order-form__inner" style={{ width: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
+              {/* Spot / Futures tab switcher */}
+              <div style={{ display: "flex", gap: 0, padding: "6px 8px 0", flexShrink: 0 }}>
+                <button onClick={() => setTradingMode("spot")} style={{ flex: 1, height: 28, background: tradingMode === "spot" ? "#ff8c32" : "transparent", border: tradingMode === "spot" ? "none" : `1px solid ${COLORS.border}`, borderRadius: 6, color: tradingMode === "spot" ? "#fff" : COLORS.text, fontWeight: 600, fontSize: 11, cursor: "pointer", transition: "all 0.15s" }}>Spot</button>
+                <button onClick={() => setTradingMode("futures")} style={{ flex: 1, height: 28, background: tradingMode === "futures" ? "#ff8c32" : "transparent", border: tradingMode === "futures" ? "none" : `1px solid ${COLORS.border}`, borderRadius: 6, color: tradingMode === "futures" ? "#fff" : COLORS.text, fontWeight: 600, fontSize: 11, cursor: "pointer", transition: "all 0.15s" }}>Futures</button>
+              </div>
+              {tradingMode === "spot" ? (
+                /* SPOT ORDER FORM */
+                <div style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0, padding: "6px 8px" }}>
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 34 }}>
+                      <span style={{ fontSize: 11, color: COLORS.textMuted, width: 50 }}>Amount</span>
+                      <input type="number" value={spotAmount} onChange={e => setSpotAmount(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="0.0000" />
+                      <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>{baseSymbol}</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: COLORS.textMuted, padding: "0 2px" }}>
+                      <span>{baseSymbol} bal: {(walletBalances[baseSymbol] || 0).toFixed(6)}</span>
+                      <span>USDT bal: ${availableBalance.toFixed(2)}</span>
+                    </div>
+                    <div style={{ display: "flex", gap: 4 }}>
+                      <button onClick={() => { setSpotAmount(""); executeSpotOrder("buy"); }} style={{ flex: 1, height: 34, background: COLORS.green, border: "none", borderRadius: 6, color: "#000", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Buy {baseSymbol}</button>
+                      <button onClick={() => { setSpotAmount(""); executeSpotOrder("sell"); }} style={{ flex: 1, height: 34, background: COLORS.red, border: "none", borderRadius: 6, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Sell {baseSymbol}</button>
+                    </div>
+                    {spotError && <div style={{ fontSize: 10, color: COLORS.red, background: COLORS.redDim, padding: "4px 8px", borderRadius: 3, border: `1px solid ${COLORS.red}` }}>{spotError}</div>}
+                  </div>
+                </div>
+              ) : (
+              <>
               {!isDesktopLayout && !isTablet && (
                 <div style={{ display: "flex", gap: 4, padding: "0 8px", flexShrink: 0, marginTop: 2 }}>
                   <button onClick={() => setOrderSide("buy")} style={{ flex: 1, height: 28, background: orderSide === "buy" ? COLORS.green : "rgba(23,199,132,0.1)", border: orderSide === "buy" ? "none" : "1px solid rgba(23,199,132,0.25)", borderRadius: 14, color: orderSide === "buy" ? "#000" : COLORS.green, fontWeight: 700, fontSize: 11, letterSpacing: 0.5, cursor: "pointer", transition: "all 0.2s" }}>BUY</button>
@@ -3506,6 +3576,8 @@ export default function Trading() {
           </>
           )}
         </div>
+      </>
+      )}
       </div>
       </div>
       )}
@@ -3513,11 +3585,38 @@ export default function Trading() {
       {/* -- BOTTOM TAB BAR (between left & right panels) -- */}
       <div ref={bottomScrollRef} className="trading-bottom-panel trading-dashboard__activity" style={{ borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", height: 36, padding: "0 12px", gap: 0, borderBottom: `1px solid ${COLORS.border}` }}>
-          {[["openorders", `Open Orders(${activeOrders.length})`], ["positions", `Positions(${serverPositions.length})`], ["orderhistory", "Order History"], ["bots", "Bots"]].map(([key, label]) => (
-            <button key={key} onClick={() => setBottomTab(key as any)} style={{ padding: "0 14px", height: "100%", background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: bottomTab === key ? COLORS.textBright : COLORS.text, borderBottom: bottomTab === key ? `2px solid ${"#f0b90b"}` : "2px solid transparent", whiteSpace: "nowrap" }}>{label}</button>
-          ))}
+          {tradingMode === "spot"
+            ? [["openorders", `Open Orders(${activeOrders.length})`], ["balances", "Balances"], ["orderhistory", "Order History"], ["bots", "Bots"]].map(([key, label]) => (
+              <button key={key} onClick={() => setBottomTab(key as any)} style={{ padding: "0 14px", height: "100%", background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: bottomTab === key ? COLORS.textBright : COLORS.text, borderBottom: bottomTab === key ? `2px solid ${"#f0b90b"}` : "2px solid transparent", whiteSpace: "nowrap" }}>{label}</button>
+            ))
+            : [["openorders", `Open Orders(${activeOrders.length})`], ["positions", `Positions(${serverPositions.length})`], ["orderhistory", "Order History"], ["bots", "Bots"]].map(([key, label]) => (
+              <button key={key} onClick={() => setBottomTab(key as any)} style={{ padding: "0 14px", height: "100%", background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: bottomTab === key ? COLORS.textBright : COLORS.text, borderBottom: bottomTab === key ? `2px solid ${"#f0b90b"}` : "2px solid transparent", whiteSpace: "nowrap" }}>{label}</button>
+            ))}
         </div>
         <div style={{ maxHeight: 120, overflow: "auto" }}>
+          {tradingMode === "spot" && bottomTab === "balances" && (
+            <div style={{ padding: "0 14px" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10, fontFamily: "monospace" }}>
+                <tr style={{ color: COLORS.textMuted }}>
+                  <td style={{ padding: "6px 2px", textAlign: "left", borderBottom: `1px solid ${COLORS.border}` }}>Asset</td>
+                  <td style={{ padding: "6px 2px", textAlign: "right", borderBottom: `1px solid ${COLORS.border}` }}>Available</td>
+                  <td style={{ padding: "6px 2px", textAlign: "right", borderBottom: `1px solid ${COLORS.border}` }}>USDT Value</td>
+                </tr>
+                <tr style={{ color: COLORS.text }}>
+                  <td style={{ padding: "5px 2px", borderBottom: `1px solid ${COLORS.border}` }}>USDT</td>
+                  <td style={{ padding: "5px 2px", textAlign: "right", fontFamily: "monospace", borderBottom: `1px solid ${COLORS.border}` }}>{(walletBalances.USDT ?? availableBalance).toFixed(2)}</td>
+                  <td style={{ padding: "5px 2px", textAlign: "right", fontFamily: "monospace", borderBottom: `1px solid ${COLORS.border}` }}>${(walletBalances.USDT ?? availableBalance).toFixed(2)}</td>
+                </tr>
+                {Object.entries(walletBalances).filter(([asset]) => asset !== "USDT").map(([asset, bal]) => (
+                  <tr key={asset} style={{ color: COLORS.text }}>
+                    <td style={{ padding: "5px 2px", borderBottom: `1px solid ${COLORS.border}` }}>{asset}</td>
+                    <td style={{ padding: "5px 2px", textAlign: "right", fontFamily: "monospace", borderBottom: `1px solid ${COLORS.border}` }}>{bal.toFixed(6)}</td>
+                    <td style={{ padding: "5px 2px", textAlign: "right", fontFamily: "monospace", borderBottom: `1px solid ${COLORS.border}` }}>${(bal * lastPrice).toFixed(2)}</td>
+                  </tr>
+                ))}
+              </table>
+            </div>
+          )}
           {bottomTab === "positions" && (
 serverPositions.length === 0
   ? <div style={{ padding: 20, textAlign: "center", color: COLORS.textMuted, fontSize: 12 }}>No open positions</div>

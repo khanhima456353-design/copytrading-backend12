@@ -12,6 +12,7 @@ const walletSchema = new mongoose.Schema(
     isFrozen: { type: Boolean, default: false },
     totalBalance: { type: Number, default: 0 },
     currency: { type: String, default: "USDT" },
+    balances: { type: Map, of: Number, default: {} },
   },
   { timestamps: true }
 );
