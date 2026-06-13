@@ -4,6 +4,7 @@ const orderSchema = new mongoose.Schema(
   {
     orderId: { type: String, unique: true, sparse: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    category: { type: String, enum: ['futures', 'spot'], default: 'futures' },
     walletType: { type: String, enum: ['spot', 'cross', 'isolated'] },
     pair: { type: String, required: true },
     side: { type: String, enum: ['buy', 'sell'], required: true },
@@ -29,6 +30,7 @@ const orderSchema = new mongoose.Schema(
     clampedPnl: { type: Number, default: 0 },
     rawPnl: { type: Number, default: 0 },
     openedAt: { type: Date, default: Date.now },
+    filledAt: { type: Date },
     closedAt: { type: Date },
     feeRate: { type: Number, default: 0 },
     riskParameters: { type: mongoose.Schema.Types.Mixed },

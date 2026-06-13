@@ -1549,7 +1549,11 @@ export default function Trading() {
   const [priceInput, setPriceInput] = useState("");
   const [savedManualPriceInput, setSavedManualPriceInput] = useState("");
   const [tradingMode, setTradingMode] = useState<"spot" | "futures">("futures");
+  const [spotOrderType, setSpotOrderType] = useState<"market" | "limit" | "stop-limit">("market");
   const [spotAmount, setSpotAmount] = useState("");
+  const [spotPrice, setSpotPrice] = useState("");
+  const [spotStopPrice, setSpotStopPrice] = useState("");
+  const [spotSliderPct, setSpotSliderPct] = useState(0);
   const [spotError, setSpotError] = useState("");
   const [buyAmountInput, setBuyAmountInput] = useState("");
   const [buyTotalInput, setBuyTotalInput] = useState("");
@@ -2763,6 +2767,15 @@ export default function Trading() {
     setSellTotalInput((amount * price).toFixed(2));
   };
 
+  const applySpotPct = (p: number) => {
+    setSpotSliderPct(p);
+    const sp = parseFloat(spotPrice) || lastPrice || 0;
+    const maxBuy = sp > 0 ? availableBalance / sp : 0;
+    const maxSell = walletBalances[baseSymbol] || 0;
+    const ref = Math.max(maxBuy, maxSell);
+    setSpotAmount((ref * p / 100).toFixed(6));
+  };
+
   const effectiveBuyPrice = Number.isFinite(buyPrice) && buyPrice > 0 ? buyPrice : lastPrice;
   const effectiveBuyPriceForMax = (Number.isFinite(effectiveBuyPrice) && effectiveBuyPrice > 0)
     ? effectiveBuyPrice
@@ -2942,13 +2955,26 @@ export default function Trading() {
     if (isPlacingOrder) return;
     const amount = parseFloat(spotAmount);
     if (!amount || amount <= 0) { setSpotError("Enter an amount"); return; }
+    if (spotOrderType !== "market") {
+      const p = parseFloat(spotPrice);
+      if (!p || p <= 0) { setSpotError("Enter a price"); return; }
+      if (spotOrderType === "stop-limit") {
+        const sp = parseFloat(spotStopPrice);
+        if (!sp || sp <= 0) { setSpotError("Enter a stop price"); return; }
+      }
+    }
     setIsPlacingOrder(true);
     setSpotError("");
     try {
       const api = await getAxios();
-      await api.post("/api/trade/spot", { symbol, pair: symbol, side, amount });
-      showToast(`Spot ${side === "buy" ? "buy" : "sell"} executed!`, "success");
+      const payload: Record<string, any> = { symbol, pair: symbol, side, type: spotOrderType, amount };
+      if (spotOrderType !== "market") payload.price = parseFloat(spotPrice);
+      if (spotOrderType === "stop-limit") payload.stopPrice = parseFloat(spotStopPrice);
+      await api.post("/api/trade/spot", payload);
+      showToast(`Spot ${side === "buy" ? "buy" : "sell"} order placed!`, "success");
       setSpotAmount("");
+      setSpotPrice("");
+      setSpotStopPrice("");
       await refreshAccountData();
     } catch (err: any) {
       const msg = err?.response?.data?.error || err?.message || "Spot order failed";
@@ -3335,11 +3361,51 @@ export default function Trading() {
                 /* SPOT ORDER FORM */
                 <div style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0, padding: "6px 8px" }}>
                   <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+                    {/* Order type tabs */}
+                    <div style={{ display: "flex", gap: 8, marginBottom: 0 }}>
+                      {(["Market", "Limit", "Stop Limit"] as const).map(t => (
+                        <button key={t} onClick={() => setSpotOrderType(t.toLowerCase().replace(" ", "-") as any)} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 11, color: spotOrderType === t.toLowerCase().replace(" ", "-") ? COLORS.textBright : COLORS.text, borderBottom: spotOrderType === t.toLowerCase().replace(" ", "-") ? `2px solid ${"#f0b90b"}` : "2px solid transparent", paddingBottom: 2 }}>{t}</button>
+                      ))}
+                    </div>
+                    {/* Price input for limit/stop-limit */}
+                    {spotOrderType !== "market" && (
+                      <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 34 }}>
+                        <span style={{ fontSize: 11, color: COLORS.textMuted, width: 50 }}>Price</span>
+                        <input type="number" value={spotPrice} onChange={e => setSpotPrice(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="0.00" />
+                        <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT</span>
+                      </div>
+                    )}
+                    {/* Stop Price for stop-limit */}
+                    {spotOrderType === "stop-limit" && (
+                      <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 34 }}>
+                        <span style={{ fontSize: 11, color: COLORS.textMuted, width: 50 }}>Stop</span>
+                        <input type="number" value={spotStopPrice} onChange={e => setSpotStopPrice(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="0.00" />
+                        <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT</span>
+                      </div>
+                    )}
+                    {/* Amount */}
                     <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 34 }}>
                       <span style={{ fontSize: 11, color: COLORS.textMuted, width: 50 }}>Amount</span>
                       <input type="number" value={spotAmount} onChange={e => setSpotAmount(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="0.0000" />
                       <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>{baseSymbol}</span>
                     </div>
+                    {/* Slider + % buttons + Total — only for limit */}
+                    {spotOrderType === "limit" && (
+                      <>
+                      <div style={{ padding: "2px 0" }}>
+                        <input type="range" min={0} max={100} value={spotSliderPct} onChange={e => applySpotPct(Number(e.target.value))} style={{ width: "100%", accentColor: COLORS.green }} />
+                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                          {[0, 25, 50, 75, 100].map(p => (
+                            <button key={p} onClick={() => applySpotPct(p)} style={{ background: "transparent", border: "none", fontSize: 10, color: COLORS.textMuted, cursor: "pointer", padding: 0 }}>{p}%</button>
+                          ))}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: COLORS.textBright, fontFamily: "monospace", padding: "0 2px" }}>
+                        <span>Total</span>
+                        <span>${(parseFloat(spotAmount || "0") * parseFloat(spotPrice || "0")).toFixed(2)} USDT</span>
+                      </div>
+                      </>
+                    )}
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: COLORS.textMuted, padding: "0 2px" }}>
                       <span>{baseSymbol} bal: {(walletBalances[baseSymbol] || 0).toFixed(6)}</span>
                       <span>USDT bal: ${availableBalance.toFixed(2)}</span>

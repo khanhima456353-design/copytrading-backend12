@@ -949,52 +949,107 @@ app.post('/api/trade/cancel', authMiddleware, async (req, res) => {
     if (!orderId) {
       return res.status(400).json({ success: false, message: "orderId is required" });
     }
-    const order = await orderService.cancelOrder(orderId);
-    return res.json({ success: true, data: { order } });
+    const order = await Order.findById(orderId) || await Order.findOne({ orderId });
+    if (!order) return res.status(404).json({ success: false, message: "Order not found" });
+    if (order.status !== "open" && order.status !== "pending") return res.status(400).json({ success: false, message: "Order is not open or pending" });
+
+    if (order.category === "spot") {
+      const [base] = order.pair.includes("/") ? order.pair.split("/") : [order.pair.replace(/USDT$/, ""), "USDT"];
+      if (order.side === "buy") {
+        await walletService.creditBalance(order.userId, order.amount * order.price, `Refund spot ${order.type} cancel ${order.amount} ${base}`, "manual_credit");
+      } else {
+        await walletService.creditAsset(order.userId, base, order.amount);
+      }
+      order.status = "cancelled";
+      order.closedAt = new Date();
+      await order.save();
+      return res.json({ success: true, data: { order } });
+    }
+
+    const result = await orderService.cancelOrder(orderId);
+    return res.json({ success: true, data: { order: result } });
   } catch (error) {
     console.error('Cancel error:', error.message, error.stack);
     return res.status(400).json({ success: false, message: error.message });
   }
 });
 
-// Spot trade endpoint – immediate buy/sell execution (no leverage, no position, no simulation)
+// Spot trade endpoint – Market / Limit / Stop Limit (no leverage, no position, no simulation)
 app.post('/api/trade/spot', authMiddleware, async (req, res) => {
   try {
-    const { symbol, pair, side, amount } = req.body;
+    const { symbol, pair, side, type, amount, price, stopPrice } = req.body;
+    const orderType = type || "market";
     if (!symbol || !side || !amount || amount <= 0) {
       return res.status(400).json({ success: false, error: "symbol, side, and amount are required" });
     }
+    if ((orderType === "limit" || orderType === "stop-limit") && (!price || price <= 0)) {
+      return res.status(400).json({ success: false, error: "price must be a positive number for limit/stop-limit orders" });
+    }
+    if (orderType === "stop-limit" && (!stopPrice || stopPrice <= 0)) {
+      return res.status(400).json({ success: false, error: "stopPrice required for stop-limit orders" });
+    }
+
     const userId = req.user._id;
     const tradingPair = pair || symbol;
     const [base, quote] = tradingPair.includes("/") ? tradingPair.split("/") : [tradingPair.replace(/USDT$/, ""), "USDT"];
 
-    // Get current price from cache
     const currentPrice = Number(cachedMarketPrices[tradingPair]?.price || 0);
     if (!currentPrice || currentPrice <= 0) {
       return res.status(400).json({ success: false, error: "No price available for this pair" });
     }
 
-    const totalCost = amount * currentPrice;
-    const takerFee = totalCost * 0.0004; // 0.04%
+    const limitPrice = Number(price) || currentPrice;
+    const totalCost = amount * (orderType === "market" ? currentPrice : limitPrice);
+    const takerFee = totalCost * 0.0004;
+    const makerFee = totalCost * 0.0002;
 
     await walletService.ensureWallet(userId);
 
-    if (side === "buy") {
-      await walletService.debitBalance(userId, totalCost, `Spot buy ${amount} ${base} @ ${currentPrice}`, "trade");
-      if (takerFee > 0) {
-        await walletService.debitBalance(userId, takerFee, `Fee for spot buy ${amount} ${base}`, "fee");
+    if (orderType === "market") {
+      // Immediate execution
+      if (side === "buy") {
+        await walletService.debitBalance(userId, totalCost, `Spot market buy ${amount} ${base} @ ${currentPrice}`, "trade");
+        if (takerFee > 0) await walletService.debitBalance(userId, takerFee, `Fee spot buy ${amount} ${base}`, "fee");
+        await walletService.creditAsset(userId, base, amount);
+      } else {
+        const assetBal = await walletService.getAssetBalance(userId, base);
+        if (assetBal < amount) return res.status(400).json({ success: false, error: `Insufficient ${base}: ${assetBal.toFixed(6)}` });
+        await walletService.debitAsset(userId, base, amount);
+        await walletService.creditBalance(userId, totalCost, `Spot market sell ${amount} ${base} @ ${currentPrice}`, "trade");
+        if (takerFee > 0) await walletService.debitBalance(userId, takerFee, `Fee spot sell ${amount} ${base}`, "fee");
       }
-      await walletService.creditAsset(userId, base, amount);
     } else {
-      const assetBal = await walletService.getAssetBalance(userId, base);
-      if (assetBal < amount) {
-        return res.status(400).json({ success: false, error: `Insufficient ${base} balance: ${assetBal.toFixed(6)}` });
+      // Limit or Stop-Limit – deduct funds upfront, create pending order
+      if (side === "buy") {
+        const deductAmt = totalCost;
+        await walletService.debitBalance(userId, deductAmt, `Spot ${orderType} buy hold ${amount} ${base} @ ${limitPrice}`, "trade");
+      } else {
+        const assetBal = await walletService.getAssetBalance(userId, base);
+        if (assetBal < amount) return res.status(400).json({ success: false, error: `Insufficient ${base}: ${assetBal.toFixed(6)}` });
+        await walletService.debitAsset(userId, base, amount);
       }
-      await walletService.debitAsset(userId, base, amount);
-      await walletService.creditBalance(userId, totalCost, `Spot sell ${amount} ${base} @ ${currentPrice}`, "trade");
-      if (takerFee > 0) {
-        await walletService.debitBalance(userId, takerFee, `Fee for spot sell ${amount} ${base}`, "fee");
+
+      const order = await Order.create({
+        userId,
+        category: "spot",
+        pair: tradingPair,
+        side,
+        type: orderType,
+        price: limitPrice,
+        amount,
+        quantity: amount,
+        stopPrice: orderType === "stop-limit" ? Number(stopPrice) : undefined,
+        status: "pending",
+        openedAt: new Date(),
+        entryPrice: limitPrice,
+        lockedAmount: totalCost,
+      });
+      if (!order.orderId) {
+        order.orderId = order._id.toString();
+        await order.save();
       }
+
+      return res.status(201).json({ success: true, data: { order } });
     }
 
     return res.json({ success: true, data: { side, pair: tradingPair, amount, price: currentPrice, total: totalCost } });
@@ -1189,6 +1244,31 @@ orderMonitor.startMonitor({
       await pos.save();
     }
     startPositionSimulation(order.userId, pos);
+  },
+  onSpotFill: async (order, fillPrice) => {
+    try {
+      const pair = order.pair;
+      const [base, quote] = pair.includes("/") ? pair.split("/") : [pair.replace(/USDT$/, ""), "USDT"];
+      const totalCost = order.amount * fillPrice;
+      const makerFee = totalCost * 0.0002;
+      const wallet = await walletService.ensureWallet(order.userId);
+
+      if (order.side === "buy") {
+        await walletService.creditAsset(order.userId, base, order.amount);
+        if (makerFee > 0) {
+          await walletService.debitBalance(order.userId, makerFee, `Maker fee spot buy ${order.amount} ${base}`, "fee");
+        }
+      } else {
+        const creditAmount = totalCost - makerFee;
+        await walletService.creditBalance(order.userId, creditAmount, `Spot limit sell ${order.amount} ${base} @ ${fillPrice}`, "trade");
+        if (makerFee > 0) {
+          await walletService.debitBalance(order.userId, makerFee, `Maker fee spot sell ${order.amount} ${base}`, "fee");
+        }
+      }
+      console.log(`[SpotFill] Filled ${order.side} ${order.amount} ${pair} @ ${fillPrice}`);
+    } catch (err) {
+      console.error(`[SpotFill] Error filling order ${order._id}:`, err.message);
+    }
   },
 });
 

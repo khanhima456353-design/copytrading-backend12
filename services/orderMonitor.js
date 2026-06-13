@@ -5,12 +5,14 @@ let getPrice = (pair) => null;
 let getSimulatedPrice = (userId, pair) => null;
 let closeOrder = null;
 let onActivate = null;
+let onSpotFill = null;
 
 function startMonitor(opts) {
   getPrice = opts.getPrice || getPrice;
   getSimulatedPrice = opts.getSimulatedPrice || getSimulatedPrice;
   closeOrder = opts.closeOrder || closeOrder;
   onActivate = opts.onActivate || onActivate;
+  onSpotFill = opts.onSpotFill || onSpotFill;
   setTimeout(() => reconcileOpenPositions(), 1000);
   setInterval(tick, 2000);
 }
@@ -100,14 +102,22 @@ async function checkPendingTriggers() {
         ? (order.side === "buy" ? Math.min(order.price, currentPrice) : Math.max(order.price, currentPrice))
         : currentPrice;
 
-      // Save order as "open" FIRST — prevents double-counting if onActivate fails
-      order.status = "open";
-      order.entryPrice = fillPrice;
-      order.openedAt = new Date();
-      await order.save();
-
-      if (typeof onActivate === "function") {
-        await onActivate(order, fillPrice);
+      if (order.category === "spot") {
+        order.status = "filled";
+        order.filledAt = new Date();
+        order.entryPrice = fillPrice;
+        await order.save();
+        if (typeof onSpotFill === "function") {
+          await onSpotFill(order, fillPrice);
+        }
+      } else {
+        order.status = "open";
+        order.entryPrice = fillPrice;
+        order.openedAt = new Date();
+        await order.save();
+        if (typeof onActivate === "function") {
+          await onActivate(order, fillPrice);
+        }
       }
       console.log(`[OrderMonitor] Triggered ${order.type} ${order._id} at ${fillPrice}`);
     } catch (err) {
