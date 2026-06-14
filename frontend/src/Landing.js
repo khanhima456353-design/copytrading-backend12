@@ -74,6 +74,7 @@ export default function Landing() {
   const [company, setCompany] = useState("");
   const [activeFAQ, setActiveFAQ] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showTradeDropdown, setShowTradeDropdown] = useState(false);
 
   const faqs = [
     {
@@ -147,9 +148,19 @@ export default function Landing() {
             </Link>
 
             <nav className="nav-links">
-              <Link to="/trade" className="nav-dropdown">
-                Trade <ChevronDown className="w-4 h-4" />
-              </Link>
+              <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}
+                onMouseEnter={() => setShowTradeDropdown(true)}
+                onMouseLeave={() => setShowTradeDropdown(false)}>
+                <span style={{ color: "var(--text-current)", cursor: "pointer", fontSize: 14, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  Trade <ChevronDown size={14} />
+                </span>
+                {showTradeDropdown && (
+                  <div style={{ position: "absolute", top: "100%", left: 0, background: "var(--surface, #1E2329)", border: "1px solid var(--border, #2B2F36)", borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.3)", minWidth: 120, zIndex: 100, overflow: "hidden" }}>
+                    <button onClick={() => { navigate("/trade", { state: { mode: "spot" } }); setShowTradeDropdown(false); }} style={{ display: "block", width: "100%", padding: "10px 16px", background: "transparent", border: "none", color: "var(--text-current)", fontSize: 13, textAlign: "left", cursor: "pointer" }}>Spot</button>
+                    <button onClick={() => { navigate("/trade", { state: { mode: "futures" } }); setShowTradeDropdown(false); }} style={{ display: "block", width: "100%", padding: "10px 16px", background: "transparent", border: "none", color: "var(--text-current)", fontSize: 13, textAlign: "left", cursor: "pointer" }}>Futures</button>
+                  </div>
+                )}
+              </div>
               <Link to="/markets">Markets</Link>
               <Link to="/earn">Earn</Link>
               <Link to="/research">Research</Link>
@@ -181,9 +192,9 @@ export default function Landing() {
                 </button>
               </div>
               <nav className="lm-nav-links">
-                <Link to="/trade" className="lm-nav-item" onClick={() => setMobileMenuOpen(false)}>
-                  <ChevronDown className="w-4 h-4" /> Trade
-                </Link>
+                <div style={{ padding: "0 20px", fontSize: 11, color: "var(--text-muted)", marginTop: 4, marginBottom: 2 }}>TRADING</div>
+                <Link to="/trade" className="lm-nav-item" onClick={() => setMobileMenuOpen(false)} state={{ mode: "spot" }}>Spot</Link>
+                <Link to="/trade" className="lm-nav-item" onClick={() => setMobileMenuOpen(false)} state={{ mode: "futures" }}>Futures</Link>
                 <Link to="/markets" className="lm-nav-item" onClick={() => setMobileMenuOpen(false)}>Markets</Link>
                 <Link to="/earn" className="lm-nav-item" onClick={() => setMobileMenuOpen(false)}>Earn</Link>
                 <Link to="/research" className="lm-nav-item" onClick={() => setMobileMenuOpen(false)}>Research</Link>

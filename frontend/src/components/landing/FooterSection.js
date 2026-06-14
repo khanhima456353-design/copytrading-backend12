@@ -23,7 +23,7 @@ export default function FooterSection() {
 
       <div className="landing-footer__links">
         {footerLinks.map((link) => (
-          <button key={link.label} type="button" className="link-button" onClick={() => navigate(link.path)}>
+          <button key={link.label} type="button" className="link-button" onClick={() => navigate(link.path, link.label === "Trading" ? { state: { mode: "futures" } } : undefined)}>
             {link.label}
           </button>
         ))}

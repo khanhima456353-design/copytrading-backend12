@@ -197,6 +197,16 @@ export default function HomeDashboard() {
   const [liveTickers, setLiveTickers] = useState<{ symbol: string; price: string; change: string; up: boolean }[]>([]);
   const [liveMarkets, setLiveMarkets] = useState<MarketRow[]>([]);
   const [marketInsights, setMarketInsights] = useState<{ label: string; val: string; c: string }[] | null>(null);
+  const [showTradeDropdown, setShowTradeDropdown] = useState(false);
+  const tradeRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (tradeRef.current && !tradeRef.current.contains(e.target as Node)) setShowTradeDropdown(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   const userEmail = localStorage.getItem("userEmail") || "user@example.com";
   const userId = localStorage.getItem("userId") || "SW-000000";
@@ -336,7 +346,7 @@ export default function HomeDashboard() {
 
   const handleScreenChange = (s: Screen | "trade") => {
     if (s === "markets") { navigate("/markets", { state: { embed: true } }); return; }
-    if (s === "trade") { navigate("/trade"); return; }
+    if (s === "trade") { navigate("/trade", { state: { mode: "futures" } }); return; }
     setScreen(s);
   };
 
@@ -345,7 +355,7 @@ export default function HomeDashboard() {
 
   const renderHomeScreen = () => (
     <>
-      <div className="hd-balance-hero">
+      <div className="hd-balance-hero" style={showTradeDropdown ? { overflow: "visible" } : undefined}>
         <div className="hd-hero-grid" />
         <div className="hd-hero-glow" />
           <div className="hd-hero-top">
@@ -401,15 +411,32 @@ export default function HomeDashboard() {
           {[
             { label: "Deposit",  icon: "↓", c: "#0ecb81" },
             { label: "Withdraw", icon: "↑", c: "#f6465d" },
-            { label: "Trade",    icon: "⇄", c: "#378ADD" },
+            { label: "Trade",    icon: "⇄", c: "#378ADD", dropdown: true },
             { label: "Transfer", icon: "⟳", c: "#ff8c32" },
           ].map((a, i) => (
-            <div key={i} className="hd-qa-item" onClick={() => { if (a.label === "Trade") navigate("/trade"); }} style={{ cursor: a.label === "Trade" ? "pointer" : undefined }}>
-              <div className="hd-qa-icon" style={{ borderColor: `${a.c}44`, color: a.c, background: `${a.c}11` }}>
-                {a.icon}
+            a.dropdown ? (
+              <div key={i} ref={tradeRef} style={{ position: "relative" }}>
+                <div className="hd-qa-item" onClick={() => setShowTradeDropdown(prev => !prev)} style={{ cursor: "pointer" }}>
+                  <div className="hd-qa-icon" style={{ borderColor: `${a.c}44`, color: a.c, background: `${a.c}11` }}>
+                    {a.icon}
+                  </div>
+                  <span className="hd-qa-label" style={{ color: a.c }}>{a.label}</span>
+                </div>
+                {showTradeDropdown && (
+                  <div style={{ position: "absolute", top: "100%", left: "50%", transform: "translateX(-50%)", marginTop: 4, background: "var(--surface, #1E2329)", border: "1px solid var(--border, #2B2F36)", borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.3)", minWidth: 130, zIndex: 9999, overflow: "hidden" }}>
+                    <button onClick={() => { navigate("/trade", { state: { mode: "spot" } }); setShowTradeDropdown(false); }} style={{ display: "block", width: "100%", padding: "10px 16px", background: "transparent", border: "none", color: "var(--text-current)", fontSize: 13, textAlign: "left", cursor: "pointer" }}>Spot</button>
+                    <button onClick={() => { navigate("/trade", { state: { mode: "futures" } }); setShowTradeDropdown(false); }} style={{ display: "block", width: "100%", padding: "10px 16px", background: "transparent", border: "none", color: "var(--text-current)", fontSize: 13, textAlign: "left", cursor: "pointer" }}>Futures</button>
+                  </div>
+                )}
               </div>
-              <span className="hd-qa-label" style={{ color: a.c }}>{a.label}</span>
-            </div>
+            ) : (
+              <div key={i} className="hd-qa-item" style={{ cursor: "pointer" }}>
+                <div className="hd-qa-icon" style={{ borderColor: `${a.c}44`, color: a.c, background: `${a.c}11` }}>
+                  {a.icon}
+                </div>
+                <span className="hd-qa-label" style={{ color: a.c }}>{a.label}</span>
+              </div>
+            )
           ))}
         </div>
       </div>

@@ -13,6 +13,7 @@ export default function Navbar({ showAuth = true, minimal = false, homepage = fa
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   const [notifDropdown, setNotifDropdown] = useState([]);
+  const [showTradeDropdown, setShowTradeDropdown] = useState(false);
 
   useEffect(() => {
     if (!homepage) return;
@@ -49,7 +50,19 @@ export default function Navbar({ showAuth = true, minimal = false, homepage = fa
 
   const navLinks = (
     <nav className="nav-links">
-      <Link to="/trade" className="nav-dropdown">Trade <ChevronDown className="w-4 h-4" /></Link>
+      <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}
+        onMouseEnter={() => setShowTradeDropdown(true)}
+        onMouseLeave={() => setShowTradeDropdown(false)}>
+        <span style={{ color: "var(--text-current)", cursor: "pointer", fontSize: 14, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 4 }}>
+          Trade <ChevronDown size={14} />
+        </span>
+        {showTradeDropdown && (
+          <div style={{ position: "absolute", top: "100%", left: 0, background: "var(--surface, #1E2329)", border: "1px solid var(--border, #2B2F36)", borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.3)", minWidth: 120, zIndex: 100, overflow: "hidden" }}>
+            <button onClick={() => { navigate("/trade", { state: { mode: "spot" } }); setShowTradeDropdown(false); }} style={{ display: "block", width: "100%", padding: "10px 16px", background: "transparent", border: "none", color: "var(--text-current)", fontSize: 13, textAlign: "left", cursor: "pointer" }}>Spot</button>
+            <button onClick={() => { navigate("/trade", { state: { mode: "futures" } }); setShowTradeDropdown(false); }} style={{ display: "block", width: "100%", padding: "10px 16px", background: "transparent", border: "none", color: "var(--text-current)", fontSize: 13, textAlign: "left", cursor: "pointer" }}>Futures</button>
+          </div>
+        )}
+      </div>
       <Link to="/markets">Markets</Link>
       <Link to="/earn">Earn</Link>
       <Link to="/research">Research</Link>
@@ -140,9 +153,9 @@ export default function Navbar({ showAuth = true, minimal = false, homepage = fa
                 </button>
               </div>
               <nav className="nav-mobile-links">
-                <Link to="/trade" className="nav-mobile-item" onClick={() => setIsMobileMenuOpen(false)}>
-                  Trade
-                </Link>
+                <div style={{ padding: "8px 20px 4px", fontSize: 11, color: "var(--text-muted, #848e9c)", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" }}>Trading</div>
+                <Link to="/trade" className="nav-mobile-item" onClick={() => setIsMobileMenuOpen(false)} state={{ mode: "spot" }}>Spot</Link>
+                <Link to="/trade" className="nav-mobile-item" onClick={() => setIsMobileMenuOpen(false)} state={{ mode: "futures" }}>Futures</Link>
                 <Link to="/markets" className="nav-mobile-item" onClick={() => setIsMobileMenuOpen(false)}>Markets</Link>
                 <Link to="/earn" className="nav-mobile-item" onClick={() => setIsMobileMenuOpen(false)}>Earn</Link>
                 <Link to="/research" className="nav-mobile-item" onClick={() => setIsMobileMenuOpen(false)}>Research</Link>

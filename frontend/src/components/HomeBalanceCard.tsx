@@ -12,6 +12,16 @@ export function HomeBalanceCard() {
   const { theme } = useTheme();
   const [dailyChange, setDailyChange] = useState<number | null>(null);
   const [weeklyChange, setWeeklyChange] = useState<number | null>(null);
+  const [showTradeDropdown, setShowTradeDropdown] = useState(false);
+  const tradeRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (tradeRef.current && !tradeRef.current.contains(e.target as Node)) setShowTradeDropdown(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   useEffect(() => {
     const unsubscribe = subscribeServerMarketUpdate((update) => {
@@ -89,16 +99,24 @@ export function HomeBalanceCard() {
               <strong>{formatPercent(weeklyChange)}</strong>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={handleTradeClick}
-            style={{
-              ...styles.tradeButton,
-              background: colors.primary,
-            }}
-          >
-            Trade now
-          </button>
+          <div ref={tradeRef} style={{ position: "relative" }}>
+            <button
+              type="button"
+              onClick={() => setShowTradeDropdown(prev => !prev)}
+              style={{
+                ...styles.tradeButton,
+                background: colors.primary,
+              }}
+            >
+              Trade now
+            </button>
+            {showTradeDropdown && (
+              <div style={{ position: "absolute", top: "100%", right: 0, marginTop: 4, background: colors.surface, border: "1px solid " + colors.border, borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.3)", minWidth: 130, zIndex: 100, overflow: "hidden" }}>
+                <button onClick={() => { navigate("/trade", { state: { mode: "spot" } }); setShowTradeDropdown(false); }} style={{ display: "block", width: "100%", padding: "10px 16px", background: "transparent", border: "none", color: colors.text, fontSize: 13, textAlign: "left", cursor: "pointer" }}>Spot</button>
+                <button onClick={() => { navigate("/trade", { state: { mode: "futures" } }); setShowTradeDropdown(false); }} style={{ display: "block", width: "100%", padding: "10px 16px", background: "transparent", border: "none", color: colors.text, fontSize: 13, textAlign: "left", cursor: "pointer" }}>Futures</button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -145,8 +163,11 @@ export function HomeBalanceCard() {
       </div>
 
       <div style={styles.ctaRow}>
-        <button type="button" onClick={() => navigate("/trade") } style={{ ...styles.ctaButton, background: colors.primary }}>
-          Trade
+        <button type="button" onClick={() => { navigate("/trade", { state: { mode: "spot" } }); }} style={{ ...styles.ctaButton, background: colors.primary }}>
+          Trade Spot
+        </button>
+        <button type="button" onClick={() => { navigate("/trade", { state: { mode: "futures" } }); }} style={{ ...styles.ctaButton, background: colors.primary }}>
+          Trade Futures
         </button>
         <button type="button" onClick={() => navigate("/trade") } style={{ ...styles.secondaryButton, borderColor: colors.border, color: colors.text }}>
           Deposit

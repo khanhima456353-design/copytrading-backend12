@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import logo from "../assets/logo.jpg";
 import "./Trading.css";
 import { getAxios } from "../api";
@@ -1548,7 +1548,9 @@ export default function Trading() {
   const [marketState, setMarketState] = useState<MarketState | null>(null);
   const [priceInput, setPriceInput] = useState("");
   const [savedManualPriceInput, setSavedManualPriceInput] = useState("");
-  const [tradingMode, setTradingMode] = useState<"spot" | "futures">("futures");
+  const location = useLocation();
+  const lockedMode = (location.state as any)?.mode as "spot" | "futures" | undefined;
+  const [tradingMode, setTradingMode] = useState<"spot" | "futures">(lockedMode || "futures");
   const [spotOrderType, setSpotOrderType] = useState<"market" | "limit" | "stop-limit">("market");
   const [spotAmount, setSpotAmount] = useState("");
   const [spotTotal, setSpotTotal] = useState("");
@@ -3382,11 +3384,13 @@ export default function Trading() {
       {isChartView && (
       <div className="trading-order-form trading-dashboard__ticket" style={{ height: "auto", minHeight: isDesktopLayout ? 320 : 210, borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, display: "flex", flexShrink: 0, overflow: "visible" }}>
         <div className="trading-order-form__inner" style={{ width: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
-              {/* Spot / Futures tab switcher */}
+              {/* Spot / Futures tab switcher — hidden when mode is locked from navigation */}
+              {!lockedMode && (
               <div style={{ display: "flex", gap: 0, padding: "6px 8px 0", flexShrink: 0 }}>
                 <button onClick={() => setTradingMode("spot")} style={{ flex: 1, height: 28, background: tradingMode === "spot" ? "#ff8c32" : "transparent", border: tradingMode === "spot" ? "none" : `1px solid ${COLORS.border}`, borderRadius: 6, color: tradingMode === "spot" ? "#fff" : COLORS.text, fontWeight: 600, fontSize: 11, cursor: "pointer", transition: "all 0.15s" }}>Spot</button>
                 <button onClick={() => setTradingMode("futures")} style={{ flex: 1, height: 28, background: tradingMode === "futures" ? "#ff8c32" : "transparent", border: tradingMode === "futures" ? "none" : `1px solid ${COLORS.border}`, borderRadius: 6, color: tradingMode === "futures" ? "#fff" : COLORS.text, fontWeight: 600, fontSize: 11, cursor: "pointer", transition: "all 0.15s" }}>Futures</button>
               </div>
+              )}
               {tradingMode === "spot" ? (
                 /* SPOT ORDER FORM */
                 <div style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0, padding: "6px 8px" }}>
