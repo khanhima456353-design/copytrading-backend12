@@ -1006,8 +1006,25 @@ app.post('/api/trade/spot', authMiddleware, async (req, res) => {
     const tradingPair = pair || symbol;
     const [base, quote] = tradingPair.includes("/") ? tradingPair.split("/") : [tradingPair.replace(/USDT$/, ""), "USDT"];
 
-    const currentPrice = Number(cachedMarketPrices[tradingPair] || 0);
-    if (!currentPrice || currentPrice <= 0) {
+    function getCurrentPrice() {
+      const p = Number(cachedMarketPrices[tradingPair] || 0);
+      if (p > 0) return p;
+      return null;
+    }
+
+    let currentPrice = getCurrentPrice();
+    if (!currentPrice) {
+      // Fallback: try fetching price from Binance REST API directly
+      try {
+        const binanceSymbol = tradingPair.replace("/", "");
+        const { data: tickerData } = await axios.get(`${BINANCE_API_BASE}/api/v3/ticker/price?symbol=${binanceSymbol}`, { timeout: 5000 });
+        if (tickerData && Number(tickerData.price) > 0) {
+          cachedMarketPrices[tradingPair] = Number(tickerData.price);
+          currentPrice = Number(tickerData.price);
+        }
+      } catch (_) {}
+    }
+    if (!currentPrice) {
       return res.status(400).json({ success: false, error: "No price available for this pair" });
     }
 
@@ -1444,7 +1461,16 @@ binanceWS.on('price', (data) => {
   }
 });
 
+// Convert Binance symbol (e.g. "BTCUSDT") to pair format (e.g. "BTC/USDT")
+function symbolToPair(s) {
+  if (!s || !s.endsWith('USDT')) return null;
+  const base = s.slice(0, -4);
+  if (!base) return null;
+  return `${base}/USDT`;
+}
+
 // Forward allTickers (24hr ticker for ALL symbols) to frontend
+// Also populate cachedMarketPrices for every pair so spot orders work for all symbols
 let allTickersReceived = false;
 let allTickersFallbackTimer = null;
 
@@ -1455,6 +1481,13 @@ binanceWS.on('allTickers', (tickers) => {
     if (allTickersFallbackTimer) {
       clearInterval(allTickersFallbackTimer);
       allTickersFallbackTimer = null;
+    }
+  }
+  // Cache price for every USDT pair from the all-symbols feed
+  for (const t of tickers) {
+    if (t && t.symbol && Number.isFinite(t.price) && t.price > 0) {
+      const pair = symbolToPair(t.symbol);
+      if (pair) cachedMarketPrices[pair] = t.price;
     }
   }
   io.emit('allTickers', tickers);
@@ -1488,6 +1521,11 @@ async function fetchAllTickersRest() {
       }))
       .filter(t => Number.isFinite(t.price) && t.price > 0);
     if (tickers.length) {
+      // Cache prices for all USDT pairs from REST fallback too
+      for (const t of tickers) {
+        const pair = symbolToPair(t.symbol);
+        if (pair) cachedMarketPrices[pair] = t.price;
+      }
       io.emit('allTickers', tickers);
     }
   } catch (err) {
