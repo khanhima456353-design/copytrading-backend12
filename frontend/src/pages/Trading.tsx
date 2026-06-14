@@ -2997,6 +2997,22 @@ export default function Trading() {
         if (!sp || sp <= 0) { setSpotError("Enter a stop price"); return; }
       }
     }
+    // Client-side balance check before sending to server
+    if (side === "sell") {
+      const baseBal = walletBalances[baseSymbol] || 0;
+      if (amount > baseBal) {
+        setSpotError(`Insufficient ${baseSymbol}: ${baseBal.toFixed(6)}`);
+        return;
+      }
+    }
+    if (side === "buy") {
+      const price = spotOrderType === "market" ? lastPrice : parseFloat(spotPrice);
+      const totalCost = amount * price;
+      if (totalCost > availableBalance) {
+        setSpotError(`Insufficient USDT: need $${totalCost.toFixed(2)} but have $${availableBalance.toFixed(2)}`);
+        return;
+      }
+    }
     setIsPlacingOrder(true);
     setSpotError("");
     try {
@@ -3473,14 +3489,14 @@ export default function Trading() {
                       ) : (
                         <>
                           {(!isDesktopLayout && !isTablet) ? (
-                            orderSide === "buy" && <button onClick={() => { setSpotAmount(""); executeSpotOrder("buy"); }} style={{ flex: 1, height: 34, background: COLORS.green, border: "none", borderRadius: 6, color: "#000", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Buy {baseSymbol}</button>
+                            orderSide === "buy" && <button onClick={() => executeSpotOrder("buy")} style={{ flex: 1, height: 34, background: COLORS.green, border: "none", borderRadius: 6, color: "#000", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Buy {baseSymbol}</button>
                           ) : (
-                            <button onClick={() => { setSpotAmount(""); executeSpotOrder("buy"); }} style={{ flex: 1, height: 34, background: COLORS.green, border: "none", borderRadius: 6, color: "#000", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Buy {baseSymbol}</button>
+                            <button onClick={() => executeSpotOrder("buy")} style={{ flex: 1, height: 34, background: COLORS.green, border: "none", borderRadius: 6, color: "#000", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Buy {baseSymbol}</button>
                           )}
                           {(!isDesktopLayout && !isTablet) ? (
-                            orderSide === "sell" && <button onClick={() => { setSpotAmount(""); executeSpotOrder("sell"); }} style={{ flex: 1, height: 34, background: COLORS.red, border: "none", borderRadius: 6, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Sell {baseSymbol}</button>
+                            orderSide === "sell" && <button onClick={() => executeSpotOrder("sell")} style={{ flex: 1, height: 34, background: COLORS.red, border: "none", borderRadius: 6, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Sell {baseSymbol}</button>
                           ) : (
-                            <button onClick={() => { setSpotAmount(""); executeSpotOrder("sell"); }} style={{ flex: 1, height: 34, background: COLORS.red, border: "none", borderRadius: 6, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Sell {baseSymbol}</button>
+                            <button onClick={() => executeSpotOrder("sell")} style={{ flex: 1, height: 34, background: COLORS.red, border: "none", borderRadius: 6, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Sell {baseSymbol}</button>
                           )}
                         </>
                       )}
