@@ -6,7 +6,7 @@ import { getAxios } from "../api";
 import authService from "../services/authService";
 import { MarketState, subscribeConnectionStatus, subscribeMarketState, isValidPrice, subscribeAllTickers } from "../services/marketState";
 
-import { initializeCandles, resetCandles, updateLatestCandle, getCandles } from "../services/candleEngine";
+import { initializeCandles, resetCandles, updateLatestCandle, getCandles, candlesInitialized } from "../services/candleEngine";
 import PositionsPanel from "../components/PositionsPanel";
 import { calculateUnrealizedPnL } from "../services/tradingUtils";
 import { TradingBalanceCard } from "../components/TradingBalanceCard";
@@ -1571,6 +1571,8 @@ export default function Trading() {
   const marketStatePrevRef = useRef(0);
   const symbolRef = useRef(symbol);
   symbolRef.current = symbol;
+  const resetGenRef = useRef(0);
+  const candleUpdateRef = useRef({ price: 0, timer: null as ReturnType<typeof requestAnimationFrame> | null });
   const [baseSymbol, quoteSymbol] = symbol.includes("/") ? symbol.split("/") as [string, string] : [symbol, "USDT"] as [string, string];
   const [change24h, setChange24h] = useState(0);
   const [changePct, setChangePct] = useState(0);
@@ -1765,6 +1767,10 @@ export default function Trading() {
       mounted = false;
       unsubscribeConnection();
       unsubscribeMarket();
+      if (candleUpdateRef.current.timer !== null) {
+        cancelAnimationFrame(candleUpdateRef.current.timer);
+        candleUpdateRef.current.timer = null;
+      }
     };
   }, [symbol]);
 
@@ -2156,14 +2162,23 @@ export default function Trading() {
       setSpread(newSpread);
       setSpreadPct(newSpreadPct);
     } catch (e) {}
-    // Update the latest candle on every live quote.
-    if (isValidPrice(marketState.lastPrice) && candles.length) {
-      const updated = updateLatestCandle(marketState.lastPrice, Date.now());
-      if (updated) {
-        setCandles(getCandles());
+    // Collect latest price for debounced candle update (actual update done in rAF)
+    if (isValidPrice(marketState.lastPrice)) {
+      candleUpdateRef.current.price = marketState.lastPrice;
+      if (candleUpdateRef.current.timer === null) {
+        candleUpdateRef.current.timer = requestAnimationFrame(() => {
+          candleUpdateRef.current.timer = null;
+          const price = candleUpdateRef.current.price;
+          if (price > 0 && candlesInitialized.current) {
+            const updated = updateLatestCandle(price, Date.now());
+            if (updated) {
+              setCandles(getCandles());
+            }
+          }
+        });
       }
     }
-  }, [marketState, candles.length]);
+  }, [marketState]);
 
   const indicators = useMemo(() => ({
     sma:  showSMA       ? calcSMA(candles, 7)     : [],
@@ -2777,35 +2792,47 @@ export default function Trading() {
   const applySpotPct = (p: number) => {
     setSpotSliderPct(p);
     const sp = parseFloat(spotPrice) || lastPrice || 0;
-    const maxBuy = sp > 0 ? availableBalance / sp : 0;
-    const maxSell = walletBalances[baseSymbol] || 0;
-    const ref = Math.max(maxBuy, maxSell);
+    const buyRef = sp > 0 ? availableBalance / sp : 0;
+    const sellRef = walletBalances[baseSymbol] || 0;
+    const ref = orderSide === "sell" ? sellRef : buyRef;
     const amt = ref * p / 100;
     setSpotAmount(amt.toFixed(6));
-    if (spotOrderType === "market") {
-      setSpotTotal((amt * lastPrice).toFixed(2));
+    if (sp > 0) {
+      setSpotTotal((amt * sp).toFixed(2));
     }
   };
 
   const updateSpotAmount = (value: string) => {
     setSpotAmount(value);
     const amt = parseFloat(value);
-    if (value && !isNaN(amt) && amt > 0 && lastPrice > 0) {
-      setSpotTotal((amt * lastPrice).toFixed(2));
-      setSpotSliderPct(0);
+    const price = spotOrderType === "market" ? lastPrice : parseFloat(spotPrice) || lastPrice;
+    if (value && !isNaN(amt) && amt > 0 && price > 0) {
+      const total = amt * price;
+      setSpotTotal(total.toFixed(2));
+      // Reflect percentage on slider based on order side
+      const maxRef = orderSide === "sell" ? (walletBalances[baseSymbol] || 0) : (price > 0 ? availableBalance / price : 0);
+      const pct = maxRef > 0 ? Math.round((amt / maxRef) * 100) : 0;
+      setSpotSliderPct(Math.min(100, Math.max(0, pct)));
     } else {
       setSpotTotal("");
+      setSpotSliderPct(0);
     }
   };
 
   const updateSpotTotal = (value: string) => {
     setSpotTotal(value);
     const total = parseFloat(value);
-    if (value && !isNaN(total) && total > 0 && lastPrice > 0) {
-      setSpotAmount((total / lastPrice).toFixed(6));
-      setSpotSliderPct(0);
+    const price = spotOrderType === "market" ? lastPrice : parseFloat(spotPrice) || lastPrice;
+    if (value && !isNaN(total) && total > 0 && price > 0) {
+      const amt = total / price;
+      setSpotAmount(amt.toFixed(6));
+      // Reflect percentage on slider based on order side
+      const ref = orderSide === "sell" ? (walletBalances[baseSymbol] || 0) * price : availableBalance;
+      const pct = ref > 0 ? Math.round((total / ref) * 100) : 0;
+      setSpotSliderPct(Math.min(100, Math.max(0, pct)));
     } else {
       setSpotAmount("");
+      setSpotSliderPct(0);
     }
   };
 
@@ -2837,32 +2864,40 @@ export default function Trading() {
     { label: "Est. Fee (0.1%)", value: `~$${pendingOrderSide === "buy" ? buyFee.toFixed(4) : sellFee.toFixed(4)} USDT`, color: "#f0b90b" },
   ], [symbol, orderType, pendingOrderSide, lastPrice, priceInput, buyAmountInput, sellAmountInput, buyTotal, sellTotal, buyFee, sellFee]);
 
-  const initChartCandles = useCallback((nextCandles: Candle[]) => {
+  const initChartCandles = useCallback((nextCandles: Candle[], gen?: number) => {
+    if (gen !== undefined && gen !== resetGenRef.current) return; // stale response
     initializeCandles(nextCandles);
     setCandles(getCandles());
   }, []);
 
   const fetchMarketData = useCallback(async (sym: string, tf: string) => {
-    // Fetch chart/candle data for the symbol and timeframe
-    // Uses fallback synthetic data if backend endpoint unavailable
+    const gen = resetGenRef.current;
     try {
       const api = await getAxios();
       const encodedPair = encodeURIComponent(sym);
       const res = await api.get(`/api/market/candles/${encodedPair}?timeframe=${tf}`);
+      if (gen !== resetGenRef.current) return; // stale
       if (res.data?.candles) {
-        initChartCandles(res.data.candles);
+        initChartCandles(res.data.candles, gen);
       } else if (Array.isArray(res.data)) {
-        initChartCandles(res.data);
+        initChartCandles(res.data, gen);
       }
     } catch (err) {
-      // Backend endpoint unavailable - use fallback synthetic candles
-      initChartCandles(createFallbackCandles(300, 80721, sym, tf));
+      if (gen !== resetGenRef.current) return; // stale
+      initChartCandles(createFallbackCandles(300, 80721, sym, tf), gen);
     }
   }, [initChartCandles]);
 
   useEffect(() => {
     resetCandles();
     setCandles([]);
+    resetGenRef.current += 1;
+    // Cancel any pending debounced candle update
+    if (candleUpdateRef.current.timer !== null) {
+      cancelAnimationFrame(candleUpdateRef.current.timer);
+      candleUpdateRef.current.timer = null;
+    }
+    candleUpdateRef.current.price = 0;
     if (!symbol) return;
     fetchMarketData(symbol, timeframe);
   }, [symbol, timeframe, fetchMarketData]);
@@ -2998,6 +3033,12 @@ export default function Trading() {
       }
     }
     // Client-side balance check before sending to server
+    const price = spotOrderType === "market" ? lastPrice : parseFloat(spotPrice);
+    const totalCost = amount * price;
+    if (totalCost < 200) {
+      setSpotError(`Minimum order is 200 USDT (total: $${totalCost.toFixed(2)})`);
+      return;
+    }
     if (side === "sell") {
       const baseBal = walletBalances[baseSymbol] || 0;
       if (amount > baseBal) {
@@ -3006,8 +3047,6 @@ export default function Trading() {
       }
     }
     if (side === "buy") {
-      const price = spotOrderType === "market" ? lastPrice : parseFloat(spotPrice);
-      const totalCost = amount * price;
       if (totalCost > availableBalance) {
         setSpotError(`Insufficient USDT: need $${totalCost.toFixed(2)} but have $${availableBalance.toFixed(2)}`);
         return;
@@ -3448,19 +3487,19 @@ export default function Trading() {
                     {/* Amount */}
                     <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 34 }}>
                       <span style={{ fontSize: 11, color: COLORS.textMuted, width: 50 }}>Amount</span>
-                      <input type="number" value={spotAmount} onChange={e => spotOrderType === "market" ? updateSpotAmount(e.target.value) : setSpotAmount(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="0.0000" />
+                      <input type="number" value={spotAmount} onChange={e => updateSpotAmount(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="0.0000" />
                       <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>{baseSymbol}</span>
                     </div>
-                    {/* Total / Spend — only for market */}
-                    {spotOrderType === "market" && (
+                    {/* Total — editable for all order types */}
+                    {(spotOrderType === "market" || spotOrderType === "limit" || spotOrderType === "stop-limit") && (
                       <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 34 }}>
                         <span style={{ fontSize: 11, color: COLORS.textMuted, width: 50 }}>Total</span>
-                        <input type="number" value={spotTotal} onChange={e => updateSpotTotal(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="0.00" />
+                        <input type="number" value={spotTotal} onChange={e => updateSpotTotal(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="Min 200 USDT" />
                         <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT</span>
                       </div>
                     )}
-                    {/* Slider + % buttons + Total — only for limit */}
-                    {spotOrderType === "limit" && (
+                    {/* Slider + % buttons — for all order types */}
+                    {(spotOrderType === "limit" || spotOrderType === "market" || spotOrderType === "stop-limit") && (
                       <>
                       <div style={{ padding: "2px 0" }}>
                         <input type="range" min={0} max={100} value={spotSliderPct} onChange={e => applySpotPct(Number(e.target.value))} style={{ width: "100%", accentColor: COLORS.green }} />
@@ -3469,10 +3508,6 @@ export default function Trading() {
                             <button key={p} onClick={() => applySpotPct(p)} style={{ background: "transparent", border: "none", fontSize: 10, color: COLORS.textMuted, cursor: "pointer", padding: 0 }}>{p}%</button>
                           ))}
                         </div>
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: COLORS.textBright, fontFamily: "monospace", padding: "0 2px" }}>
-                        <span>Total</span>
-                        <span>${(parseFloat(spotAmount || "0") * parseFloat(spotPrice || "0")).toFixed(2)} USDT</span>
                       </div>
                       </>
                     )}

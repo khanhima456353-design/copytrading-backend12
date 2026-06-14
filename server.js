@@ -1044,6 +1044,9 @@ app.post('/api/trade/spot', authMiddleware, async (req, res) => {
 
     const limitPrice = Number(price) || currentPrice;
     const totalCost = amount * (orderType === "market" ? currentPrice : limitPrice);
+    if (totalCost < 200) {
+      return res.status(400).json({ success: false, error: `Minimum order is 200 USDT (total: $${totalCost.toFixed(2)})` });
+    }
     const takerFee = totalCost * 0.0004;
     const makerFee = totalCost * 0.0002;
 
