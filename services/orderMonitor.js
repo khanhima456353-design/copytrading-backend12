@@ -1,11 +1,14 @@
 const mongoose = require("mongoose");
 const Order = require("../models/Order");
+const Position = require("../models/Position");
+const { getMaintenanceMargin, computeLiquidationPrice } = require("../config/riskParams");
 
 let getPrice = (pair) => null;
 let getSimulatedPrice = (userId, pair) => null;
 let closeOrder = null;
 let onActivate = null;
 let onSpotFill = null;
+let onLiquidation = null;
 
 function startMonitor(opts) {
   getPrice = opts.getPrice || getPrice;
@@ -13,6 +16,7 @@ function startMonitor(opts) {
   closeOrder = opts.closeOrder || closeOrder;
   onActivate = opts.onActivate || onActivate;
   onSpotFill = opts.onSpotFill || onSpotFill;
+  onLiquidation = opts.onLiquidation || onLiquidation;
   setTimeout(() => reconcileOpenPositions(), 1000);
   setInterval(tick, 2000);
 }
@@ -21,8 +25,33 @@ async function tick() {
   try {
     await checkPendingTriggers();
     await checkSlTpTriggers();
+    await checkLiquidations();
   } catch (err) {
     console.error("[OrderMonitor] tick error:", err.message);
+  }
+}
+
+async function checkLiquidations() {
+  const positions = await Position.find({ size: { $gt: 0 } });
+  if (!positions.length) return;
+  for (const pos of positions) {
+    try {
+      const currentPrice = getSimulatedPrice(pos.userId, pos.pair) || getPrice(pos.pair);
+      if (!currentPrice || currentPrice <= 0) continue;
+      const liqPrice = Number(pos.liquidationPrice);
+      if (!liqPrice || liqPrice <= 0) continue;
+      let liquidated = false;
+      if (pos.side === "long" && currentPrice <= liqPrice) liquidated = true;
+      if (pos.side === "short" && currentPrice >= liqPrice) liquidated = true;
+      if (liquidated) {
+        console.log(`[Liquidation] ${pos.pair} ${pos.side} pos ${pos._id} at ${currentPrice} (liq ${liqPrice})`);
+        if (typeof onLiquidation === "function") {
+          await onLiquidation(pos, currentPrice);
+        }
+      }
+    } catch (err) {
+      console.error(`[Liquidation] error for pos ${pos._id}:`, err.message);
+    }
   }
 }
 

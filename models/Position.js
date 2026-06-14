@@ -15,6 +15,7 @@ const positionSchema = new mongoose.Schema(
     rawUnrealizedPnL: { type: Number, default: 0 },
     roePct: { type: Number, default: 0 },
     rawRoePct: { type: Number, default: 0 },
+    liquidationPrice: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

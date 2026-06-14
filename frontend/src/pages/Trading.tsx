@@ -1551,6 +1551,7 @@ export default function Trading() {
   const [tradingMode, setTradingMode] = useState<"spot" | "futures">("futures");
   const [spotOrderType, setSpotOrderType] = useState<"market" | "limit" | "stop-limit">("market");
   const [spotAmount, setSpotAmount] = useState("");
+  const [spotTotal, setSpotTotal] = useState("");
   const [spotPrice, setSpotPrice] = useState("");
   const [spotStopPrice, setSpotStopPrice] = useState("");
   const [spotSliderPct, setSpotSliderPct] = useState(0);
@@ -1614,6 +1615,7 @@ export default function Trading() {
   const [activeChartTab, setActiveChartTab] = useState<"original" | "depth">("original");
   const [activeViewTab, setActiveViewTab] = useState<"chart" | "orderbook" | "trades" | "info" | "tradingdata">("chart");
   const [orderType, setOrderType] = useState<"limit" | "market" | "stop-limit" | "oco">("limit");
+  const [leverage, setLeverage] = useState(1);
   const [buyStopLoss, setBuyStopLoss] = useState("");
   const [buyTakeProfit, setBuyTakeProfit] = useState("");
   const [sellStopLoss, setSellStopLoss] = useState("");
@@ -2773,7 +2775,33 @@ export default function Trading() {
     const maxBuy = sp > 0 ? availableBalance / sp : 0;
     const maxSell = walletBalances[baseSymbol] || 0;
     const ref = Math.max(maxBuy, maxSell);
-    setSpotAmount((ref * p / 100).toFixed(6));
+    const amt = ref * p / 100;
+    setSpotAmount(amt.toFixed(6));
+    if (spotOrderType === "market") {
+      setSpotTotal((amt * lastPrice).toFixed(2));
+    }
+  };
+
+  const updateSpotAmount = (value: string) => {
+    setSpotAmount(value);
+    const amt = parseFloat(value);
+    if (value && !isNaN(amt) && amt > 0 && lastPrice > 0) {
+      setSpotTotal((amt * lastPrice).toFixed(2));
+      setSpotSliderPct(0);
+    } else {
+      setSpotTotal("");
+    }
+  };
+
+  const updateSpotTotal = (value: string) => {
+    setSpotTotal(value);
+    const total = parseFloat(value);
+    if (value && !isNaN(total) && total > 0 && lastPrice > 0) {
+      setSpotAmount((total / lastPrice).toFixed(6));
+      setSpotSliderPct(0);
+    } else {
+      setSpotAmount("");
+    }
   };
 
   const effectiveBuyPrice = Number.isFinite(buyPrice) && buyPrice > 0 ? buyPrice : lastPrice;
@@ -2915,6 +2943,7 @@ export default function Trading() {
         side,
         type: orderType,
         amount,
+        leverage,
         slippageTolerance: slippageTol ? 0.01 : 0,
       };
       // Only send price for non-market orders
@@ -2973,6 +3002,7 @@ export default function Trading() {
       await api.post("/api/trade/spot", payload);
       showToast(`Spot ${side === "buy" ? "buy" : "sell"} order placed!`, "success");
       setSpotAmount("");
+      setSpotTotal("");
       setSpotPrice("");
       setSpotStopPrice("");
       await refreshAccountData();
@@ -3363,18 +3393,21 @@ export default function Trading() {
                   <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
                     {/* Order type tabs */}
                     <div style={{ display: "flex", gap: 8, marginBottom: 0 }}>
-                      {(["Market", "Limit", "Stop Limit"] as const).map(t => (
-                        <button key={t} onClick={() => setSpotOrderType(t.toLowerCase().replace(" ", "-") as any)} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 11, color: spotOrderType === t.toLowerCase().replace(" ", "-") ? COLORS.textBright : COLORS.text, borderBottom: spotOrderType === t.toLowerCase().replace(" ", "-") ? `2px solid ${"#f0b90b"}` : "2px solid transparent", paddingBottom: 2 }}>{t}</button>
-                      ))}
+                      {(["Market", "Limit", "Stop Limit"] as const).map(t => {
+                        const tv = t.toLowerCase().replace(" ", "-");
+                        return <button key={t} onClick={() => { setSpotOrderType(tv as any); if (tv !== "limit") { setSpotSliderPct(0); } }} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 11, color: spotOrderType === tv ? COLORS.textBright : COLORS.text, borderBottom: spotOrderType === tv ? `2px solid ${"#f0b90b"}` : "2px solid transparent", paddingBottom: 2 }}>{t}</button>;
+                      })}
                     </div>
-                    {/* Price input for limit/stop-limit */}
-                    {spotOrderType !== "market" && (
-                      <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 34 }}>
-                        <span style={{ fontSize: 11, color: COLORS.textMuted, width: 50 }}>Price</span>
+                    {/* Price (editable for limit/stop-limit, read-only market rate) */}
+                    <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 34 }}>
+                      <span style={{ fontSize: 11, color: COLORS.textMuted, width: 50 }}>Price</span>
+                      {spotOrderType === "market" ? (
+                        <input type="number" value={lastPrice > 0 ? lastPrice.toFixed(2) : ""} disabled style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textMuted, fontSize: 12, fontFamily: "monospace", textAlign: "right", opacity: 0.6 }} placeholder="Market Price" />
+                      ) : (
                         <input type="number" value={spotPrice} onChange={e => setSpotPrice(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="0.00" />
-                        <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT</span>
-                      </div>
-                    )}
+                      )}
+                      <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT</span>
+                    </div>
                     {/* Stop Price for stop-limit */}
                     {spotOrderType === "stop-limit" && (
                       <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 34 }}>
@@ -3386,9 +3419,17 @@ export default function Trading() {
                     {/* Amount */}
                     <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 34 }}>
                       <span style={{ fontSize: 11, color: COLORS.textMuted, width: 50 }}>Amount</span>
-                      <input type="number" value={spotAmount} onChange={e => setSpotAmount(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="0.0000" />
+                      <input type="number" value={spotAmount} onChange={e => spotOrderType === "market" ? updateSpotAmount(e.target.value) : setSpotAmount(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="0.0000" />
                       <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>{baseSymbol}</span>
                     </div>
+                    {/* Total / Spend — only for market */}
+                    {spotOrderType === "market" && (
+                      <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 34 }}>
+                        <span style={{ fontSize: 11, color: COLORS.textMuted, width: 50 }}>Total</span>
+                        <input type="number" value={spotTotal} onChange={e => updateSpotTotal(e.target.value)} style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: COLORS.textBright, fontSize: 12, fontFamily: "monospace", textAlign: "right" }} placeholder="0.00" />
+                        <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8 }}>USDT</span>
+                      </div>
+                    )}
                     {/* Slider + % buttons + Total — only for limit */}
                     {spotOrderType === "limit" && (
                       <>
@@ -3433,6 +3474,19 @@ export default function Trading() {
               {(["Limit", "Market", "Stop Limit", "OCO"] as const).map(t => (
                 <button key={t} onClick={() => handleOrderTypeChange(t.toLowerCase().replace(" ", "-") as any)} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: orderType === t.toLowerCase().replace(" ", "-") ? COLORS.textBright : COLORS.text, borderBottom: orderType === t.toLowerCase().replace(" ", "-") ? `2px solid ${"#f0b90b"}` : "2px solid transparent", paddingBottom: 2 }}>{t}</button>
               ))}
+            </div>
+            {/* Leverage selector */}
+            <div style={{ padding: "2px 0" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: COLORS.textMuted, marginBottom: 2 }}>
+                <span>Leverage</span>
+                <span style={{ color: COLORS.textBright, fontWeight: 600 }}>{leverage}x</span>
+              </div>
+              <input type="range" min={1} max={125} value={leverage} onChange={e => setLeverage(Number(e.target.value))} style={{ width: "100%", accentColor: "#f0b90b" }} />
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                {[1, 2, 5, 10, 25, 50, 100, 125].map(v => (
+                  <button key={v} onClick={() => setLeverage(v)} style={{ background: leverage === v ? "rgba(240,185,11,0.2)" : "transparent", border: "none", fontSize: 9, color: leverage === v ? "#f0b90b" : COLORS.textMuted, cursor: "pointer", padding: "2px 0", fontWeight: leverage === v ? 700 : 400 }}>{v}x</button>
+                ))}
+              </div>
             </div>
             {/* Price input */}
             <div style={{ display: "flex", alignItems: "center", border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.bgAlt, padding: "0 10px", height: 34 }}>
@@ -3690,9 +3744,10 @@ serverPositions.length === 0
       <tr style={{ color: COLORS.textMuted }}>
         <td style={{ padding: "6px 2px", textAlign: "left", borderBottom: `1px solid ${COLORS.border}` }}>Pair</td>
         <td style={{ padding: "6px 2px", textAlign: "left", borderBottom: `1px solid ${COLORS.border}` }}>Side</td>
+        <td style={{ padding: "6px 2px", textAlign: "center", borderBottom: `1px solid ${COLORS.border}` }}>Size</td>
         <td style={{ padding: "6px 2px", textAlign: "center", borderBottom: `1px solid ${COLORS.border}` }}>Entry</td>
         <td style={{ padding: "6px 2px", textAlign: "center", borderBottom: `1px solid ${COLORS.border}` }}>Mark</td>
-        <td style={{ padding: "6px 2px", textAlign: "center", borderBottom: `1px solid ${COLORS.border}` }}>Size</td>
+        <td style={{ padding: "6px 2px", textAlign: "center", borderBottom: `1px solid ${COLORS.border}` }}>Liq.</td>
         <td style={{ padding: "6px 2px", textAlign: "center", borderBottom: `1px solid ${COLORS.border}` }}>PnL</td>
         <td style={{ padding: "6px 2px", textAlign: "center", borderBottom: `1px solid ${COLORS.border}`, width: 80 }}>Action</td>
       </tr>
@@ -3700,16 +3755,20 @@ serverPositions.length === 0
         const markPrice = Number((marketState?.pair === p.pair && marketState?.markPrice ? marketState.markPrice : p.markPrice ?? p.entryPrice ?? 0)).toFixed(2);
         const entryPrice = Number(p.entryPrice || 0).toFixed(2);
         const size = Number(p.quantity ?? p.size ?? 0).toFixed(4);
+        const liqPrice = Number(p.liquidationPrice ?? 0);
+        const liqStr = liqPrice > 0 ? liqPrice.toFixed(2) : "--";
         const livePnl = Number(p.unrealizedPnl ?? p.rawUnrealizedPnl ?? 0);
         const pnlColor = livePnl >= 0 ? COLORS.green : COLORS.red;
         const pnlStr = (livePnl >= 0 ? "+" : "") + livePnl.toFixed(2);
+        const levStr = p.leverage ? `${p.leverage}x` : "";
         return (
           <tr key={p.id || p._id || idx} style={{ borderBottom: idx < serverPositions.length - 1 ? `1px solid ${COLORS.border}` : "none" }}>
-            <td style={{ padding: "5px 2px", color: COLORS.text }}>{p.pair}</td>
+            <td style={{ padding: "5px 2px", color: COLORS.text }}>{p.pair} <span style={{ color: COLORS.textMuted, fontSize: 9 }}>{levStr}</span></td>
             <td style={{ padding: "5px 2px", color: p.side === "long" ? COLORS.green : COLORS.red }}>{p.side.toUpperCase()}</td>
+            <td style={{ padding: "5px 2px", color: COLORS.text, textAlign: "center" }}>{size}</td>
             <td style={{ padding: "5px 2px", color: COLORS.text, textAlign: "center" }}>{entryPrice}</td>
             <td style={{ padding: "5px 2px", color: COLORS.text, textAlign: "center" }}>{markPrice}</td>
-            <td style={{ padding: "5px 2px", color: COLORS.text, textAlign: "center" }}>{size}</td>
+            <td style={{ padding: "5px 2px", color: liqPrice > 0 ? COLORS.red : COLORS.textMuted, textAlign: "center" }}>{liqStr}</td>
             <td style={{ padding: "5px 2px", color: pnlColor, textAlign: "center" }}>{pnlStr}</td>
             <td style={{ padding: "5px 2px", textAlign: "center", width: 80 }}>
               <button onClick={() => closePosition(p)} style={{ padding: "2px 10px", fontSize: 10, background: COLORS.red, color: "#fff", border: "none", borderRadius: 3, cursor: "pointer" }}>Close</button>

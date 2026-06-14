@@ -28,7 +28,7 @@ async function deductFee(userId, amount, feeType, orderId) {
   }
 }
 
-async function openOrder(userId, pair, side, type, entryPrice, quantity, lockedAmount, stopPrice, stopLoss, takeProfit) {
+async function openOrder(userId, pair, side, type, entryPrice, quantity, lockedAmount, stopPrice, stopLoss, takeProfit, leverage = 1) {
   const positionSide = side === "sell" ? "short" : "long";
   const isPending = ["limit", "stop-limit", "oco"].includes(type);
   const order = await Order.create({
@@ -42,6 +42,7 @@ async function openOrder(userId, pair, side, type, entryPrice, quantity, lockedA
     entryPrice,
     quantity,
     lockedAmount,
+    leverage: Math.min(Math.max(Number(leverage) || 1, 1), 125),
     stopPrice: stopPrice || entryPrice,
     stopLoss: stopLoss != null ? Number(stopLoss) : undefined,
     takeProfit: takeProfit != null ? Number(takeProfit) : undefined,

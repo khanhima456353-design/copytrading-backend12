@@ -901,10 +901,11 @@ app.get('/api/trade/history', authMiddleware, async (req, res) => {
 
 app.post('/api/trade/place', authMiddleware, async (req, res) => {
   try {
-    const { pair, side, type, amount, price, total, slippageTolerance, stopLoss, takeProfit } = req.body;
+    const { pair, side, type, amount, price, total, slippageTolerance, stopLoss, takeProfit, leverage } = req.body;
     const entryPrice = Number(price || 0);
     const quantity = Number(amount || 0);
-    const lockedAmount = total != null ? Number(total) : quantity * (price || 0);
+    const userLeverage = Math.min(Math.max(Number(leverage) || 1, 1), 125);
+    const lockedAmount = total != null ? Number(total) : quantity * (entryPrice || 0);
     if (!pair || !side || !type || !quantity || quantity <= 0) {
       return res.status(400).json({ success: false, message: "pair, side, type, and amount are required" });
     }
@@ -912,25 +913,36 @@ app.post('/api/trade/place', authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, message: "price must be a positive number for limit orders" });
     }
     const stopPrice = ["stop-limit", "oco"].includes(type) ? entryPrice : undefined;
-    const order = await orderService.openOrder(req.userId, pair, side, type, entryPrice, quantity, lockedAmount, stopPrice, stopLoss, takeProfit);
+    const order = await orderService.openOrder(req.userId, pair, side, type, entryPrice, quantity, lockedAmount, stopPrice, stopLoss, takeProfit, userLeverage);
 
     // For non-pending orders (market), immediately create position and start simulation
     if (order.status === "open" && type === "market") {
       const fillPrice = cachedMarketPrices[pair] || entryPrice;
       const positionSide = side === "sell" ? "short" : "long";
+      const riskParams = require('./config/riskParams');
+      const maint = riskParams.getMaintenanceMargin(pair);
+      const liqPrice = riskParams.computeLiquidationPrice(fillPrice, positionSide, userLeverage, maint);
 
       let pos = await Position.findOne({ userId: req.userId, pair });
       if (!pos) {
         pos = await Position.create({
           userId: req.userId, pair, side: positionSide,
           size: quantity, entryPrice: fillPrice, margin: lockedAmount,
+          leverage: userLeverage, liquidationPrice: liqPrice,
         });
       } else {
-        const newSize = pos.size + quantity;
-        const newEntry = ((pos.entryPrice * pos.size) + (fillPrice * quantity)) / newSize;
-        pos.size = newSize;
+        const totalSize = pos.size + quantity;
+        const totalMargin = (pos.margin || 0) + lockedAmount;
+        const avgLeverage = totalMargin > 0 && totalSize > 0
+          ? (totalSize * fillPrice) / totalMargin
+          : userLeverage;
+        const newEntry = ((pos.entryPrice * pos.size) + (fillPrice * quantity)) / totalSize;
+        pos.size = totalSize;
         pos.entryPrice = newEntry;
-        pos.margin = (pos.margin || 0) + lockedAmount;
+        pos.margin = totalMargin;
+        pos.leverage = Math.round(avgLeverage);
+        const newLiqPrice = riskParams.computeLiquidationPrice(newEntry, positionSide, pos.leverage, maint);
+        pos.liquidationPrice = newLiqPrice;
         await pos.save();
       }
       startPositionSimulation(req.userId, pos);
@@ -1268,6 +1280,20 @@ orderMonitor.startMonitor({
       console.log(`[SpotFill] Filled ${order.side} ${order.amount} ${pair} @ ${fillPrice}`);
     } catch (err) {
       console.error(`[SpotFill] Error filling order ${order._id}:`, err.message);
+    }
+  },
+  onLiquidation: async (pos, currentPrice) => {
+    try {
+      const closePrice = currentPrice;
+      const pnl = orderService.calculatePnl(pos.entryPrice, closePrice, pos.size, pos.side, pos.leverage);
+      const realizedPnl = pnl.clampedPnl ?? pnl.rawPnl ?? 0;
+      await walletService.unlockBalance(pos.userId, pos.margin, realizedPnl, pos._id.toString());
+      await Position.deleteOne({ _id: pos._id });
+      marketSimulator.clearSimulation(pos.userId, pos.pair, pos._id.toString());
+      io.to(`user:${pos.userId}`).emit('positionClosed', { pair: pos.pair, positionId: pos._id, reason: 'liquidation' });
+      console.log(`[Liquidation] Closed ${pos.pair} ${pos.side} pos ${pos._id} at ${closePrice} (PnL: ${realizedPnl.toFixed(2)})`);
+    } catch (err) {
+      console.error(`[Liquidation] Failed to close pos ${pos._id}:`, err.message);
     }
   },
 });
