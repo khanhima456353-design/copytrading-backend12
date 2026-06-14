@@ -181,7 +181,19 @@ export function initializeCandles(candles) {
     return true;
   });
 
-  candlesRef.current = valid.slice(-200); // Keep last 200
+  // Deduplicate by time (keep first occurrence) and sort ascending
+  const seen = new Set();
+  const deduped = [];
+  for (let i = 0; i < valid.length; i++) {
+    const c = valid[i];
+    if (!seen.has(c.time)) {
+      seen.add(c.time);
+      deduped.push(c);
+    }
+  }
+  deduped.sort((a, b) => a.time - b.time);
+
+  candlesRef.current = deduped.slice(-200); // Keep last 200
   candlesInitialized.current = true;
 }
 

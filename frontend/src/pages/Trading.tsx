@@ -685,10 +685,13 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
     ctx.fillStyle = COLORS.textMuted; ctx.font = "10px monospace"; ctx.textAlign = "right";
     ctx.fillText("Vol: " + formatVol(vMax), W - 4, volTop + 12);
 
-    // Time axis
+    // Time axis - place labels at ~8 evenly spaced positions, skip if overlapping
     ctx.fillStyle = COLORS.text; ctx.font = "10px monospace"; ctx.textAlign = "center";
+    let lastLabelX = -100;
     for (let i = 0; i < visible.length; i += timeStep) {
       const x = toX(i); if (x > plotW - 20) continue;
+      if (x - lastLabelX < 60) continue; // skip if too close to previous label
+      lastLabelX = x;
       ctx.fillText(formatChartTime(visible[i].time, tf), x, mainH + volH - 6);
     }
 
@@ -2836,7 +2839,7 @@ export default function Trading() {
 
   const initChartCandles = useCallback((nextCandles: Candle[]) => {
     initializeCandles(nextCandles);
-    setCandles(nextCandles);
+    setCandles(getCandles());
   }, []);
 
   const fetchMarketData = useCallback(async (sym: string, tf: string) => {

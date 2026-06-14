@@ -283,25 +283,39 @@ async function getPersistedCandles(pair, timeframe = "1m") {
   }
 }
 
+function dedupeAndSortCandles(arr) {
+  const seen = new Set();
+  const out = [];
+  for (let i = 0; i < arr.length; i++) {
+    const c = arr[i];
+    if (c && !seen.has(c.time)) {
+      seen.add(c.time);
+      out.push(c);
+    }
+  }
+  return out.sort((a, b) => a.time - b.time);
+}
+
 async function mergeLiveCurrentBucket(pair, timeframe, candles) {
   if (!Array.isArray(candles) || !candles.length) return candles;
   const persisted = await getPersistedCandles(pair, timeframe);
-  if (!persisted.length) return candles;
+  if (!persisted.length) return dedupeAndSortCandles(candles);
 
   const latestPersisted = persisted[persisted.length - 1];
   const existingIndex = candles.findIndex((c) => c.time === latestPersisted.time);
 
   if (existingIndex >= 0) {
-    candles[existingIndex] = latestPersisted;
-    return candles;
+    const copy = candles.slice();
+    copy[existingIndex] = { ...latestPersisted };
+    return dedupeAndSortCandles(copy);
   }
 
   const lastCandle = candles[candles.length - 1];
   if (latestPersisted.time > lastCandle.time) {
-    return [...candles, latestPersisted];
+    return dedupeAndSortCandles([...candles, latestPersisted]);
   }
 
-  return candles;
+  return dedupeAndSortCandles(candles);
 }
 
 async function upsertLiveCandle(pair, price, timestampMs = Date.now(), timeframe = "1m") {
@@ -510,7 +524,7 @@ app.get("/api/market/candles/:pair", async (req, res) => {
   }
 
   const persisted = await getPersistedCandles(pair, timeframe);
-  if (persisted.length) return res.json(persisted);
+  if (persisted.length) return res.json(dedupeAndSortCandles(persisted));
 
   const trades = getTrades(pair);
   const intervalMap = { "1m": 60, "5m": 300, "15m": 900, "1h": 3600 };
@@ -550,7 +564,7 @@ app.get("/api/market/candles/:pair", async (req, res) => {
       c.volume += t.amount;
     }
   });
-  res.json(Object.values(map));
+  res.json(dedupeAndSortCandles(Object.values(map)));
 });
 
 app.get("/api/market/deepmarket/:pair", async (req, res) => {
