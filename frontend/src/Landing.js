@@ -75,6 +75,7 @@ export default function Landing() {
   const [activeFAQ, setActiveFAQ] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showTradeDropdown, setShowTradeDropdown] = useState(false);
+  const [showMobileTrade, setShowMobileTrade] = useState(false);
 
   const faqs = [
     {
@@ -163,7 +164,7 @@ export default function Landing() {
               </div>
               <Link to="/markets">Markets</Link>
               <Link to="/earn">Earn</Link>
-              <Link to="/research">Research</Link>
+              <Link to="/news">News</Link>
             </nav>
           </div>
 
@@ -192,12 +193,18 @@ export default function Landing() {
                 </button>
               </div>
               <nav className="lm-nav-links">
-                <div style={{ padding: "0 20px", fontSize: 11, color: "var(--text-muted)", marginTop: 4, marginBottom: 2 }}>TRADING</div>
-                <Link to="/trade" className="lm-nav-item" onClick={() => setMobileMenuOpen(false)} state={{ mode: "spot" }}>Spot</Link>
-                <Link to="/trade" className="lm-nav-item" onClick={() => setMobileMenuOpen(false)} state={{ mode: "futures" }}>Futures</Link>
+                <button onClick={() => setShowMobileTrade(prev => !prev)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "12px 20px", background: "transparent", border: "none", color: "var(--text-current)", fontSize: 14, fontWeight: 500, cursor: "pointer", textAlign: "left" }}>
+                  Trade <ChevronDown size={14} style={{ transform: showMobileTrade ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }} />
+                </button>
+                {showMobileTrade && (
+                  <div style={{ paddingLeft: 20 }}>
+                    <Link to="/trade" className="lm-nav-item" onClick={() => { setMobileMenuOpen(false); setShowMobileTrade(false); }} state={{ mode: "spot" }}>Spot</Link>
+                    <Link to="/trade" className="lm-nav-item" onClick={() => { setMobileMenuOpen(false); setShowMobileTrade(false); }} state={{ mode: "futures" }}>Futures</Link>
+                  </div>
+                )}
                 <Link to="/markets" className="lm-nav-item" onClick={() => setMobileMenuOpen(false)}>Markets</Link>
                 <Link to="/earn" className="lm-nav-item" onClick={() => setMobileMenuOpen(false)}>Earn</Link>
-                <Link to="/research" className="lm-nav-item" onClick={() => setMobileMenuOpen(false)}>Research</Link>
+                <Link to="/news" className="lm-nav-item" onClick={() => setMobileMenuOpen(false)}>News</Link>
                 <Link to="/" className="lm-nav-item" onClick={() => setMobileMenuOpen(false)}>Dashboard</Link>
               </nav>
               <div className="lm-nav-auth">

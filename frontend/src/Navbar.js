@@ -14,6 +14,7 @@ export default function Navbar({ showAuth = true, minimal = false, homepage = fa
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   const [notifDropdown, setNotifDropdown] = useState([]);
   const [showTradeDropdown, setShowTradeDropdown] = useState(false);
+  const [showMobileTrade, setShowMobileTrade] = useState(false);
 
   useEffect(() => {
     if (!homepage) return;
@@ -63,9 +64,10 @@ export default function Navbar({ showAuth = true, minimal = false, homepage = fa
           </div>
         )}
       </div>
+      <Link to="/">Dashboard</Link>
       <Link to="/markets">Markets</Link>
       <Link to="/earn">Earn</Link>
-      <Link to="/research">Research</Link>
+      <Link to="/news">News</Link>
     </nav>
   );
 
@@ -153,12 +155,18 @@ export default function Navbar({ showAuth = true, minimal = false, homepage = fa
                 </button>
               </div>
               <nav className="nav-mobile-links">
-                <div style={{ padding: "8px 20px 4px", fontSize: 11, color: "var(--text-muted, #848e9c)", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" }}>Trading</div>
-                <Link to="/trade" className="nav-mobile-item" onClick={() => setIsMobileMenuOpen(false)} state={{ mode: "spot" }}>Spot</Link>
-                <Link to="/trade" className="nav-mobile-item" onClick={() => setIsMobileMenuOpen(false)} state={{ mode: "futures" }}>Futures</Link>
+                <button onClick={() => setShowMobileTrade(prev => !prev)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "12px 20px", background: "transparent", border: "none", color: "var(--text-current)", fontSize: 14, fontWeight: 500, cursor: "pointer", textAlign: "left" }}>
+                  Trade <ChevronDown size={14} style={{ transform: showMobileTrade ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }} />
+                </button>
+                {showMobileTrade && (
+                  <div style={{ paddingLeft: 20 }}>
+                    <Link to="/trade" className="nav-mobile-item" onClick={() => { setIsMobileMenuOpen(false); setShowMobileTrade(false); }} state={{ mode: "spot" }}>Spot</Link>
+                    <Link to="/trade" className="nav-mobile-item" onClick={() => { setIsMobileMenuOpen(false); setShowMobileTrade(false); }} state={{ mode: "futures" }}>Futures</Link>
+                  </div>
+                )}
                 <Link to="/markets" className="nav-mobile-item" onClick={() => setIsMobileMenuOpen(false)}>Markets</Link>
                 <Link to="/earn" className="nav-mobile-item" onClick={() => setIsMobileMenuOpen(false)}>Earn</Link>
-                <Link to="/research" className="nav-mobile-item" onClick={() => setIsMobileMenuOpen(false)}>Research</Link>
+                <Link to="/news" className="nav-mobile-item" onClick={() => setIsMobileMenuOpen(false)}>News</Link>
                 <Link to="/" className="nav-mobile-item" onClick={() => setIsMobileMenuOpen(false)}>Dashboard</Link>
               </nav>
               {showAuth && !minimal && !localStorage.getItem('token') && (
