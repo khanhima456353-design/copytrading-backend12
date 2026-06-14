@@ -129,6 +129,7 @@ export default function Markets() {
   const [sortKey, setSortKey] = useState("volume24h");
   const [sortDir, setSortDir] = useState("desc");
   const [initialLoading, setInitialLoading] = useState(true);
+  const [expandedCards, setExpandedCards] = useState({});
 
   useEffect(() => {
     const unsub = subscribeAllTickers((data) => {
@@ -198,6 +199,14 @@ export default function Markets() {
   const gainers = pairs.filter(p => p.changePct > 0).length;
   const losers = pairs.filter(p => p.changePct < 0).length;
 
+  const allByVolume = useMemo(() => [...pairs].sort((a, b) => b.volume24h - a.volume24h), [pairs]);
+  const allByChange = useMemo(() => [...pairs].sort((a, b) => b.changePct - a.changePct), [pairs]);
+  const allByVolumeAsc = useMemo(() => [...pairs].sort((a, b) => a.volume24h - b.volume24h), [pairs]);
+  const hotPairs = useMemo(() => allByVolume.slice(0, expandedCards.hot ? undefined : 5), [allByVolume, expandedCards.hot]);
+  const topGainers = useMemo(() => allByChange.slice(0, expandedCards.gainers ? undefined : 5), [allByChange, expandedCards.gainers]);
+  const topVolume = useMemo(() => allByVolume.slice(0, expandedCards.volume ? undefined : 5), [allByVolume, expandedCards.volume]);
+  const newPairs = useMemo(() => allByVolumeAsc.slice(0, expandedCards.new ? undefined : 5), [allByVolumeAsc, expandedCards.new]);
+
   const columns = [
     { key: "asset", label: "Name", align: "left", sortable: true },
     { key: "price", label: "Last Price", align: "right", sortable: true },
@@ -227,22 +236,66 @@ export default function Markets() {
           </div>
         </div>
 
-        <div className="mk-stats-bar">
-          <div className="mk-stat">
-            <span className="mk-stat-label">24h Volume</span>
-            <span className="mk-stat-val">{totalVolStr}</span>
+        <div className="mk-category-cards">
+          <div className="mk-cat-card">
+            <div className="mk-cat-hdr">
+              <span className="mk-cat-title">Hot</span>
+              <span className="mk-cat-more" onClick={() => setExpandedCards(p => ({ ...p, hot: !p.hot }))}>{expandedCards.hot ? "Less" : "More"}</span>
+            </div>
+            <div className="mk-cat-body">
+              {hotPairs.map(p => (
+                <div key={p.sym} className="mk-cat-row" onClick={() => navigate(`/trade?pair=${p.asset}USDT`)}>
+                  <span className="mk-cat-name">{p.asset}/USDT</span>
+                  <span className="mk-cat-price">${fmtPrice(p.price, p.sym)}</span>
+                  <span className={p.changePct >= 0 ? "mk-green" : "mk-red"}>{fmtPct(p.changePct)}</span>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="mk-stat">
-            <span className="mk-stat-label">Gainers</span>
-            <span className="mk-stat-val mk-stat-green">{gainers}</span>
+          <div className="mk-cat-card">
+            <div className="mk-cat-hdr">
+              <span className="mk-cat-title">New</span>
+              <span className="mk-cat-more" onClick={() => setExpandedCards(p => ({ ...p, new: !p.new }))}>{expandedCards.new ? "Less" : "More"}</span>
+            </div>
+            <div className="mk-cat-body">
+              {newPairs.map(p => (
+                <div key={p.sym} className="mk-cat-row" onClick={() => navigate(`/trade?pair=${p.asset}USDT`)}>
+                  <span className="mk-cat-name">{p.asset}/USDT</span>
+                  <span className="mk-cat-price">${fmtPrice(p.price, p.sym)}</span>
+                  <span className={p.changePct >= 0 ? "mk-green" : "mk-red"}>{fmtPct(p.changePct)}</span>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="mk-stat">
-            <span className="mk-stat-label">Losers</span>
-            <span className="mk-stat-val mk-stat-red">{losers}</span>
+          <div className="mk-cat-card">
+            <div className="mk-cat-hdr">
+              <span className="mk-cat-title">Top Gainer</span>
+              <span className="mk-cat-more" onClick={() => setExpandedCards(p => ({ ...p, gainers: !p.gainers }))}>{expandedCards.gainers ? "Less" : "More"}</span>
+            </div>
+            <div className="mk-cat-body">
+              {topGainers.map(p => (
+                <div key={p.sym} className="mk-cat-row" onClick={() => navigate(`/trade?pair=${p.asset}USDT`)}>
+                  <span className="mk-cat-name">{p.asset}/USDT</span>
+                  <span className="mk-cat-price">${fmtPrice(p.price, p.sym)}</span>
+                  <span className={p.changePct >= 0 ? "mk-green" : "mk-red"}>{fmtPct(p.changePct)}</span>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="mk-stat">
-            <span className="mk-stat-label">Live</span>
-            <span className="mk-stat-live"><span className="mk-live-dot" /> Real-time</span>
+          <div className="mk-cat-card">
+            <div className="mk-cat-hdr">
+              <span className="mk-cat-title">Top Volume</span>
+              <span className="mk-cat-more" onClick={() => setExpandedCards(p => ({ ...p, volume: !p.volume }))}>{expandedCards.volume ? "Less" : "More"}</span>
+            </div>
+            <div className="mk-cat-body">
+              {topVolume.map(p => (
+                <div key={p.sym} className="mk-cat-row" onClick={() => navigate(`/trade?pair=${p.asset}USDT`)}>
+                  <span className="mk-cat-name">{p.asset}/USDT</span>
+                  <span className="mk-cat-price">${fmtPrice(p.price, p.sym)}</span>
+                  <span className={p.changePct >= 0 ? "mk-green" : "mk-red"}>{fmtPct(p.changePct)}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 

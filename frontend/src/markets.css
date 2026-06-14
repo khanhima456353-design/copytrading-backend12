@@ -114,6 +114,88 @@
   color: var(--text-primary, #eaecef);
 }
 
+/* ─── Category Cards ─── */
+
+.mk-category-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.mk-cat-card {
+  background: var(--surface, #1e2329);
+  border: 1px solid var(--border, #2b3139);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.mk-cat-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 6px;
+}
+
+.mk-cat-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary, #eaecef);
+}
+
+.mk-cat-more {
+  font-size: 11px;
+  color: var(--primary, #f0b90b);
+  cursor: pointer;
+}
+
+.mk-cat-more:hover {
+  text-decoration: underline;
+}
+
+.mk-cat-body {
+  padding: 0 12px 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.mk-cat-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.mk-cat-row:hover {
+  opacity: 0.8;
+}
+
+.mk-cat-name {
+  flex: 1;
+  color: var(--text-primary, #eaecef);
+  font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mk-cat-price {
+  color: var(--text-primary, #eaecef);
+  font-family: monospace;
+  text-align: right;
+  min-width: 60px;
+}
+
+.mk-cat-row .mk-green,
+.mk-cat-row .mk-red {
+  font-family: monospace;
+  min-width: 50px;
+  text-align: right;
+}
+
 .mk-stat-green { color: #0ecb81; }
 .mk-stat-red { color: #f6465d; }
 
@@ -353,6 +435,12 @@
 
   .mk-table-body {
     max-height: calc(100vh - 310px);
+  }
+}
+
+@media (max-width: 768px) {
+  .mk-category-cards {
+    display: none;
   }
 }
 

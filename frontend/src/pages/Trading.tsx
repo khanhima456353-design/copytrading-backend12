@@ -3384,11 +3384,19 @@ export default function Trading() {
       {isChartView && (
       <div className="trading-order-form trading-dashboard__ticket" style={{ height: "auto", minHeight: isDesktopLayout ? 320 : 210, borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, display: "flex", flexShrink: 0, overflow: "visible" }}>
         <div className="trading-order-form__inner" style={{ width: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
-              {/* Spot / Futures tab switcher */}
+              {/* Spot / Futures tab switcher — desktop/tablet only */}
+              {isDesktopLayout || isTablet ? (
               <div style={{ display: "flex", gap: 0, padding: "6px 8px 0", flexShrink: 0 }}>
                 <button onClick={() => setTradingMode("spot")} style={{ flex: 1, height: 28, background: tradingMode === "spot" ? "#ff8c32" : "transparent", border: tradingMode === "spot" ? "none" : `1px solid ${COLORS.border}`, borderRadius: 6, color: tradingMode === "spot" ? "#fff" : COLORS.text, fontWeight: 600, fontSize: 11, cursor: "pointer", transition: "all 0.15s" }}>Spot</button>
                 <button onClick={() => setTradingMode("futures")} style={{ flex: 1, height: 28, background: tradingMode === "futures" ? "#ff8c32" : "transparent", border: tradingMode === "futures" ? "none" : `1px solid ${COLORS.border}`, borderRadius: 6, color: tradingMode === "futures" ? "#fff" : COLORS.text, fontWeight: 600, fontSize: 11, cursor: "pointer", transition: "all 0.15s" }}>Futures</button>
               </div>
+              ) : tradingMode === "spot" ? (
+                /* Mobile: BUY/SELL toggle for spot */
+                <div style={{ display: "flex", gap: 4, padding: "6px 8px 0", flexShrink: 0 }}>
+                  <button onClick={() => setOrderSide("buy")} style={{ flex: 1, height: 28, background: orderSide === "buy" ? COLORS.green : "rgba(23,199,132,0.1)", border: orderSide === "buy" ? "none" : `1px solid rgba(23,199,132,0.25)`, borderRadius: 14, color: orderSide === "buy" ? "#000" : COLORS.green, fontWeight: 700, fontSize: 11, letterSpacing: 0.5, cursor: "pointer", transition: "all 0.2s" }}>BUY</button>
+                  <button onClick={() => setOrderSide("sell")} style={{ flex: 1, height: 28, background: orderSide === "sell" ? COLORS.red : "rgba(240,82,101,0.1)", border: orderSide === "sell" ? "none" : `1px solid rgba(240,82,101,0.25)`, borderRadius: 14, color: orderSide === "sell" ? "#fff" : COLORS.red, fontWeight: 700, fontSize: 11, letterSpacing: 0.5, cursor: "pointer", transition: "all 0.2s" }}>SELL</button>
+                </div>
+              ) : null}
               {tradingMode === "spot" ? (
                 /* SPOT ORDER FORM */
                 <div style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0, padding: "6px 8px" }}>
@@ -3461,8 +3469,16 @@ export default function Trading() {
                         </>
                       ) : (
                         <>
-                          <button onClick={() => { setSpotAmount(""); executeSpotOrder("buy"); }} style={{ flex: 1, height: 34, background: COLORS.green, border: "none", borderRadius: 6, color: "#000", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Buy {baseSymbol}</button>
-                          <button onClick={() => { setSpotAmount(""); executeSpotOrder("sell"); }} style={{ flex: 1, height: 34, background: COLORS.red, border: "none", borderRadius: 6, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Sell {baseSymbol}</button>
+                          {(!isDesktopLayout && !isTablet) ? (
+                            orderSide === "buy" && <button onClick={() => { setSpotAmount(""); executeSpotOrder("buy"); }} style={{ flex: 1, height: 34, background: COLORS.green, border: "none", borderRadius: 6, color: "#000", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Buy {baseSymbol}</button>
+                          ) : (
+                            <button onClick={() => { setSpotAmount(""); executeSpotOrder("buy"); }} style={{ flex: 1, height: 34, background: COLORS.green, border: "none", borderRadius: 6, color: "#000", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Buy {baseSymbol}</button>
+                          )}
+                          {(!isDesktopLayout && !isTablet) ? (
+                            orderSide === "sell" && <button onClick={() => { setSpotAmount(""); executeSpotOrder("sell"); }} style={{ flex: 1, height: 34, background: COLORS.red, border: "none", borderRadius: 6, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Sell {baseSymbol}</button>
+                          ) : (
+                            <button onClick={() => { setSpotAmount(""); executeSpotOrder("sell"); }} style={{ flex: 1, height: 34, background: COLORS.red, border: "none", borderRadius: 6, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Sell {baseSymbol}</button>
+                          )}
                         </>
                       )}
                     </div>
