@@ -55,6 +55,7 @@ const walletRoutes = require('./routes/walletRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const orderService = require('./services/orderService');
 const orderMonitor = require('./services/orderMonitor');
+const walletService = require('./services/walletService');
 
 // Models (single import for User to avoid duplicate declarations)
 const User = require('./models/User');
@@ -892,7 +893,7 @@ app.post('/api/dev/reset', async (req, res) => {
 app.get('/api/trade/history', authMiddleware, async (req, res) => {
   try {
     const userId = req.userId;
-    const orders = await Order.find({ userId, status: 'closed' }).sort({ closedAt: -1 });
+    const orders = await Order.find({ userId, status: { $in: ['closed', 'filled'] } }).sort({ closedAt: -1 });
     res.json({ success: true, data: orders });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -1001,11 +1002,11 @@ app.post('/api/trade/spot', authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, error: "stopPrice required for stop-limit orders" });
     }
 
-    const userId = req.user._id;
+    const userId = req.userId;
     const tradingPair = pair || symbol;
     const [base, quote] = tradingPair.includes("/") ? tradingPair.split("/") : [tradingPair.replace(/USDT$/, ""), "USDT"];
 
-    const currentPrice = Number(cachedMarketPrices[tradingPair]?.price || 0);
+    const currentPrice = Number(cachedMarketPrices[tradingPair] || 0);
     if (!currentPrice || currentPrice <= 0) {
       return res.status(400).json({ success: false, error: "No price available for this pair" });
     }
@@ -1138,7 +1139,7 @@ marketSimulator.initMarketSimulator({
     try {
       const userId    = state.userId;
       const pair      = state.pair;
-      const positions = await Position.find({ userId });
+      const positions = await Position.find({ userId, category: { $ne: "spot" } });
       const balances  = { USDT: { total: 0, available: 0, locked: 0 }, BTC: { total: 0, available: 0, locked: 0 } };
 
       let totalUnreal = 0;
@@ -1211,7 +1212,7 @@ marketSimulator.initMarketSimulator({
 // Recover simulations for existing positions after restart
 marketSimulator.recoverSimulations(async () => {
   try {
-    const positions = await Position.find({ isDemo: { $ne: true } });
+    const positions = await Position.find({ isDemo: { $ne: true }, category: { $ne: "spot" } });
     return positions.map((p) => ({
       userId: p.userId?.toString() || p.userId,
       _id: p._id,
@@ -1543,6 +1544,7 @@ function buildPositionPnL(position, markPrice, options = {}) {
 
 function startPositionSimulation(userId, position, orderMeta = {}) {
   if (!position?._id || !userId || !position.pair) return;
+  if (position.category === "spot") return;
   if (orderMeta.isDemo === true || position.isDemo === true) return;
   if (orderMeta.isGenuine === false || position.isGenuine === false) return;
   try {
@@ -1568,6 +1570,10 @@ function startPositionSimulation(userId, position, orderMeta = {}) {
 
 function getPositionMarkPrice(userId, position) {
   if (!position || !position.pair) return null;
+  if (position.category === "spot") {
+    const fallback = cachedMarketPrices[position.pair];
+    return isValidPriceValue(fallback) ? fallback : position.entryPrice;
+  }
   try {
     const simulated = marketSimulator.getSimulationPrice?.(userId, position.pair, position._id?.toString());
     if (isValidPriceValue(simulated)) return simulated;

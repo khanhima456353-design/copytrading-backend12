@@ -134,6 +134,7 @@ async function checkPendingTriggers() {
       if (order.category === "spot") {
         order.status = "filled";
         order.filledAt = new Date();
+        order.closedAt = new Date();
         order.entryPrice = fillPrice;
         await order.save();
         if (typeof onSpotFill === "function") {

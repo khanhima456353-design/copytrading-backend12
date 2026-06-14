@@ -9,6 +9,7 @@ const positionSchema = new mongoose.Schema(
     entryPrice: { type: Number, default: 0 },
     margin: { type: Number, default: 0 },
     leverage: { type: Number, default: 1 },
+    category: { type: String, enum: ["futures", "spot"], default: "futures" },
     isDemo: { type: Boolean, default: false },
     isGenuine: { type: Boolean, default: true },
     unrealizedPnL: { type: Number, default: 0 },

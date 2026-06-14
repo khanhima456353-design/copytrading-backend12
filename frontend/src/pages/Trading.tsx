@@ -1819,7 +1819,7 @@ export default function Trading() {
       }
       if (positionsRes?.data) setServerPositions((positionsRes.data || []).filter((p: any) => p && (p.size || p.quantity) && Number(p.size || p.quantity) !== 0));
       if (ordersRes?.data) {
-        const orders = (ordersRes.data || []).map((o: any) => ({
+        const orders = (ordersRes.data || []).filter(Boolean).map((o: any) => ({
           id: o._id || o.orderId,
           pair: o.pair || o.symbol,
           type: o.type,
@@ -3393,7 +3393,7 @@ export default function Trading() {
                   <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
                     {/* Order type tabs */}
                     <div style={{ display: "flex", gap: 8, marginBottom: 0 }}>
-                      {(["Market", "Limit", "Stop Limit"] as const).map(t => {
+                      {(["Limit", "Market", "Stop Limit"] as const).map(t => {
                         const tv = t.toLowerCase().replace(" ", "-");
                         return <button key={t} onClick={() => { setSpotOrderType(tv as any); if (tv !== "limit") { setSpotSliderPct(0); } }} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 11, color: spotOrderType === tv ? COLORS.textBright : COLORS.text, borderBottom: spotOrderType === tv ? `2px solid ${"#f0b90b"}` : "2px solid transparent", paddingBottom: 2 }}>{t}</button>;
                       })}
