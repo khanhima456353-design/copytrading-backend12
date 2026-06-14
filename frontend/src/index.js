@@ -26,6 +26,7 @@ function AppLayout() {
     location.pathname !== "/register" &&
     location.pathname !== "/login" &&
     location.pathname !== "/news" &&
+    location.pathname !== "/verification" &&
     !(isTradingPage && isAuthenticated) &&
     !location.state?.embed;
 

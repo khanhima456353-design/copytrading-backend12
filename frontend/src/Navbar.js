@@ -117,7 +117,7 @@ export default function Navbar({ showAuth = true, minimal = false, homepage = fa
                 </div>
               )}
             </div>
-          ) : showAuth && !minimal ? (
+          ) : showAuth && !minimal && !localStorage.getItem('token') ? (
             <div className="nav-auth">
               <button onClick={() => navigate('/login')} className="btn-ghost">Log in</button>
               <button onClick={() => navigate('/register')} className="btn-primary">Sign Up</button>
@@ -148,7 +148,7 @@ export default function Navbar({ showAuth = true, minimal = false, homepage = fa
                 <Link to="/research" className="nav-mobile-item" onClick={() => setIsMobileMenuOpen(false)}>Research</Link>
                 <Link to="/" className="nav-mobile-item" onClick={() => setIsMobileMenuOpen(false)}>Dashboard</Link>
               </nav>
-              {showAuth && !minimal && (
+              {showAuth && !minimal && !localStorage.getItem('token') && (
                 <div className="nav-mobile-auth">
                   <button onClick={() => { navigate('/login'); setIsMobileMenuOpen(false); }} className="btn-ghost">Log in</button>
                   <button onClick={() => { navigate('/register'); setIsMobileMenuOpen(false); }} className="btn-primary">Sign Up</button>
