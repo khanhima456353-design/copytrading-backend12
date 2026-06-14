@@ -468,3 +468,17 @@
     padding-bottom: 56px;
   }
 }
+
+.mk-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border, #2B3139);
+  border-top-color: #f0b90b;
+  border-radius: 50%;
+  animation: mk-spin 0.8s linear infinite;
+  margin: 0 auto;
+}
+
+@keyframes mk-spin {
+  to { transform: rotate(360deg); }
+}

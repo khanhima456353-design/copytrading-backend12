@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { House, BriefcaseBusiness, Store, ShieldUser } from "lucide-react";
+import { House, BriefcaseBusiness, Store, ShieldUser, BookSearch } from "lucide-react";
 import "./markets.css";
 import { subscribeAllTickers } from "./services/marketState";
 
@@ -217,7 +217,7 @@ export default function Markets() {
             <span className="mk-subtitle">{pairs.length} pairs</span>
           </div>
           <div className="mk-search-wrap">
-            <span className="mk-search-icon">🔍</span>
+            <span className="mk-search-icon"><BookSearch size={16} /></span>
             <input
               className="mk-search-input"
               type="text"
@@ -265,7 +265,7 @@ export default function Markets() {
             {initialLoading ? (
               <div className="mk-loading">Loading market data...</div>
             ) : pairs.length === 0 ? (
-              <div className="mk-loading">No pairs found</div>
+              <div className="mk-loading"><div className="mk-spinner" /></div>
             ) : (
               pairs.map((p, i) => (
                 <div
