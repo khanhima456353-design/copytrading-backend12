@@ -564,12 +564,12 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
     const visible  = candles.slice(startIdx, endIdx);
     if (!visible.length) { ctx.restore(); return; }
 
-    const candleW = plotW / visible.length;
+    const candleW = plotW / visibleCount;
     const bodyW = Math.max(1, candleW * 0.6);
     const { pMin, pMax } = getPriceRange(visible);
 
     const toY = (p: number, top: number, h: number) => top + h - ((p - pMin) / (pMax - pMin || 1)) * h;
-    const toX = (i: number) => i * candleW + candleW / 2;
+    const toX = (i: number) => (plotW - candleW / 2) - (visible.length - 1 - i) * candleW;
 
     // Grid lines
     const gridCount = 6;
