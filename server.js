@@ -1365,9 +1365,43 @@ emitter.on("orderbook", (data) => {
 
 // ????????? Market price feed ????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 // UPGRADED: Binance WebSocket (primary) + CoinGecko fallback (secondary)
-const trackedPairs        = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "LTC/USDT", "ADA/USDT"];
-const binancePairs        = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "LTCUSDT", "ADAUSDT"];
-const coinGeckoIds        = { "BTC/USDT": "bitcoin", "ETH/USDT": "ethereum", "SOL/USDT": "solana", "LTC/USDT": "litecoin", "ADA/USDT": "cardano" };
+const trackedPairs        = [
+  "BTC/USDT","ETH/USDT","SOL/USDT","LTC/USDT","ADA/USDT",
+  "XRP/USDT","DOGE/USDT","AVAX/USDT","DOT/USDT","LINK/USDT",
+  "MATIC/USDT","BNB/USDT","NEAR/USDT","APT/USDT","ARB/USDT",
+  "UNI/USDT","ATOM/USDT","TRX/USDT","ETC/USDT","XLM/USDT",
+  "FIL/USDT","ALGO/USDT","VET/USDT","ICP/USDT","SAND/USDT",
+  "MANA/USDT","AXS/USDT","AAVE/USDT","EGLD/USDT","THETA/USDT",
+  "FTM/USDT","EOS/USDT","XTZ/USDT","CRV/USDT","SNX/USDT",
+  "ENJ/USDT","CHZ/USDT","KSM/USDT","RNDR/USDT","FET/USDT",
+  "GALA/USDT","IMX/USDT","MKR/USDT","COMP/USDT","YFI/USDT",
+  "ZIL/USDT","BAT/USDT","ZRX/USDT","RVN/USDT","IOTA/USDT",
+  "ANKR/USDT","HOT/USDT","OMG/USDT","SC/USDT","BCH/USDT",
+  "STX/USDT","HBAR/USDT","SUI/USDT","OP/USDT",
+];
+const binancePairs        = trackedPairs.map(p => p.replace("/", ""));
+const coinGeckoIds        = {
+  "BTC/USDT":"bitcoin","ETH/USDT":"ethereum","SOL/USDT":"solana",
+  "LTC/USDT":"litecoin","ADA/USDT":"cardano","XRP/USDT":"ripple",
+  "DOGE/USDT":"dogecoin","AVAX/USDT":"avalanche-2","DOT/USDT":"polkadot",
+  "LINK/USDT":"chainlink","MATIC/USDT":"matic-network","BNB/USDT":"binancecoin",
+  "NEAR/USDT":"near","APT/USDT":"aptos","ARB/USDT":"arbitrum",
+  "UNI/USDT":"uniswap","ATOM/USDT":"cosmos","TRX/USDT":"tron",
+  "ETC/USDT":"ethereum-classic","XLM/USDT":"stellar","FIL/USDT":"filecoin",
+  "ALGO/USDT":"algorand","VET/USDT":"vechain","ICP/USDT":"internet-computer",
+  "SAND/USDT":"the-sandbox","MANA/USDT":"decentraland","AXS/USDT":"axie-infinity",
+  "AAVE/USDT":"aave","EGLD/USDT":"elrond-erd-2","THETA/USDT":"theta-token",
+  "FTM/USDT":"fantom","EOS/USDT":"eos","XTZ/USDT":"tezos",
+  "CRV/USDT":"curve-dao-token","SNX/USDT":"synthetix-network-token","ENJ/USDT":"enjincoin",
+  "CHZ/USDT":"chiliz","KSM/USDT":"kusama","RNDR/USDT":"render-token",
+  "FET/USDT":"fetch-ai","GALA/USDT":"gala","IMX/USDT":"immutable-x",
+  "MKR/USDT":"maker","COMP/USDT":"compound-governance-token","YFI/USDT":"yearn-finance",
+  "ZIL/USDT":"zilliqa","BAT/USDT":"basic-attention-token","ZRX/USDT":"0x",
+  "RVN/USDT":"ravencoin","IOTA/USDT":"iota",  "ANKR/USDT":"ankr",
+  "HOT/USDT":"holo","OMG/USDT":"omisego","SC/USDT":"siacoin",
+  "BCH/USDT":"bitcoin-cash","STX/USDT":"stacks","HBAR/USDT":"hedera-hashgraph",
+  "SUI/USDT":"sui","OP/USDT":"optimism",
+};
 const cachedMarketPrices  = {};
 let marketPollDelay       = 15_000;
 const MIN_POLL_DELAY      = 15_000;
