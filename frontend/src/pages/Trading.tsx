@@ -536,7 +536,28 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
     return { pMin: pMin - pad, pMax: pMax + pad };
   }, [indicators.bb]);
 
+  const dataRef = useRef({ candles, indicators, chartType, tf, rsiData, macdData, showRSI, showMACD, lastPrice, entryPriceLine, drawings, deepMarketData, viewportWidth, COLORS, getMainPlotBounds, getPriceRange, toolbarCollapsed });
+  dataRef.current = { candles, indicators, chartType, tf, rsiData, macdData, showRSI, showMACD, lastPrice, entryPriceLine, drawings, deepMarketData, viewportWidth, COLORS, getMainPlotBounds, getPriceRange, toolbarCollapsed };
+
   const draw = useCallback(() => {
+    const d = dataRef.current;
+    const candles = d.candles;
+    const indicators = d.indicators;
+    const COLORS = d.COLORS;
+    const viewportWidth = d.viewportWidth;
+    const getMainPlotBounds = d.getMainPlotBounds;
+    const getPriceRange = d.getPriceRange;
+    const toolbarCollapsed = d.toolbarCollapsed;
+    const chartType = d.chartType;
+    const tf = d.tf;
+    const rsiData = d.rsiData;
+    const macdData = d.macdData;
+    const showRSI = d.showRSI;
+    const showMACD = d.showMACD;
+    const lastPrice = d.lastPrice;
+    const entryPriceLine = d.entryPriceLine;
+    const drawings = d.drawings;
+    const deepMarketData = d.deepMarketData;
     const canvas = canvasRef.current;
     if (!canvas || !candles.length) return;
     const ctx = canvas.getContext("2d")!;
@@ -569,7 +590,11 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
     const { pMin, pMax } = getPriceRange(visible);
 
     const toY = (p: number, top: number, h: number) => top + h - ((p - pMin) / (pMax - pMin || 1)) * h;
-    const toX = (i: number) => (plotW - candleW / 2) - (visible.length - 1 - i) * candleW;
+    // Anchor candles to RIGHT edge — latest candle sits at rightmost position
+    const toX = (i: number) => {
+      const rightEdge = plotW - candleW * 0.5;
+      return rightEdge - (visible.length - 1 - i) * candleW;
+    };
 
     // Grid lines
     const gridCount = 6;
@@ -844,7 +869,7 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
     maInfo.forEach(m => { ctx.fillStyle = m.color; ctx.textAlign = "left"; ctx.fillText(`${m.label}: ${m.value}`, maX, maInfoY); maX += ctx.measureText(`${m.label}: ${m.value}`).width + 16; });
 
     ctx.restore();
-  }, [candles, indicators, chartType, tf, rsiData, macdData, showRSI, showMACD, liveStatus, lastPrice, entryPriceLine, CHART_WEIGHT, VOL_WEIGHT, SUB_WEIGHT, getMainPlotBounds, getPriceRange, drawings, deepMarketData, viewportWidth, COLORS]);
+  }, []);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -942,14 +967,14 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
       const W = canvas.width / dpr;
       const H = canvas.height / dpr;
       const plotW = W - 88;
-      return { plotW, ...getMainPlotBounds(H) };
+      return { plotW, ...dataRef.current.getMainPlotBounds(H) };
     };
     const getVisibleCount = (zoom = st.zoom) => {
       const { plotW } = getCanvasInfo();
       return Math.max(20, Math.floor(Math.max(1, plotW) / (8 * zoom)));
     };
     const clampOffset = (offset: number, zoom = st.zoom) => {
-      const maxOffset = Math.max(0, candles.length - getVisibleCount(zoom));
+      const maxOffset = Math.max(0, dataRef.current.candles.length - getVisibleCount(zoom));
       return Math.max(0, Math.min(offset, maxOffset));
     };
     const getCandleWidth = (zoom = st.zoom) => {
@@ -957,10 +982,11 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
       return Math.max(1, plotW) / getVisibleCount(zoom);
     };
     const getPriceAtY = (y: number) => {
+      const d = dataRef.current;
       const { mainPlotTop, mainPlotH, mainPlotBottom } = getCanvasInfo();
-      const visible = candles.slice(Math.max(0, candles.length - Math.max(20, Math.floor(getCanvasInfo().plotW / (8 * st.zoom))) - st.offset), Math.max(0, candles.length - st.offset));
+      const visible = d.candles.slice(Math.max(0, d.candles.length - Math.max(20, Math.floor(getCanvasInfo().plotW / (8 * st.zoom))) - st.offset), Math.max(0, d.candles.length - st.offset));
       if (!visible.length) return 0;
-      const { pMin, pMax } = getPriceRange(visible);
+      const { pMin, pMax } = d.getPriceRange(visible);
       const boundedY = Math.max(mainPlotTop, Math.min(mainPlotBottom, y));
       return pMin + (pMax - pMin) * (1 - (boundedY - mainPlotTop) / mainPlotH);
     };
@@ -1065,7 +1091,7 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
       const midpoint = getTouchMidpoint(touches);
       const { plotW } = getCanvasInfo();
       const visibleCount = getVisibleCount(st.zoom);
-      const startIndex = Math.max(0, candles.length - visibleCount - st.offset);
+      const startIndex = Math.max(0, dataRef.current.candles.length - visibleCount - st.offset);
 
       pinchStartDistance = Math.max(1, getTouchDistance(touches));
       pinchStartZoom = st.zoom;
@@ -1104,7 +1130,7 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
         const newZoom = Math.max(0.3, Math.min(5, pinchStartZoom * (distance / pinchStartDistance)));
         const visibleCount = getVisibleCount(newZoom);
         const candleW = getCandleWidth(newZoom);
-        const anchoredOffset = candles.length - pinchAnchorIndex - visibleCount * (1 - pinchAnchorRatio);
+        const anchoredOffset = dataRef.current.candles.length - pinchAnchorIndex - visibleCount * (1 - pinchAnchorRatio);
         const midpointPanOffset = (midpoint.x - pinchStartMidX) / Math.max(1, candleW);
 
         st.zoom = newZoom;
@@ -1180,7 +1206,7 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
       canvas.removeEventListener("touchcancel", onTouchCancel);
       document.removeEventListener("mouseup", onUp);
     };
-  }, [activeTool, drawings, onDrawingsChange, drawingColor, drawingWidth, candles, getPriceRange, getMainPlotBounds]);
+  }, [activeTool, drawings, onDrawingsChange, drawingColor, drawingWidth]);
 
   const cursorStyle = activeTool === "cursor" ? "default" : activeTool === "eraser" ? "cell" : "crosshair";
   return <canvas ref={canvasRef} style={{ display: "block", cursor: cursorStyle, width: "100%", height: "100%", touchAction: "pan-y" }} />;
@@ -2172,7 +2198,7 @@ export default function Trading() {
           if (price > 0 && candlesInitialized.current) {
             const updated = updateLatestCandle(price, Date.now());
             if (updated) {
-              setCandles(getCandles());
+              setCandles([...getCandles()]);
             }
           }
         });
@@ -3349,7 +3375,7 @@ export default function Trading() {
           <div className="trading-chart-layout" style={{ display: "flex", height: "100%" }}>
             <div ref={chartStageRef} className="trading-chart-stage" style={{ flex: 1, position: "relative", minWidth: 0, marginLeft: viewportWidth >= 1024 ? (toolbarCollapsed ? 0 : 44) : 0, transition: "margin-left 0.18s ease" }}>
               {activeChartTab === "original" && (
-                <CandleChart candles={candles} deepMarketData={deepMarketData} indicators={indicators} chartType={chartType} tf={timeframe} pair={symbol} rsiData={rsiData} macdData={macdData} showRSI={showRSI} showMACD={showMACD} liveStatus={liveStatus} activeTool={activeTool} drawings={drawings} onDrawingsChange={setDrawings} drawingColor={drawingColor} drawingWidth={drawingWidth} lastPrice={lastPrice} entryPriceLine={entryPriceOverlay} toolbarCollapsed={toolbarCollapsed} />
+                <CandleChart key={`${symbol}-${timeframe}`} candles={candles} deepMarketData={deepMarketData} indicators={indicators} chartType={chartType} tf={timeframe} pair={symbol} rsiData={rsiData} macdData={macdData} showRSI={showRSI} showMACD={showMACD} liveStatus={liveStatus} activeTool={activeTool} drawings={drawings} onDrawingsChange={setDrawings} drawingColor={drawingColor} drawingWidth={drawingWidth} lastPrice={lastPrice} entryPriceLine={entryPriceOverlay} toolbarCollapsed={toolbarCollapsed} />
               )}
               {activeChartTab === "depth" && (
                 <div style={{ height: "100%", display: "flex", flexDirection: "column", padding: 16, gap: 16, background: COLORS.bgPanel, minHeight: 360 }}>

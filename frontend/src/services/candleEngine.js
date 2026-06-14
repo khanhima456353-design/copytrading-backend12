@@ -93,48 +93,39 @@ export function updateLatestCandle(lastPrice, timestamp, volatility = 'low') {
   let hasChanged = false;
 
   if (latest.time === bucketTime) {
-    // Same candle bucket: update high/low/close only
+    // Same candle bucket: mutate in-place (no new array)
     const newHigh = Math.max(latest.high, lastPrice) + wick();
     const newLow = Math.min(latest.low, lastPrice) - wick();
     const newClose = lastPrice;
 
-    // Only trigger update if values actually changed
-    hasChanged =
-      newClose !== latest.close ||
-      newHigh !== latest.high ||
-      newLow !== latest.low;
-
-    updated = {
-      time: latest.time,
-      open: latest.open, // Never touch open
-      high: newHigh,
-      low: newLow,
-      close: newClose,
-      volume: latest.volume ?? 0
-    };
+    hasChanged = newClose !== latest.close || newHigh !== latest.high || newLow !== latest.low;
 
     if (hasChanged) {
-      candlesRef.current = [...candles.slice(0, -1), updated];
+      latest.high = newHigh;
+      latest.low = newLow;
+      latest.close = newClose;
+      updated = latest;
     }
   } else {
-    // New candle bucket: OHLC from previous close
+    // New candle bucket: push to existing array (no new array)
     const prevClose = latest.close ?? lastPrice;
     const newHigh = Math.max(prevClose, lastPrice) + wick();
     const newLow = Math.min(prevClose, lastPrice) - wick();
 
-    updated = {
+    candles.push({
       time: bucketTime,
-      open: prevClose, // Initialize from previous close
+      open: prevClose,
       high: newHigh,
       low: newLow,
       close: lastPrice,
       volume: latest.volume ?? 0
-    };
-
-    const next = [...candles, updated];
+    });
     // Keep last 200 candles only
-    candlesRef.current = next.length > 200 ? next.slice(-200) : next;
+    if (candles.length > 200) {
+      candles.splice(0, candles.length - 200);
+    }
     hasChanged = true;
+    updated = candlesRef.current[candlesRef.current.length - 1];
   }
 
   return hasChanged ? updated : null;
