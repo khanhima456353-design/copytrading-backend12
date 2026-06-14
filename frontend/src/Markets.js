@@ -214,7 +214,6 @@ export default function Markets() {
         <div className="mk-top-bar">
           <div className="mk-title-area">
             <h1 className="mk-title">Markets</h1>
-            <span className="mk-subtitle">{pairs.length} pairs</span>
           </div>
           <div className="mk-search-wrap">
             <span className="mk-search-icon"><BookSearch size={16} /></span>
