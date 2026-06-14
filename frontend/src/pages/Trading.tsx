@@ -3456,8 +3456,17 @@ export default function Trading() {
                       <span>USDT bal: ${availableBalance.toFixed(2)}</span>
                     </div>
                     <div style={{ display: "flex", gap: 4 }}>
-                      <button onClick={() => { setSpotAmount(""); executeSpotOrder("buy"); }} style={{ flex: 1, height: 34, background: COLORS.green, border: "none", borderRadius: 6, color: "#000", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Buy {baseSymbol}</button>
-                      <button onClick={() => { setSpotAmount(""); executeSpotOrder("sell"); }} style={{ flex: 1, height: 34, background: COLORS.red, border: "none", borderRadius: 6, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Sell {baseSymbol}</button>
+                      {!isAuthenticated ? (
+                        <>
+                          <button onClick={() => navigate("/login")} style={{ flex: 1, height: 34, background: COLORS.green, border: "none", borderRadius: 6, color: "#000", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Log in</button>
+                          <button onClick={() => navigate("/login")} style={{ flex: 1, height: 34, background: COLORS.red, border: "none", borderRadius: 6, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Log in</button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={() => { setSpotAmount(""); executeSpotOrder("buy"); }} style={{ flex: 1, height: 34, background: COLORS.green, border: "none", borderRadius: 6, color: "#000", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Buy {baseSymbol}</button>
+                          <button onClick={() => { setSpotAmount(""); executeSpotOrder("sell"); }} style={{ flex: 1, height: 34, background: COLORS.red, border: "none", borderRadius: 6, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Sell {baseSymbol}</button>
+                        </>
+                      )}
                     </div>
                     {spotError && <div style={{ fontSize: 10, color: COLORS.red, background: COLORS.redDim, padding: "4px 8px", borderRadius: 3, border: `1px solid ${COLORS.red}` }}>{spotError}</div>}
                   </div>
@@ -3614,7 +3623,7 @@ export default function Trading() {
         <div className="trading-order-actions" style={{ display: "flex", gap: 8, padding: "8px 16px", borderTop: `1px solid ${COLORS.border}`, flexShrink: 0 }}>
           {!isAuthenticated ? (
             <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 8, gridColumn: "1 / -1" }}>
-              {isDesktopLayout ? (
+              {isDesktopLayout || isTablet ? (
                 <>
               <div style={{ display: "flex", gap: 8 }}>
                 <button className="login-prompt-btn" onClick={() => navigate("/login")} style={{ flex: 1, height: 44, background: COLORS.green, border: "none", borderRadius: 8, color: "#000", fontWeight: 700, fontSize: 15, cursor: "pointer" }}>Log in</button>
