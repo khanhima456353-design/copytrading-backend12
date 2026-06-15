@@ -40,6 +40,19 @@ function normalizeToBucket(timestamp, intervalSec) {
   if (seconds > 1e12) {
     seconds = Math.floor(seconds / 1000);
   }
+
+  if (intervalSec === 604800) {
+    const d = new Date(seconds * 1000);
+    const utcDay = d.getUTCDay();
+    const daysSinceMonday = (utcDay + 6) % 7; // Monday = 0, Sunday = 6
+    const mondayUtcMs = Date.UTC(
+      d.getUTCFullYear(),
+      d.getUTCMonth(),
+      d.getUTCDate() - daysSinceMonday,
+    );
+    return Math.floor(mondayUtcMs / 1000);
+  }
+
   return Math.floor(seconds / intervalSec) * intervalSec;
 }
 

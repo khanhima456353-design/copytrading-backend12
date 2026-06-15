@@ -239,9 +239,17 @@ async function fetchBinanceTicker(pair) {
 }
 
 async function fetchBinanceCandles(pair, timeframe = "1m", limit = 80) {
+  if (timeframe === "1s") {
+    // Binance does not provide true 1-second historical candles.
+    // The backend stores live 1s candles in Redis, so the API will
+    // return persisted 1s data when available.
+    return null;
+  }
+
   try {
+    const interval = BINANCE_CANDLE_INTERVAL[timeframe] || timeframe;
     const { data } = await axios.get(`${BINANCE_API_BASE}/api/v3/klines`, {
-      params: { symbol: binanceSymbolForPair(pair), interval: timeframe, limit },
+      params: { symbol: binanceSymbolForPair(pair), interval, limit },
       timeout: 8000,
     });
     return data.map((k) => ({
@@ -258,12 +266,47 @@ async function fetchBinanceCandles(pair, timeframe = "1m", limit = 80) {
   }
 }
 
-const CANDLE_TIMEFRAMES = ["1m", "5m", "15m", "1h"];
-const CANDLE_INTERVAL_SECONDS = { "1m": 60, "5m": 300, "15m": 900, "1h": 3600 };
+const CANDLE_TIMEFRAMES = [
+  "1s", "1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "1w"
+];
+const CANDLE_INTERVAL_SECONDS = { "1s": 1, "1m": 60, "3m": 180, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "2h": 7200, "4h": 14400, "6h": 21600, "8h": 28800, "12h": 43200, "1d": 86400, "1w": 604800 };
+const BINANCE_CANDLE_INTERVAL = {
+  "1s": "1m",
+  "1m": "1m",
+  "3m": "3m",
+  "5m": "5m",
+  "15m": "15m",
+  "30m": "30m",
+  "1h": "1h",
+  "2h": "2h",
+  "4h": "4h",
+  "6h": "6h",
+  "8h": "8h",
+  "12h": "12h",
+  "1d": "1d",
+  "1w": "1w"
+};
 
 function getCandleBucketStart(timestampMs, timeframe = "1m") {
+  let ms = timestampMs;
+  if (typeof ms !== "number") ms = Number(ms);
+  if (!Number.isFinite(ms)) ms = Date.now();
+  if (ms < 1e12) ms *= 1000; // accept seconds or milliseconds
+
+  if (timeframe === "1w") {
+    const d = new Date(ms);
+    const utcDay = d.getUTCDay();
+    const daysSinceMonday = (utcDay + 6) % 7; // Monday = 0, Sunday = 6
+    const mondayUtcMs = Date.UTC(
+      d.getUTCFullYear(),
+      d.getUTCMonth(),
+      d.getUTCDate() - daysSinceMonday,
+    );
+    return Math.floor(mondayUtcMs / 1000);
+  }
+
   const interval = CANDLE_INTERVAL_SECONDS[timeframe] || 60;
-  return Math.floor(timestampMs / 1000 / interval) * interval;
+  return Math.floor(ms / 1000 / interval) * interval;
 }
 
 async function getPersistedCandles(pair, timeframe = "1m") {
@@ -516,8 +559,17 @@ app.get("/api/market/trades/:pair", async (req, res) => {
 app.get("/api/market/candles/:pair", async (req, res) => {
   const pair      = cleanPair(req.params.pair);
   const timeframe = String(req.query.timeframe || "1m");
-  const candles   = await fetchBinanceCandles(pair, timeframe, 1000);
 
+  if (!CANDLE_TIMEFRAMES.includes(timeframe)) {
+    return res.status(400).json({ error: `Invalid timeframe: ${timeframe}` });
+  }
+
+  if (timeframe === "1s") {
+    const persisted = await getPersistedCandles(pair, timeframe);
+    if (persisted.length) return res.json(dedupeAndSortCandles(persisted));
+  }
+
+  const candles = await fetchBinanceCandles(pair, timeframe, 1000);
   if (candles) {
     const merged = await mergeLiveCurrentBucket(pair, timeframe, candles);
     return res.json(merged);
@@ -527,8 +579,7 @@ app.get("/api/market/candles/:pair", async (req, res) => {
   if (persisted.length) return res.json(dedupeAndSortCandles(persisted));
 
   const trades = getTrades(pair);
-  const intervalMap = { "1m": 60, "5m": 300, "15m": 900, "1h": 3600 };
-  const interval    = intervalMap[timeframe] || 60;
+  const interval = CANDLE_INTERVAL_SECONDS[timeframe] || 60;
 
   if (!trades.length) {
     const now = Math.floor(Date.now() / 1000);

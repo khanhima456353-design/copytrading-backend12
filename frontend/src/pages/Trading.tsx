@@ -314,9 +314,14 @@ function formatChartTime(ts: number, tf: string) {
   const d = new Date(ts * 1000);
   if (tf === "1d" || tf === "1w") return d.toLocaleDateString([], { month: "short", day: "numeric" });
 
-  if (["1h", "2h", "4h", "6h", "8h", "12h"].includes(tf)) {
-    return d.toLocaleDateString([], { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  if (["4h", "6h", "8h", "12h"].includes(tf)) {
+    return d.toLocaleDateString([], { month: "short", day: "numeric" });
   }
+
+  if (["1h", "2h"].includes(tf)) {
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
