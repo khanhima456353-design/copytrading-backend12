@@ -53,6 +53,8 @@ const adminRoutes = require("./src/routes/adminRoutes");
 const notificationRoutes = require("./src/routes/notificationRoutes");
 const walletRoutes = require('./routes/walletRoutes');
 const orderRoutes = require('./routes/orderRoutes');
+const earnRoutes = require('./routes/earnRoutes');
+const earnService = require('./services/earnService');
 const orderService = require('./services/orderService');
 const orderMonitor = require('./services/orderMonitor');
 const walletService = require('./services/walletService');
@@ -670,6 +672,7 @@ app.use("/api/admin",         adminRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/earn', earnRoutes);
 
 app.get("/test",    (_req, res) => res.json({ message: "Server is working" }));
 app.get("/health",  (_req, res) => res.send("OK"));
@@ -2063,6 +2066,25 @@ if (require.main === module) {
   const serverInstance = server.listen(PORT, "0.0.0.0", () => {
     console.log(`???? Server running on port ${PORT}`);
     startNewsStream();
+    // Earn daily payout: check every 60 minutes
+    setInterval(async () => {
+      try {
+        const result = await earnService.processDailyPayouts();
+        if (result.paidCount > 0) {
+          console.log(`[Earn] Paid ${result.paidCount} daily earnings — total: $${result.totalPaid.toFixed(2)}`);
+        }
+      } catch (err) {
+        console.error('[Earn] Payout cron error:', err.message);
+      }
+    }, 60 * 60 * 1000);
+    // Run once at startup to catch missed payouts
+    setTimeout(async () => {
+      try {
+        await earnService.processDailyPayouts();
+      } catch (err) {
+        console.error('[Earn] Startup payout error:', err.message);
+      }
+    }, 10_000);
   }).on("error", (err) => {
     if (err.code === "EADDRINUSE") {
       console.error(`Port ${PORT} already in use ??? set PORT env var to override.`);

@@ -1,6 +1,6 @@
 "use strict";
 
-const PNL_MAX_PERCENT = 0;
+const PNL_MAX_PERCENT = 2;
 const PNL_MIN_PERCENT = -25;
 
 /**

@@ -3352,10 +3352,10 @@ export default function Trading() {
   ], [changePct, high24h, low24h, vol24h, vol24hUSDT, isPriceUp]);
 
   return (
-    <div ref={tradingPageRef} className="trading-page trading-dashboard" style={{ display: "flex", flexDirection: "column", height: "auto", background: COLORS.bg, color: COLORS.textBright, fontFamily: "'IBM Plex Sans', 'Helvetica Neue', sans-serif", fontSize: 13, overflowY: "auto", overflowX: "hidden", minHeight: "100dvh", scrollBehavior: "smooth", WebkitOverflowScrolling: "touch", touchAction: "pan-y", overscrollBehaviorY: "auto", position: "relative", margin: 0 }}>
+    <div ref={tradingPageRef} className="trading-page trading-dashboard" style={{ display: "flex", flexDirection: "column", height: paneMaximized ? "100vh" : "auto", background: COLORS.bg, color: COLORS.textBright, fontFamily: "'IBM Plex Sans', 'Helvetica Neue', sans-serif", fontSize: 13, overflowY: paneMaximized ? "hidden" : "auto", overflowX: "hidden", minHeight: paneMaximized ? "100vh" : "100dvh", scrollBehavior: "smooth", WebkitOverflowScrolling: "touch", touchAction: "pan-y", overscrollBehaviorY: "auto", position: paneMaximized ? "fixed" : "relative", inset: paneMaximized ? 0 : "auto", zIndex: paneMaximized ? 9999 : "auto", margin: 0 }}>
 
       {/* -- WALLET + LIVE STATUS (desktop top-right) -- */}
-      {isDesktopLayout && (
+      {isDesktopLayout && !paneMaximized && (
         <div style={{ position: "absolute", top: 8, right: 12, zIndex: 100, display: "flex", alignItems: "center", gap: 8 }}>
           <button onClick={() => setShowWallet(p => !p)} style={{ padding: "3px 8px", height: 26, background: showWallet ? "#f0b90b" : "transparent", border: `1px solid ${showWallet ? "#f0b90b" : COLORS.border}`, borderRadius: 4, color: showWallet ? "#000" : COLORS.text, cursor: "pointer", fontSize: 10, fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
             <Wallet size={12} /> Wallet {showWallet ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
@@ -3366,6 +3366,7 @@ export default function Trading() {
           </div>
         </div>
       )}
+      {!paneMaximized && (
       <div className="trading-rotate-prompt" role="status" aria-live="polite">
         <div className="trading-rotate-prompt__panel">
           <div className="trading-rotate-prompt__icon">?</div>
@@ -3375,8 +3376,10 @@ export default function Trading() {
           </div>
         </div>
       </div>
+      )}
 
       {/* -- TOP HEADER BAR (Binance style) -- */}
+      {!paneMaximized && (
       <div className="trading-header trading-dashboard__header" style={{ display: "flex", alignItems: "center", height: 52, borderBottom: `1px solid ${COLORS.border}`, padding: "0 16px", gap: 24, background: COLORS.bgPanel, flexShrink: 0, overflow: "hidden" }}>
         {/* Symbol + price */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
@@ -3414,12 +3417,13 @@ export default function Trading() {
           ))}
         </div>
       </div>
+      )}
 
       {/* -- 3-PANEL BODY (desktop: flex row; compact: normal flow) -- */}
-      <div style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0, flexDirection: isDesktopLayout ? "row" : "column", background: COLORS.bgPanel }}>
+      <div style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0, height: paneMaximized ? "100vh" : undefined, flexDirection: isDesktopLayout ? "row" : "column", background: COLORS.bgPanel }}>
 
         {/* -- LEFT PANEL: Order Book + Market Trades + Top Movers (desktop only) -- */}
-        {isDesktopLayout && isChartView && (
+        {isDesktopLayout && isChartView && !paneMaximized && (
           <aside style={{ width: 'var(--left-width, 340px)', background: COLORS.bgPanel, borderRight: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden" }}>
             <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
               <div style={{ padding: "8px 10px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
@@ -3434,15 +3438,17 @@ export default function Trading() {
         )}
 
         {/* -- CENTER COLUMN (scrollable on desktop) -- */}
-        <div style={{ flex: 1, overflowY: isDesktopLayout ? "auto" : undefined, display: "flex", flexDirection: "column", minHeight: isDesktopLayout ? 0 : undefined, background: COLORS.bgPanel }}>
+        <div style={{ flex: 1, overflowY: isDesktopLayout ? "auto" : undefined, display: "flex", flexDirection: "column", minHeight: isDesktopLayout ? 0 : undefined, height: paneMaximized ? "100%" : undefined, background: COLORS.bgPanel }}>
 
       {/* -- COLLAPSIBLE PAIRS SELECTOR (mobile/tablet) -- */}
+      {!paneMaximized && (
       <div className="trading-pairs-dropdown" style={{ maxHeight: showPairSelector && isCompactLayout ? 400 : 0, overflow: "hidden", transition: "max-height 0.35s ease", borderBottom: showPairSelector && isCompactLayout ? `1px solid ${COLORS.border}` : "none", background: COLORS.bgPanel }}>
         {showPairSelector && isCompactLayout && marketPairsPanel()}
       </div>
+      )}
 
       {/* -- COLLAPSIBLE WALLET PANEL -- */}
-      {showWallet && (
+      {!paneMaximized && showWallet && (
         <div style={{ borderBottom: `1px solid ${COLORS.border}` }}>
           <div style={{ padding: "12px 16px", background: COLORS.bg }}>
             <TradingBalanceCard />
@@ -3451,6 +3457,7 @@ export default function Trading() {
       )}
 
       {/* -- MAIN VIEW TABS (between left & right panels) -- */}
+      {!paneMaximized && (
       <div className="trading-main-tabs" style={{ display: "flex", alignItems: "center", height: 38, borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, padding: "0 12px", gap: 0, flexShrink: 0 }}>
         {([
           { id: "chart", label: "Chart" },
@@ -3468,9 +3475,10 @@ export default function Trading() {
           </div>
         </div>
       </div>
+      )}
 
       {/* -- TIMEFRAME TOOLBAR (between left & right panels) -- */}
-      {isChartView && (
+      {isChartView && !paneMaximized && (
       <div style={{ display: "flex", alignItems: "center", height: 34, borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, padding: "0 10px", gap: 2, flexShrink: 0, flexWrap: "nowrap", position: "relative", zIndex: 100 }}>
         {/* Pinned Timeframes */}
         <div style={{ display: "flex", gap: isDesktop ? 1 : 0 }}>
@@ -4039,6 +4047,7 @@ export default function Trading() {
       )}
 
       {/* -- BOTTOM TAB BAR (between left & right panels) -- */}
+      {!paneMaximized && (
       <div ref={bottomScrollRef} className="trading-bottom-panel trading-dashboard__activity" style={{ borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", height: 36, padding: "0 12px", gap: 0, borderBottom: `1px solid ${COLORS.border}` }}>
           {tradingMode === "spot"
@@ -4160,8 +4169,10 @@ serverPositions.length === 0
 
         </div>
       </div>
+      )}
 
       {/* -- MAIN BODY -- */}
+      {!paneMaximized && (
       <div className="trading-body trading-dashboard__body" style={{ display: "flex", overflow: "hidden", minHeight: 0, flex: isDesktopLayout ? 1 : "0 0 auto", background: COLORS.bgPanel }}>
 
         
@@ -4171,10 +4182,11 @@ serverPositions.length === 0
         </div>
 
       </div>
+      )}
       </div>
 
         {/* -- RIGHT PANEL: Trading Pairs + Market Trades (desktop only) -- */}
-        {isDesktopLayout && (
+        {isDesktopLayout && !paneMaximized && (
           <aside style={{ width: 'var(--right-width, 340px)', background: COLORS.bgPanel, borderLeft: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden" }}>
             {marketPairsPanel()}
             {marketTradesPanel(false)}

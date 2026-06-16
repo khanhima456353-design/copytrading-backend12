@@ -19,6 +19,7 @@ import Careers from "./pages/Careers";
 import Imformation from "./Imformation";
 import BuildingTrust from "./pages/BuildingTrust";
 import Trading from './pages/Trading.tsx';
+import Earn from './pages/Earn';
 import Verification from './pages/Verification';
 import ResponsiveHomepage from './pages/ResponsiveHomepage';
 import AdminLogin from "./pages/AdminLogin";
@@ -59,6 +60,7 @@ export default function App() {
         <Route path="/imformation" element={<Imformation />} />
         <Route path="/legal/privacy" element={<Privacy />} />
         <Route path="/trade" element={<Trading />} />
+        <Route path="/earn" element={<Earn />} />
         <Route
           path="/verification"
           element={
