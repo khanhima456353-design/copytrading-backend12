@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
+﻿import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import logo from "../assets/logo.jpg";
 import "./Trading.css";
@@ -11,7 +11,7 @@ import PositionsPanel from "../components/PositionsPanel";
 import { calculateUnrealizedPnL } from "../services/tradingUtils";
 import { TradingBalanceCard } from "../components/TradingBalanceCard";
 import { useTheme } from "../components/theme/ThemeContext";
-import { Wallet, Trash, Magnet, PaintbrushVertical, RulerDimensionLine, Eraser, ChartCandlestick, ChartLine, BarChart3, ChartArea, ChevronLeft, ChevronRight, Search, Star, Menu, ChevronDown, ChevronUp, Check, X, Info, MousePointer2, Crosshair, TrendingUp, Minus, SeparatorVertical, Square, GitBranch, ArrowUpDown, Type } from "lucide-react";
+import { Wallet, Trash, Magnet, PaintbrushVertical, RulerDimensionLine, Eraser, ChartCandlestick, ChartLine, BarChart3, ChartArea, ChevronLeft, ChevronRight, Search, Star, Menu, ChevronDown, ChevronUp, Check, X, Info, MousePointer2, Crosshair, TrendingUp, Minus, SeparatorVertical, Square, GitBranch, ArrowUpDown, Type, ChevronsDown, Maximize2 } from "lucide-react";
 
 // --- Types --------------------------------------------------------------------
 
@@ -81,18 +81,50 @@ function normalizeTimeframe(value: string | undefined) {
 const FEE_RATE = 0.001;
 const MIN_ORDER_TOTAL = 5;
 
-function getColors(theme: string) {
+type Colors = {
+  bg: string;
+  bgPanel: string;
+  bgAlt: string;
+  bgHover: string;
+  border: string;
+  borderLight: string;
+  text: string;
+  textBright: string;
+  textMuted: string;
+  grid: string;
+  crosshair: string;
+  tooltipBg: string;
+  tagBg: string;
+  green: string;
+  greenDim: string;
+  red: string;
+  redDim: string;
+  blue: string;
+  blueDim: string;
+  amber: string;
+  cyan: string;
+  sma: string;
+  ema: string;
+  bbUpper: string;
+  bbMid: string;
+  bbLow: string;
+  vwap: string;
+};
+
+function getColors(theme: string): Colors {
   const dark = {
     bg: "#0b0e11", bgPanel: "#161a1e", bgAlt: "#1a1e24", bgHover: "#1f2530",
     border: "#2a2e35", borderLight: "#222730",
     text: "#848e9c", textBright: "#eaecef", textMuted: "#474d57",
     grid: "rgba(42,46,53,0.6)", crosshair: "rgba(132,142,156,0.5)",
+    tooltipBg: "rgba(0,0,0,0.88)", tagBg: "rgba(0,0,0,0.95)",
   };
   const light = {
     bg: "#f5f6f8", bgPanel: "#ffffff", bgAlt: "#f0f2f5", bgHover: "#e8eaed",
     border: "#d0d5dd", borderLight: "#e2e5ea",
     text: "#64748b", textBright: "#0f172a", textMuted: "#94a3b8",
     grid: "rgba(0,0,0,0.08)", crosshair: "rgba(0,0,0,0.12)",
+    tooltipBg: "rgba(0,0,0,0.86)", tagBg: "rgba(0,0,0,0.92)",
   };
   return {
     ...(theme === "light" ? light : dark),
@@ -294,35 +326,35 @@ const formatTime = (t: number) =>
   new Date(t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
 function formatPrice(p: number) {
-  if (!p || isNaN(p)) return "�";
-  const a = Math.abs(p);
-  if (a >= 10000) return p.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  if (a >= 100) return p.toFixed(2);
-  if (a >= 1) return p.toFixed(4);
-  return p.toFixed(6);
+  if (!Number.isFinite(p)) return "—";
+  const absP = Math.abs(p);
+  if (absP >= 100) return p.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (absP >= 1) return p.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+  return p.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 6 });
 }
 function formatVol(v: number) {
+  if (!Number.isFinite(v)) return "—";
   if (v >= 1e9) return (v / 1e9).toFixed(2) + "B";
   if (v >= 1e6) return (v / 1e6).toFixed(2) + "M";
   if (v >= 1e3) return (v / 1e3).toFixed(2) + "K";
   return v.toFixed(2);
 }
 function formatFullAmount(v: number) {
+  if (!Number.isFinite(v)) return "—";
   return v.toFixed(2);
 }
 function formatChartTime(ts: number, tf: string) {
   const d = new Date(ts * 1000);
-  if (tf === "1d" || tf === "1w") return d.toLocaleDateString([], { month: "short", day: "numeric" });
-
-  if (["4h", "6h", "8h", "12h"].includes(tf)) {
+  if (tf === "1w" || tf === "1d") {
     return d.toLocaleDateString([], { month: "short", day: "numeric" });
   }
-
-  if (["1h", "2h"].includes(tf)) {
+  if (["12h", "8h", "6h", "4h"].includes(tf)) {
+    return d.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  }
+  if (["2h", "1h", "30m", "15m", "5m"].includes(tf)) {
     return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
-
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
 function formatMsTime(ts: number) {
@@ -509,12 +541,13 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const CHART_WEIGHT = showRSI && showMACD ? 0.52 : (showRSI || showMACD) ? 0.65 : 0.76;
-  const VOL_WEIGHT = 0.10;
+  const VOL_WEIGHT = 0.25;
+  const CHART_WEIGHT = showRSI && showMACD ? 0.50 : (showRSI || showMACD) ? 0.60 : 0.75;
   const SUB_WEIGHT = 1 - CHART_WEIGHT - VOL_WEIGHT;
 
   const getMainPlotBounds = useCallback((height: number) => {
-    const mainH = Math.floor(height * CHART_WEIGHT);
+    const contentH = Math.max(28, height - 28);
+    const mainH = Math.floor(contentH * CHART_WEIGHT);
     const isMobile = viewportWidth < 768;
     const isTablet = viewportWidth >= 768 && viewportWidth < 1024;
     let topPadding = Math.floor(mainH * 0.12);
@@ -570,10 +603,16 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
     const W = canvas.width / dpr, H = canvas.height / dpr;
 
     const { mainH, mainPlotTop, mainPlotH, mainPlotBottom } = getMainPlotBounds(H);
-    const volH  = Math.floor(H * VOL_WEIGHT);
-    const rsiH  = showRSI && !showMACD ? Math.floor(H * SUB_WEIGHT) : showRSI ? Math.floor(H * SUB_WEIGHT * 0.5) : 0;
-    const macdH = showMACD && !showRSI ? Math.floor(H * SUB_WEIGHT) : showMACD ? Math.floor(H * SUB_WEIGHT * 0.5) : 0;
+    const contentH = Math.max(28, H - 28);
+    const volH  = Math.floor(contentH * VOL_WEIGHT);
+    const indicatorH = Math.max(0, contentH - mainH - volH);
+    const rsiH  = showRSI && !showMACD ? indicatorH : showRSI ? Math.floor(indicatorH * 0.5) : 0;
+    const macdH = showMACD && !showRSI ? indicatorH : showMACD ? Math.floor(indicatorH * 0.5) : 0;
     const PRICE_AXIS_W = 88, TIME_AXIS_H = 28;
+    const volTop = mainH;
+    const rsiTop = mainH + volH;
+    const macdTop = mainH + volH + rsiH;
+    const timeAxisY = mainH + volH + rsiH + macdH;
     const plotW = W - PRICE_AXIS_W;
     const overlayOffsetX = viewportWidth < 1024 ? 36 : (toolbarCollapsed ? 44 : 0);
 
@@ -589,6 +628,7 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
     const endIdx   = Math.max(0, totalCandles - st.offset);
     const visible  = candles.slice(startIdx, endIdx);
     if (!visible.length) { ctx.restore(); return; }
+    const vMax = Math.max(...visible.map(c => c.volume), 1);
 
     const candleW = plotW / visibleCount;
     const bodyW = Math.max(1, candleW * 0.6);
@@ -601,24 +641,101 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
       return rightEdge - (visible.length - 1 - i) * candleW;
     };
 
-    // Grid lines
-    const gridCount = 6;
+    // Compute nice round Y-axis tick values (like Binance)
+    const desiredTickCount = 5;
+    let priceRange = pMax - pMin;
+    let niceStep = priceRange > 0 ? (() => {
+      const roughStep = priceRange / desiredTickCount;
+      const exp = Math.floor(Math.log10(roughStep));
+      const frac = roughStep / Math.pow(10, exp);
+      const niceFrac = frac <= 1.5 ? 1 : frac <= 3.5 ? 2 : frac <= 7.5 ? 5 : 10;
+      return niceFrac * Math.pow(10, exp);
+    })() : Math.pow(10, Math.floor(Math.log10(Math.abs(pMin || 1))));
+
+    const tickMin = Math.ceil(pMin / niceStep - 1e-10) * niceStep;
+    const tickMax = Math.floor(pMax / niceStep + 1e-10) * niceStep;
+
+    const priceTicks: number[] = [];
+    for (let p = tickMin; p <= tickMax + niceStep * 0.5; p += niceStep) {
+      priceTicks.push(Math.round(p * 1e10) / 1e10);
+    }
+
+    const lastCandlePrice = Number.isFinite(lastPrice) && lastPrice > 0 ? lastPrice : (visible[visible.length - 1]?.close || 0);
+    const refPrice = visible.length > 1 ? visible[visible.length - 2].close : (visible[visible.length - 1]?.open || 0);
+    const isGreen = lastCandlePrice >= refPrice;
+
+    // Grid lines aligned to nice round ticks
     ctx.strokeStyle = COLORS.grid; ctx.lineWidth = 0.5;
-    for (let g = 0; g <= gridCount; g++) { const y = mainPlotTop + Math.floor(mainPlotH * g / gridCount) + 0.5; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(plotW, y); ctx.stroke(); }
+    priceTicks.forEach(p => {
+      if (p < pMin || p > pMax) return;
+      const y = Math.round(toY(p, mainPlotTop, mainPlotH)) + 0.5;
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(plotW, y); ctx.stroke();
+    });
     const timeStep = Math.max(1, Math.floor(visible.length / 8));
-    for (let g = 0; g < visible.length; g += timeStep) { const x = Math.floor(toX(g)) + 0.5; ctx.beginPath(); ctx.moveTo(x, mainPlotTop); ctx.lineTo(x, mainH + volH); ctx.stroke(); }
+    for (let g = 0; g < visible.length; g += timeStep) { const x = Math.floor(toX(g)) + 0.5; ctx.beginPath(); ctx.moveTo(x, mainPlotTop); ctx.lineTo(x, timeAxisY); ctx.stroke(); }
 
     // Separator lines
     ctx.strokeStyle = COLORS.border; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(0, mainH + volH); ctx.lineTo(W, mainH + volH); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, mainH); ctx.lineTo(W, mainH); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, timeAxisY); ctx.lineTo(W, timeAxisY); ctx.stroke();
 
-    // Price axis
-    ctx.fillStyle = COLORS.text; ctx.font = `10px 'JetBrains Mono', monospace`; ctx.textAlign = "right";
-    for (let g = 0; g <= gridCount; g++) {
-      const p = pMin + (pMax - pMin) * (1 - g / gridCount);
-      const y = mainPlotTop + Math.floor(mainPlotH * g / gridCount);
-      ctx.fillText(formatPrice(p), W - 4, y + 4);
+    // Unified right-side axis panel (price + volume)
+    ctx.fillStyle = COLORS.bgPanel;
+    ctx.fillRect(plotW, mainPlotTop, PRICE_AXIS_W, timeAxisY - mainPlotTop);
+    ctx.strokeStyle = COLORS.border;
+    ctx.lineWidth = 0.8;
+    ctx.strokeRect(plotW + 0.5, mainPlotTop + 0.5, PRICE_AXIS_W - 1, timeAxisY - mainPlotTop - 1);
+
+    ctx.font = `10px 'JetBrains Mono', monospace`;
+    priceTicks.forEach(p => {
+      if (p < pMin || p > pMax) return;
+      const y = Math.round(toY(p, mainPlotTop, mainPlotH));
+      const isCurrentPrice = Math.abs(p - lastCandlePrice) < niceStep * 0.15;
+      if (isCurrentPrice) {
+        const label = formatPrice(p);
+        const lw = Math.min(ctx.measureText(label).width + 12, PRICE_AXIS_W - 8);
+        const lh = 18;
+        ctx.save();
+        ctx.fillStyle = isGreen ? COLORS.green : COLORS.red;
+        ctx.beginPath();
+        ctx.roundRect(plotW + 4, y - lh / 2, lw, lh, 4);
+        ctx.fill();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = "middle";
+        ctx.fillText(label, plotW + 4 + 6, y);
+        ctx.restore();
+      } else {
+        ctx.fillStyle = COLORS.text;
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        ctx.fillText(formatPrice(p), W - 8, y);
+      }
+    });
+
+    // Volume tick labels in unified axis
+    const volNiceStep = vMax > 0 ? (() => {
+      const vr = vMax / 3;
+      const ve = Math.floor(Math.log10(vr));
+      const vf = vr / Math.pow(10, ve);
+      return (vf <= 1.5 ? 1 : vf <= 3.5 ? 2 : vf <= 7.5 ? 5 : 10) * Math.pow(10, ve);
+    })() : 1;
+    const volPlotH = volH;
+    for (let v = 0; v <= vMax + volNiceStep * 0.5; v += volNiceStep) {
+      const vv = Math.round(v * 1e10) / 1e10;
+      const y = volTop + volPlotH - 4 - (vv / vMax) * volPlotH * 0.85;
+      if (y < volTop || y > volTop + volPlotH) continue;
+      ctx.fillStyle = COLORS.textMuted;
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      ctx.fillText(formatVol(vv), W - 8, y);
     }
+    // "VOL" label at top of volume section
+    ctx.fillStyle = COLORS.textMuted;
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    ctx.fillText("VOL", W - 8, volTop + 14);
+    ctx.textBaseline = "alphabetic";
 
     ctx.save();
     ctx.beginPath();
@@ -702,32 +819,31 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
 
     ctx.restore();
 
-    // Volume
-    const volTop = mainH, volPlotH = volH - TIME_AXIS_H;
-    let vMax = Math.max(...visible.map(c => c.volume), 1);
+    // Volume pane
     visible.forEach((c, i) => {
       const isGreen = c.close >= c.open;
-      const barH = Math.max(1, (c.volume / vMax) * volPlotH);
+      const barH = Math.max(1, (c.volume / vMax) * volPlotH * 0.85);
       const x = toX(i), hw = Math.max(0.5, bodyW / 2);
-      ctx.fillStyle = isGreen ? "rgba(14,203,129,0.25)" : "rgba(246,70,93,0.25)";
-      ctx.fillRect(x - hw, volTop + volPlotH - barH, bodyW, barH);
+      ctx.fillStyle = isGreen ? "rgba(14,203,129,0.35)" : "rgba(246,70,93,0.35)";
+      ctx.fillRect(x - hw, volTop + volPlotH - barH - 4, bodyW, barH);
     });
-    ctx.fillStyle = COLORS.textMuted; ctx.font = "10px monospace"; ctx.textAlign = "right";
-    ctx.fillText("Vol: " + formatVol(vMax), W - 4, volTop + 12);
 
-    // Time axis - place labels at ~8 evenly spaced positions, skip if overlapping
-    ctx.fillStyle = COLORS.text; ctx.font = "10px monospace"; ctx.textAlign = "center";
+    // Time axis at bottom of all panes
+    ctx.fillStyle = COLORS.textMuted;
+    ctx.font = "10px 'JetBrains Mono', monospace";
+    ctx.textAlign = "center";
     let lastLabelX = -100;
     for (let i = 0; i < visible.length; i += timeStep) {
-      const x = toX(i); if (x > plotW - 20) continue;
-      if (x - lastLabelX < 60) continue; // skip if too close to previous label
+      const x = Math.round(toX(i));
+      if (x > plotW - 24) continue;
+      if (x - lastLabelX < 64) continue;
       lastLabelX = x;
-      ctx.fillText(formatChartTime(visible[i].time, tf), x, mainH + volH - 6);
+      ctx.fillText(formatChartTime(visible[i].time, tf), x, timeAxisY + 16);
     }
 
     // RSI
     if (showRSI && rsiData?.length) {
-      const rsiTop = mainH + volH, rsiPlotH = rsiH - TIME_AXIS_H;
+      const rsiPlotH = rsiH;
       ctx.fillStyle = alpha(COLORS.bgPanel, 0.7); ctx.fillRect(0, rsiTop, W, rsiH);
       ctx.strokeStyle = COLORS.border; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.moveTo(0, rsiTop); ctx.lineTo(W, rsiTop); ctx.stroke();
       ctx.fillStyle = COLORS.textMuted; ctx.font = "10px monospace"; ctx.textAlign = "left"; ctx.fillText("RSI(14)", 6, rsiTop + 14);
@@ -747,7 +863,7 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
 
     // MACD
     if (showMACD && macdData) {
-      const macdTop = mainH + volH + (showRSI ? rsiH : 0), macdPlotH = macdH - TIME_AXIS_H;
+      const macdPlotH = macdH;
       ctx.fillStyle = alpha(COLORS.bgPanel, 0.7); ctx.fillRect(0, macdTop, W, macdH);
       ctx.strokeStyle = COLORS.border; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.moveTo(0, macdTop); ctx.lineTo(W, macdTop); ctx.stroke();
       ctx.fillStyle = COLORS.textMuted; ctx.font = "10px monospace"; ctx.textAlign = "left"; ctx.fillText("MACD(12,26,9)", 6, macdTop + 14);
@@ -798,53 +914,115 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
     });
     ctx.restore();
 
-    // Crosshair
+    // Crosshair with axis labels (TradingView style)
     const mx = st.mouseX, my = st.mouseY;
+    
     if (mx >= 0 && mx <= plotW && my >= mainPlotTop && my <= mainPlotBottom) {
-      ctx.strokeStyle = COLORS.crosshair; ctx.lineWidth = 0.5; ctx.setLineDash([4, 4]);
+      // Crosshair lines
+      ctx.strokeStyle = alpha(COLORS.textBright, 0.55); ctx.lineWidth = 1.2; ctx.setLineDash([6, 4]);
       ctx.beginPath(); ctx.moveTo(mx, mainPlotTop); ctx.lineTo(mx, mainPlotBottom); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(0, my); ctx.lineTo(plotW, my); ctx.stroke();
       ctx.setLineDash([]);
+      
       const ci = Math.floor(mx / candleW);
       if (ci >= 0 && ci < visible.length) {
         const c = visible[ci];
         const isGreen = c.close >= c.open;
         const chg = ((c.close - c.open) / c.open * 100).toFixed(2);
+        
         // Header stats bar (like Binance) - two rows
         ctx.fillStyle = alpha(COLORS.bgPanel, 0.95); ctx.fillRect(0, 0, plotW, 32);
         const stats = [`O: ${formatPrice(c.open)}`, `H: ${formatPrice(c.high)}`, `L: ${formatPrice(c.low)}`, `C: ${formatPrice(c.close)}`, `V: ${formatVol(c.volume)}`, `${Number(chg) >= 0 ? "+" : ""}${chg}%`];
         ctx.font = "9px monospace"; ctx.textAlign = "left";
-        // Top row: O, H, L
         [0, 1, 2].forEach((i) => {
           ctx.fillStyle = i === 1 ? COLORS.green : i === 2 ? COLORS.red : COLORS.textBright;
           ctx.fillText(stats[i], overlayOffsetX + 8 + i * 90, 12);
         });
-        // Bottom row: C, V, %
         [3, 4, 5].forEach((i) => {
           ctx.fillStyle = i === 5 ? (Number(chg) >= 0 ? COLORS.green : COLORS.red) : COLORS.textBright;
           ctx.fillText(stats[i], overlayOffsetX + 8 + (i - 3) * 90, 26);
         });
-        // Price tag on right axis
-        const priceY = Math.max(mainPlotTop + 6, Math.min(mainPlotBottom - 4, my));
-        const priceAtY = pMin + (pMax - pMin) * (1 - (priceY - mainPlotTop) / mainPlotH);
-        ctx.fillStyle = COLORS.border; ctx.fillRect(plotW, priceY - 9, PRICE_AXIS_W, 18);
-        ctx.strokeStyle = COLORS.text; ctx.lineWidth = 0.5; ctx.strokeRect(plotW, priceY - 9, PRICE_AXIS_W, 18);
-        ctx.fillStyle = COLORS.textBright; ctx.font = "bold 10px monospace"; ctx.textAlign = "center";
-        ctx.fillText(formatPrice(priceAtY), plotW + PRICE_AXIS_W / 2, priceY + 4);
+        
+        // ─── Volume value label (right of volume pane) ───
+        const volText = formatVol(c.volume);
+        ctx.font = "bold 10px monospace";
+        const vW = ctx.measureText(volText).width + 14;
+        const vH = 18;
+        ctx.save();
+        ctx.fillStyle = alpha(COLORS.bgPanel, 0.95);
+        ctx.beginPath();
+        ctx.roundRect(plotW - vW - 2, volTop + 2, vW, vH, 4);
+        ctx.fill();
+        ctx.fillStyle = COLORS.textBright;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(volText, plotW - vW / 2 - 2, volTop + 2 + vH / 2);
+        ctx.restore();
+        
+        // ─── Y-axis price label (right edge) ───
+        const priceAtY = pMin + (pMax - pMin) * (1 - (my - mainPlotTop) / mainPlotH);
+        const priceText = formatPrice(priceAtY);
+        ctx.font = "bold 11px monospace";
+        const priceW = ctx.measureText(priceText).width + 16;
+        const labelH = 22;
+        const px = plotW;
+        const py = Math.max(mainPlotTop, Math.min(mainPlotBottom - labelH, my - labelH / 2));
+        ctx.save();
+        ctx.fillStyle = alpha(COLORS.bgPanel, 0.95);
+        ctx.beginPath();
+        ctx.roundRect(px - priceW - 2, py, priceW, labelH, 4);
+        ctx.fill();
+        ctx.strokeStyle = alpha(COLORS.border, 0.5); ctx.lineWidth = 0.5; ctx.stroke();
+        ctx.fillStyle = COLORS.textBright;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(priceText, px - priceW / 2 - 2, py + labelH / 2);
+        ctx.restore();
+        
+        // ─── X-axis time label (attached to bottom time scale) ───
+        const timeText = formatChartTime(c.time, tf);
+        ctx.font = "bold 11px monospace";
+        const tW = ctx.measureText(timeText).width + 16;
+        const tH = 22;
+        const tx = Math.max(0, Math.min(plotW - tW, mx - tW / 2));
+        const ty = timeAxisY;
+        ctx.save();
+        ctx.fillStyle = alpha(COLORS.bgPanel, 0.95);
+        ctx.beginPath();
+        ctx.roundRect(tx, ty + 3, tW, tH, 4);
+        ctx.fill();
+        ctx.strokeStyle = alpha(COLORS.border, 0.5); ctx.lineWidth = 0.5; ctx.stroke();
+        ctx.fillStyle = COLORS.textBright;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(timeText, tx + tW / 2, ty + 3 + tH / 2);
+        ctx.restore();
       }
     }
 
     // Entry price line (active trade only)
     if (Number.isFinite(entryPriceLine) && (entryPriceLine as number) > 0) {
       const entryY = Math.max(mainPlotTop + 2, Math.min(mainPlotBottom - 2, toY(entryPriceLine as number, mainPlotTop, mainPlotH)));
-      ctx.strokeStyle = COLORS.amber;
-      ctx.lineWidth = 1;
-      ctx.setLineDash([]);
-      ctx.strokeRect(plotW, entryY - 9, PRICE_AXIS_W, 18);
-      ctx.fillStyle = COLORS.amber;
-      ctx.font = "10px monospace";
-      ctx.textAlign = "left";
-      ctx.fillText(`Entry ${formatPrice(entryPriceLine as number)}`, 8, entryY - 4);
+      ctx.strokeStyle = COLORS.amber; ctx.lineWidth = 1; ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(0, entryY); ctx.lineTo(plotW, entryY); ctx.stroke();
+      const entryText = `E ${formatPrice(entryPriceLine as number)}`;
+      ctx.font = "bold 9px monospace";
+      const entryTagWidth = Math.max(60, ctx.measureText(entryText).width + 18);
+      const entryTagX = Math.min(Math.max(plotW + PRICE_AXIS_W - entryTagWidth - 6, plotW + 4), W - entryTagWidth - 4);
+      // Entry tag with rounded corners + shadow
+      ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
+      ctx.fillStyle = COLORS.tagBg || 'rgba(0,0,0,0.95)';
+      const entR = 6;
+      ctx.beginPath();
+      ctx.moveTo(entryTagX + entR, entryY - 9);
+      ctx.arcTo(entryTagX + entryTagWidth, entryY - 9, entryTagX + entryTagWidth, entryY + 9, entR);
+      ctx.arcTo(entryTagX + entryTagWidth, entryY + 9, entryTagX, entryY + 9, entR);
+      ctx.arcTo(entryTagX, entryY + 9, entryTagX, entryY - 9, entR);
+      ctx.arcTo(entryTagX, entryY - 9, entryTagX + entryTagWidth, entryY - 9, entR);
+      ctx.closePath(); ctx.fill(); ctx.shadowColor = 'transparent';
+      ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.stroke();
+      ctx.fillStyle = COLORS.textBright; ctx.font = 'bold 9px monospace'; ctx.textAlign = 'center'; ctx.fillText(entryText, entryTagX + entryTagWidth / 2, entryY + 3);
+      ctx.restore();
     }
 
     // Last price line (Binance style)
@@ -854,14 +1032,26 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
       const referencePrice = visible.length > 1 ? visible[visible.length - 2].close : lastC.open;
       const lastY = Math.max(mainPlotTop + 2, Math.min(mainPlotBottom - 2, toY(priceForLast, mainPlotTop, mainPlotH)));
       const isGreen = priceForLast >= referencePrice;
-      ctx.strokeStyle = isGreen ? COLORS.green : COLORS.red;
-      ctx.lineWidth = 0.75; ctx.setLineDash([3, 5]);
+      ctx.strokeStyle = isGreen ? COLORS.green : COLORS.red; ctx.lineWidth = 1; ctx.setLineDash([]);
       ctx.beginPath(); ctx.moveTo(0, lastY); ctx.lineTo(plotW, lastY); ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle = isGreen ? COLORS.green : COLORS.red;
-      ctx.fillRect(plotW, lastY - 10, PRICE_AXIS_W, 20);
-      ctx.fillStyle = COLORS.bgPanel; ctx.font = "bold 11px monospace"; ctx.textAlign = "center";
-      ctx.fillText(formatPrice(priceForLast), plotW + PRICE_AXIS_W / 2, lastY + 4);
+      const lastText = formatPrice(priceForLast);
+      ctx.font = "bold 10px monospace";
+      const lastTagWidth = Math.max(60, ctx.measureText(lastText).width + 18);
+      const lastTagX = Math.min(Math.max(plotW + PRICE_AXIS_W - lastTagWidth - 6, plotW + 4), W - lastTagWidth - 4);
+      // Last price tag with rounded corners + shadow, green price
+      ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
+      ctx.fillStyle = COLORS.tagBg || 'rgba(0,0,0,0.95)';
+      const lastR = 6;
+      ctx.beginPath();
+      ctx.moveTo(lastTagX + lastR, lastY - 10);
+      ctx.arcTo(lastTagX + lastTagWidth, lastY - 10, lastTagX + lastTagWidth, lastY + 10, lastR);
+      ctx.arcTo(lastTagX + lastTagWidth, lastY + 10, lastTagX, lastY + 10, lastR);
+      ctx.arcTo(lastTagX, lastY + 10, lastTagX, lastY - 10, lastR);
+      ctx.arcTo(lastTagX, lastY - 10, lastTagX + lastTagWidth, lastY - 10, lastR);
+      ctx.closePath(); ctx.fill(); ctx.shadowColor = 'transparent';
+      ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.stroke();
+      ctx.fillStyle = COLORS.green || '#0ECB81'; ctx.font = 'bold 11px monospace'; ctx.textAlign = 'center'; ctx.fillText(lastText, lastTagX + lastTagWidth / 2, lastY + 4);
+      ctx.restore();
     }
 
     // MA info overlay (fixed top-left)
@@ -3387,6 +3577,11 @@ export default function Trading() {
                   <DepthChart buyLevels={buyDisplay} sellLevels={sellDisplay} depthLimit={depthLimit} baseSymbol={baseSymbol} quoteSymbol={quoteSymbol} />
                 </div>
               )}
+              <div style={{ position: "absolute", top: 4, right: 4, display: "flex", gap: 2, opacity: 0.35, zIndex: 20 }} className="chart-pane-controls">
+                <button title="Move pane down" style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", borderRadius: 4, cursor: "pointer", color: COLORS.textMuted }} onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = COLORS.bgPanel; }} onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}><ChevronsDown size={14} /></button>
+                <button title="Collapse pane" style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", borderRadius: 4, cursor: "pointer", color: COLORS.textMuted }} onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = COLORS.bgPanel; }} onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}><Minus size={14} /></button>
+                <button title="Maximize pane" style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", borderRadius: 4, cursor: "pointer", color: COLORS.textMuted }} onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = COLORS.bgPanel; }} onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}><Maximize2 size={14} /></button>
+              </div>
             </div>
           </div>
         )}

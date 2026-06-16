@@ -3874,6 +3874,9 @@ input,select{
 .trading-dashboard .trading-trades-layout {
   min-height: 100% !important;
 }
+.trading-dashboard .trading-chart-stage:hover .chart-pane-controls {
+  opacity: 1 !important;
+}
 
 .trading-dashboard__ticket {
   min-height: 0 !important;
