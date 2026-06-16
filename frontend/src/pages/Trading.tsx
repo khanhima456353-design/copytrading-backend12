@@ -523,9 +523,10 @@ interface CandleChartProps {
   entryPriceLine?: number | null;
   toolbarCollapsed: boolean;
   paneMovedDown: boolean;
+  paneCollapsed: boolean;
 }
 
-function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair, rsiData, macdData, showRSI, showMACD, liveStatus, activeTool, drawings, onDrawingsChange, drawingColor, drawingWidth, lastPrice, entryPriceLine, toolbarCollapsed, paneMovedDown }: CandleChartProps) {
+function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair, rsiData, macdData, showRSI, showMACD, liveStatus, activeTool, drawings, onDrawingsChange, drawingColor, drawingWidth, lastPrice, entryPriceLine, toolbarCollapsed, paneMovedDown, paneCollapsed }: CandleChartProps) {
   const { theme } = useTheme();
   const COLORS = useMemo(() => getColors(theme), [theme]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -575,8 +576,8 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
     return { pMin: pMin - pad, pMax: pMax + pad };
   }, [indicators.bb]);
 
-  const dataRef = useRef({ candles, indicators, chartType, tf, rsiData, macdData, showRSI, showMACD, lastPrice, entryPriceLine, drawings, deepMarketData, viewportWidth, COLORS, getMainPlotBounds, getPriceRange, toolbarCollapsed, paneMovedDown });
-  dataRef.current = { candles, indicators, chartType, tf, rsiData, macdData, showRSI, showMACD, lastPrice, entryPriceLine, drawings, deepMarketData, viewportWidth, COLORS, getMainPlotBounds, getPriceRange, toolbarCollapsed, paneMovedDown };
+  const dataRef = useRef({ candles, indicators, chartType, tf, rsiData, macdData, showRSI, showMACD, lastPrice, entryPriceLine, drawings, deepMarketData, viewportWidth, COLORS, getMainPlotBounds, getPriceRange, toolbarCollapsed, paneMovedDown, paneCollapsed });
+  dataRef.current = { candles, indicators, chartType, tf, rsiData, macdData, showRSI, showMACD, lastPrice, entryPriceLine, drawings, deepMarketData, viewportWidth, COLORS, getMainPlotBounds, getPriceRange, toolbarCollapsed, paneMovedDown, paneCollapsed };
 
   const draw = useCallback(() => {
     const d = dataRef.current;
@@ -598,6 +599,7 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
     const drawings = d.drawings;
     const deepMarketData = d.deepMarketData;
     const paneMovedDown = d.paneMovedDown;
+    const paneCollapsed = d.paneCollapsed;
     const canvas = canvasRef.current;
     if (!canvas || !candles.length) return;
     const ctx = canvas.getContext("2d")!;
@@ -611,13 +613,20 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
     let mainPlotBottom = b.mainPlotBottom;
     const PRICE_AXIS_W = 88, TIME_AXIS_H = 28;
     const contentH = Math.max(28, H - 28);
-    const volH  = Math.floor(contentH * VOL_WEIGHT);
+    const volH  = paneCollapsed ? 0 : Math.floor(contentH * VOL_WEIGHT);
     const indicatorH = Math.max(0, contentH - mainH - volH);
     const rsiH  = showRSI && !showMACD ? indicatorH : showRSI ? Math.floor(indicatorH * 0.5) : 0;
     const macdH = showMACD && !showRSI ? indicatorH : showMACD ? Math.floor(indicatorH * 0.5) : 0;
-    const separatorY = paneMovedDown ? volH : mainH;
+    if (paneCollapsed) {
+      mainH = contentH - rsiH - macdH;
+      const topPadding = Math.min(56, Math.max(16, Math.floor(mainH * (viewportWidth < 768 ? 0.18 : viewportWidth < 1024 ? 0.15 : 0.12))));
+      mainPlotTop = Math.min(56, Math.max(16, topPadding));
+      mainPlotH = Math.max(48, mainH - mainPlotTop - 6);
+      mainPlotBottom = mainPlotTop + mainPlotH;
+    }
+    const separatorY = paneCollapsed ? -1 : (paneMovedDown ? volH : mainH);
     let volTop = mainH;
-    if (paneMovedDown) {
+    if (paneMovedDown && !paneCollapsed) {
       mainPlotTop = volH + b.mainPlotTop;
       mainPlotBottom = mainPlotTop + mainPlotH;
       volTop = 0;
@@ -698,7 +707,7 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
     ctx.lineWidth = 0.8;
     ctx.strokeRect(plotW + 0.5, mainPlotTop + 0.5, PRICE_AXIS_W - 1, timeAxisY - mainPlotTop - 1);
 
-    ctx.font = `10px 'JetBrains Mono', monospace`;
+    ctx.font = `bold 11px 'JetBrains Mono', monospace`;
     priceTicks.forEach(p => {
       if (p < pMin || p > pMax) return;
       const y = Math.round(toY(p, mainPlotTop, mainPlotH));
@@ -718,7 +727,7 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
         ctx.fillText(label, plotW + 4 + 6, y);
         ctx.restore();
       } else {
-        ctx.fillStyle = COLORS.text;
+        ctx.fillStyle = COLORS.textBright;
         ctx.textAlign = "right";
         ctx.textBaseline = "middle";
         ctx.fillText(formatPrice(p), W - 8, y);
@@ -733,20 +742,22 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
       return (vf <= 1.5 ? 1 : vf <= 3.5 ? 2 : vf <= 7.5 ? 5 : 10) * Math.pow(10, ve);
     })() : 1;
     const volPlotH = volH;
+    ctx.font = `bold 11px 'JetBrains Mono', monospace`;
     for (let v = 0; v <= vMax + volNiceStep * 0.5; v += volNiceStep) {
       const vv = Math.round(v * 1e10) / 1e10;
       const y = volTop + volPlotH - 4 - (vv / vMax) * volPlotH * 0.85;
       if (y < volTop || y > volTop + volPlotH) continue;
-      ctx.fillStyle = COLORS.textMuted;
+      ctx.fillStyle = COLORS.textBright;
       ctx.textAlign = "right";
       ctx.textBaseline = "middle";
       ctx.fillText(formatVol(vv), W - 8, y);
     }
-    // "VOL" label at top of volume section
+    // "VOL" label at top-left of volume section
     ctx.fillStyle = COLORS.textMuted;
-    ctx.textAlign = "right";
-    ctx.textBaseline = "middle";
-    ctx.fillText("VOL", W - 8, volTop + 14);
+    ctx.font = "9px monospace";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText("VOL", plotW + 6, volTop + 4);
     ctx.textBaseline = "alphabetic";
 
     ctx.save();
@@ -3553,11 +3564,11 @@ export default function Trading() {
       )}
 
       {/* -- CHART / CONTENT AREA (between left & right panels) -- */}
-      <div className="trading-chart-panel trading-dashboard__chart-panel" style={{ flex: paneCollapsed ? "none" : 1, position: "relative", overflow: "hidden", minHeight: 0, background: COLORS.bg }}>
-        <div style={{ position: "absolute", top: 4, right: paneMovedDown ? "auto" : 4, left: paneMovedDown ? (toolbarCollapsed ? 4 : 48) : "auto", display: "flex", gap: 2, opacity: 0.35, zIndex: 40, borderRadius: 4, padding: "2px 4px", background: COLORS.bg, transition: "opacity 0.15s" }} className="chart-pane-controls">
-          <button title="Move pane down" onClick={() => setPaneMovedDown(p => !p)} style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", borderRadius: 4, cursor: "pointer", color: paneMovedDown ? "#f0b90b" : COLORS.textMuted }} onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = COLORS.bgPanel; }} onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}><ChevronsDown size={14} /></button>
-          <button title={paneCollapsed ? "Restore pane" : "Collapse pane"} onClick={() => setPaneCollapsed(p => !p)} style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", borderRadius: 4, cursor: "pointer", color: paneCollapsed ? "#f0b90b" : COLORS.textMuted }} onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = COLORS.bgPanel; }} onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}>{paneCollapsed ? <ChevronUp size={14} /> : <Minus size={14} />}</button>
-          <button title={paneMaximized ? "Restore pane" : "Maximize pane"} onClick={() => setPaneMaximized(p => !p)} style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", borderRadius: 4, cursor: "pointer", color: paneMaximized ? "#f0b90b" : COLORS.textMuted }} onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = COLORS.bgPanel; }} onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}>{paneMaximized ? <Minus size={14} /> : <Maximize2 size={14} />}</button>
+      <div className="trading-chart-panel trading-dashboard__chart-panel" style={{ flex: 1, position: "relative", overflow: "hidden", minHeight: 0, background: COLORS.bg }}>
+        <div style={{ position: "absolute", top: 4, right: paneMovedDown ? "auto" : 4, left: paneMovedDown ? (toolbarCollapsed ? 4 : 48) : "auto", display: "flex", gap: 2, opacity: 0.65, zIndex: 40, borderRadius: 4, padding: "2px 4px", background: COLORS.bgPanel, border: `1px solid ${COLORS.border}`, transition: "opacity 0.15s" }} className="chart-pane-controls">
+          <button title="Move pane down" onClick={() => setPaneMovedDown(p => !p)} style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", borderRadius: 4, cursor: "pointer", color: paneMovedDown ? "#f0b90b" : COLORS.text }} onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = COLORS.bgHover; }} onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}><ChevronsDown size={14} /></button>
+          <button title={paneCollapsed ? "Restore pane" : "Collapse pane"} onClick={() => setPaneCollapsed(p => !p)} style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", borderRadius: 4, cursor: "pointer", color: paneCollapsed ? "#f0b90b" : COLORS.text }} onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = COLORS.bgHover; }} onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}>{paneCollapsed ? <ChevronUp size={14} /> : <Minus size={14} />}</button>
+          <button title={paneMaximized ? "Restore pane" : "Maximize pane"} onClick={() => setPaneMaximized(p => !p)} style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", borderRadius: 4, cursor: "pointer", color: paneMaximized ? "#f0b90b" : COLORS.text }} onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = COLORS.bgHover; }} onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}>{paneMaximized ? <Minus size={14} /> : <Maximize2 size={14} />}</button>
         </div>
         {/* Left toolbar attached to chart (desktop/tablet/mobile) */}
         {activeViewTab === "chart" && (
@@ -3590,10 +3601,10 @@ export default function Trading() {
         )}
 
         {activeViewTab === "chart" && (
-          <div className="trading-chart-layout" style={{ display: "flex", height: paneCollapsed ? 0 : "100%", overflow: "hidden" }}>
+          <div className="trading-chart-layout" style={{ display: "flex", height: "100%", overflow: "hidden" }}>
             <div ref={chartStageRef} className="trading-chart-stage" style={{ flex: 1, position: "relative", minWidth: 0, marginLeft: viewportWidth >= 1024 ? (toolbarCollapsed ? 0 : 44) : 0, transition: "margin-left 0.18s ease" }}>
               {activeChartTab === "original" && (
-                <CandleChart key={`${symbol}-${timeframe}`} candles={candles} deepMarketData={deepMarketData} indicators={indicators} chartType={chartType} tf={timeframe} pair={symbol} rsiData={rsiData} macdData={macdData} showRSI={showRSI} showMACD={showMACD} liveStatus={liveStatus} activeTool={activeTool} drawings={drawings} onDrawingsChange={setDrawings} drawingColor={drawingColor} drawingWidth={drawingWidth} lastPrice={lastPrice} entryPriceLine={entryPriceOverlay} toolbarCollapsed={toolbarCollapsed} paneMovedDown={paneMovedDown} />
+                <CandleChart key={`${symbol}-${timeframe}`} candles={candles} deepMarketData={deepMarketData} indicators={indicators} chartType={chartType} tf={timeframe} pair={symbol} rsiData={rsiData} macdData={macdData} showRSI={showRSI} showMACD={showMACD} liveStatus={liveStatus} activeTool={activeTool} drawings={drawings} onDrawingsChange={setDrawings} drawingColor={drawingColor} drawingWidth={drawingWidth} lastPrice={lastPrice} entryPriceLine={entryPriceOverlay} toolbarCollapsed={toolbarCollapsed} paneMovedDown={paneMovedDown} paneCollapsed={paneCollapsed} />
               )}
               {activeChartTab === "depth" && (
                 <div style={{ height: "100%", display: "flex", flexDirection: "column", padding: 16, gap: 16, background: COLORS.bgPanel, minHeight: 360 }}>
