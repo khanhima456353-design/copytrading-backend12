@@ -522,9 +522,10 @@ interface CandleChartProps {
   lastPrice: number;
   entryPriceLine?: number | null;
   toolbarCollapsed: boolean;
+  paneMovedDown: boolean;
 }
 
-function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair, rsiData, macdData, showRSI, showMACD, liveStatus, activeTool, drawings, onDrawingsChange, drawingColor, drawingWidth, lastPrice, entryPriceLine, toolbarCollapsed }: CandleChartProps) {
+function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair, rsiData, macdData, showRSI, showMACD, liveStatus, activeTool, drawings, onDrawingsChange, drawingColor, drawingWidth, lastPrice, entryPriceLine, toolbarCollapsed, paneMovedDown }: CandleChartProps) {
   const { theme } = useTheme();
   const COLORS = useMemo(() => getColors(theme), [theme]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -574,8 +575,8 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
     return { pMin: pMin - pad, pMax: pMax + pad };
   }, [indicators.bb]);
 
-  const dataRef = useRef({ candles, indicators, chartType, tf, rsiData, macdData, showRSI, showMACD, lastPrice, entryPriceLine, drawings, deepMarketData, viewportWidth, COLORS, getMainPlotBounds, getPriceRange, toolbarCollapsed });
-  dataRef.current = { candles, indicators, chartType, tf, rsiData, macdData, showRSI, showMACD, lastPrice, entryPriceLine, drawings, deepMarketData, viewportWidth, COLORS, getMainPlotBounds, getPriceRange, toolbarCollapsed };
+  const dataRef = useRef({ candles, indicators, chartType, tf, rsiData, macdData, showRSI, showMACD, lastPrice, entryPriceLine, drawings, deepMarketData, viewportWidth, COLORS, getMainPlotBounds, getPriceRange, toolbarCollapsed, paneMovedDown });
+  dataRef.current = { candles, indicators, chartType, tf, rsiData, macdData, showRSI, showMACD, lastPrice, entryPriceLine, drawings, deepMarketData, viewportWidth, COLORS, getMainPlotBounds, getPriceRange, toolbarCollapsed, paneMovedDown };
 
   const draw = useCallback(() => {
     const d = dataRef.current;
@@ -596,20 +597,31 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
     const entryPriceLine = d.entryPriceLine;
     const drawings = d.drawings;
     const deepMarketData = d.deepMarketData;
+    const paneMovedDown = d.paneMovedDown;
     const canvas = canvasRef.current;
     if (!canvas || !candles.length) return;
     const ctx = canvas.getContext("2d")!;
     const dpr = window.devicePixelRatio || 1;
     const W = canvas.width / dpr, H = canvas.height / dpr;
 
-    const { mainH, mainPlotTop, mainPlotH, mainPlotBottom } = getMainPlotBounds(H);
+    const b = getMainPlotBounds(H);
+    let mainH = b.mainH;
+    let mainPlotTop = b.mainPlotTop;
+    let mainPlotH = b.mainPlotH;
+    let mainPlotBottom = b.mainPlotBottom;
+    const PRICE_AXIS_W = 88, TIME_AXIS_H = 28;
     const contentH = Math.max(28, H - 28);
     const volH  = Math.floor(contentH * VOL_WEIGHT);
     const indicatorH = Math.max(0, contentH - mainH - volH);
     const rsiH  = showRSI && !showMACD ? indicatorH : showRSI ? Math.floor(indicatorH * 0.5) : 0;
     const macdH = showMACD && !showRSI ? indicatorH : showMACD ? Math.floor(indicatorH * 0.5) : 0;
-    const PRICE_AXIS_W = 88, TIME_AXIS_H = 28;
-    const volTop = mainH;
+    const separatorY = paneMovedDown ? volH : mainH;
+    let volTop = mainH;
+    if (paneMovedDown) {
+      mainPlotTop = volH + b.mainPlotTop;
+      mainPlotBottom = mainPlotTop + mainPlotH;
+      volTop = 0;
+    }
     const rsiTop = mainH + volH;
     const macdTop = mainH + volH + rsiH;
     const timeAxisY = mainH + volH + rsiH + macdH;
@@ -676,7 +688,7 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
 
     // Separator lines
     ctx.strokeStyle = COLORS.border; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(0, mainH); ctx.lineTo(W, mainH); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, separatorY); ctx.lineTo(W, separatorY); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(0, timeAxisY); ctx.lineTo(W, timeAxisY); ctx.stroke();
 
     // Unified right-side axis panel (price + volume)
@@ -1179,11 +1191,13 @@ function CandleChart({ candles, deepMarketData, indicators, chartType, tf, pair,
     const getPriceAtY = (y: number) => {
       const d = dataRef.current;
       const { mainPlotTop, mainPlotH, mainPlotBottom } = getCanvasInfo();
+      const paneVolH = Math.floor(Math.max(28, canvas.height / dpr - 28) * VOL_WEIGHT);
+      const paneOffset = d.paneMovedDown ? paneVolH : 0;
       const visible = d.candles.slice(Math.max(0, d.candles.length - Math.max(20, Math.floor(getCanvasInfo().plotW / (8 * st.zoom))) - st.offset), Math.max(0, d.candles.length - st.offset));
       if (!visible.length) return 0;
       const { pMin, pMax } = d.getPriceRange(visible);
-      const boundedY = Math.max(mainPlotTop, Math.min(mainPlotBottom, y));
-      return pMin + (pMax - pMin) * (1 - (boundedY - mainPlotTop) / mainPlotH);
+      const boundedY = Math.max(mainPlotTop + paneOffset, Math.min(mainPlotBottom + paneOffset, y));
+      return pMin + (pMax - pMin) * (1 - (boundedY - mainPlotTop - paneOffset) / mainPlotH);
     };
 
     const onMove = (e: MouseEvent) => {
@@ -1755,6 +1769,10 @@ export default function Trading() {
   const canvasColors = useMemo(() => getColors(theme), [theme]);
   const COLORS = CV;
   const saved = loadLayout();
+
+  const [paneMovedDown, setPaneMovedDown] = useState(false);
+  const [paneCollapsed, setPaneCollapsed] = useState(false);
+  const [paneMaximized, setPaneMaximized] = useState(false);
 
   const [symbols, setSymbols] = useState<string[]>([]);
   const [symbol, setSymbol] = useState(saved.symbol || "BTC/USDT");
@@ -3535,7 +3553,12 @@ export default function Trading() {
       )}
 
       {/* -- CHART / CONTENT AREA (between left & right panels) -- */}
-      <div className="trading-chart-panel trading-dashboard__chart-panel" style={{ flex: 1, position: "relative", overflow: "hidden", minHeight: 0, background: COLORS.bg }}>
+      <div className="trading-chart-panel trading-dashboard__chart-panel" style={{ flex: paneCollapsed ? "none" : 1, position: "relative", overflow: "hidden", minHeight: 0, background: COLORS.bg }}>
+        <div style={{ position: "absolute", top: 4, right: 4, display: "flex", gap: 2, opacity: 0.35, zIndex: 20, transition: "opacity 0.15s" }} className="chart-pane-controls">
+          <button title="Move pane down" onClick={() => setPaneMovedDown(p => !p)} style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", borderRadius: 4, cursor: "pointer", color: paneMovedDown ? "#f0b90b" : COLORS.textMuted }} onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = COLORS.bgPanel; }} onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}><ChevronsDown size={14} /></button>
+          <button title="Collapse pane" onClick={() => setPaneCollapsed(p => !p)} style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", borderRadius: 4, cursor: "pointer", color: paneCollapsed ? "#f0b90b" : COLORS.textMuted }} onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = COLORS.bgPanel; }} onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}><Minus size={14} /></button>
+          <button title={paneMaximized ? "Restore pane" : "Maximize pane"} onClick={() => setPaneMaximized(p => !p)} style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", borderRadius: 4, cursor: "pointer", color: paneMaximized ? "#f0b90b" : COLORS.textMuted }} onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = COLORS.bgPanel; }} onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}>{paneMaximized ? <Minus size={14} /> : <Maximize2 size={14} />}</button>
+        </div>
         {/* Left toolbar attached to chart (desktop/tablet/mobile) */}
         {activeViewTab === "chart" && (
           <div className="trading-toolbar trading-dashboard__tools--desktop" style={{ width: toolbarCollapsed ? 0 : 44, background: toolbarCollapsed ? "transparent" : COLORS.bgPanel, borderRight: toolbarCollapsed ? "none" : `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", alignItems: "center", padding: toolbarCollapsed ? 0 : "8px 6px", gap: 6, flexShrink: 0, boxSizing: "border-box", overflowY: "auto", WebkitOverflowScrolling: "touch", position: "absolute", left: 0, top: 0, bottom: 0, zIndex: 30, transition: "width 0.18s ease, background 0.18s ease, border 0.18s ease" }}>
@@ -3567,21 +3590,16 @@ export default function Trading() {
         )}
 
         {activeViewTab === "chart" && (
-          <div className="trading-chart-layout" style={{ display: "flex", height: "100%" }}>
+          <div className="trading-chart-layout" style={{ display: "flex", height: paneCollapsed ? 0 : "100%", overflow: "hidden" }}>
             <div ref={chartStageRef} className="trading-chart-stage" style={{ flex: 1, position: "relative", minWidth: 0, marginLeft: viewportWidth >= 1024 ? (toolbarCollapsed ? 0 : 44) : 0, transition: "margin-left 0.18s ease" }}>
               {activeChartTab === "original" && (
-                <CandleChart key={`${symbol}-${timeframe}`} candles={candles} deepMarketData={deepMarketData} indicators={indicators} chartType={chartType} tf={timeframe} pair={symbol} rsiData={rsiData} macdData={macdData} showRSI={showRSI} showMACD={showMACD} liveStatus={liveStatus} activeTool={activeTool} drawings={drawings} onDrawingsChange={setDrawings} drawingColor={drawingColor} drawingWidth={drawingWidth} lastPrice={lastPrice} entryPriceLine={entryPriceOverlay} toolbarCollapsed={toolbarCollapsed} />
+                <CandleChart key={`${symbol}-${timeframe}`} candles={candles} deepMarketData={deepMarketData} indicators={indicators} chartType={chartType} tf={timeframe} pair={symbol} rsiData={rsiData} macdData={macdData} showRSI={showRSI} showMACD={showMACD} liveStatus={liveStatus} activeTool={activeTool} drawings={drawings} onDrawingsChange={setDrawings} drawingColor={drawingColor} drawingWidth={drawingWidth} lastPrice={lastPrice} entryPriceLine={entryPriceOverlay} toolbarCollapsed={toolbarCollapsed} paneMovedDown={paneMovedDown} />
               )}
               {activeChartTab === "depth" && (
                 <div style={{ height: "100%", display: "flex", flexDirection: "column", padding: 16, gap: 16, background: COLORS.bgPanel, minHeight: 360 }}>
                   <DepthChart buyLevels={buyDisplay} sellLevels={sellDisplay} depthLimit={depthLimit} baseSymbol={baseSymbol} quoteSymbol={quoteSymbol} />
                 </div>
               )}
-              <div style={{ position: "absolute", top: 4, right: 4, display: "flex", gap: 2, opacity: 0.35, zIndex: 20 }} className="chart-pane-controls">
-                <button title="Move pane down" style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", borderRadius: 4, cursor: "pointer", color: COLORS.textMuted }} onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = COLORS.bgPanel; }} onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}><ChevronsDown size={14} /></button>
-                <button title="Collapse pane" style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", borderRadius: 4, cursor: "pointer", color: COLORS.textMuted }} onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = COLORS.bgPanel; }} onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}><Minus size={14} /></button>
-                <button title="Maximize pane" style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", borderRadius: 4, cursor: "pointer", color: COLORS.textMuted }} onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = COLORS.bgPanel; }} onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}><Maximize2 size={14} /></button>
-              </div>
             </div>
           </div>
         )}
@@ -3628,7 +3646,7 @@ export default function Trading() {
       </div>
 
       {/* -- BALANCE STRIP (between left & right panels) -- */}
-      {isChartView && (
+      {isChartView && !paneMaximized && (
       <div className="trading-balance-strip" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, padding: isDesktopLayout ? "8px 16px" : "4px 16px 8px", borderBottom: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, flexShrink: 0 }}>
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 10, color: COLORS.text }}>Available USDT</div>
@@ -3665,7 +3683,7 @@ export default function Trading() {
       )}
 
       {/* -- ORDER FORM (between left & right panels) -- */}
-      {isChartView && (
+      {isChartView && !paneMaximized && (
       <div className="trading-order-form trading-dashboard__ticket" style={{ height: "auto", minHeight: isDesktopLayout ? 320 : 210, borderTop: `1px solid ${COLORS.border}`, background: COLORS.bgPanel, display: "flex", flexShrink: 0, overflow: "visible" }}>
         <div className="trading-order-form__inner" style={{ width: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
               {/* Spot / Futures tab switcher — desktop/tablet only */}
