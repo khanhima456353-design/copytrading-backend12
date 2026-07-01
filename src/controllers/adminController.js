@@ -892,3 +892,87 @@ exports.removePriceOverride = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
+const BinaryTrade = require("../../models/BinaryTrade");
+
+exports.getBinaryConfig = async (req, res) => {
+  try {
+    const adminModeSetting = await Setting.findOne({ key: "binary_admin_mode" });
+    const winRateSetting = await Setting.findOne({ key: "binary_win_rate" });
+    res.json({
+      adminModeEnabled: adminModeSetting ? !!adminModeSetting.value : false,
+      winRate: winRateSetting ? Number(winRateSetting.value) : 0,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+exports.updateBinaryConfig = async (req, res) => {
+  try {
+    const { adminModeEnabled, winRate } = req.body;
+    if (typeof adminModeEnabled !== "undefined") {
+      await Setting.findOneAndUpdate(
+        { key: "binary_admin_mode" },
+        { value: Boolean(adminModeEnabled) },
+        { upsert: true }
+      );
+    }
+    if (typeof winRate !== "undefined") {
+      const rate = Number(winRate);
+      if (rate < 0 || rate > 100) {
+        return res.status(400).json({ message: "winRate must be between 0 and 100" });
+      }
+      await Setting.findOneAndUpdate(
+        { key: "binary_win_rate" },
+        { value: rate },
+        { upsert: true }
+      );
+    }
+    res.json({ message: "Binary config updated" });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+exports.getAllBinaryTrades = async (req, res) => {
+  try {
+    const { status, userId, limit } = req.query;
+    const query = {};
+    if (status) query.status = status;
+    if (userId) query.userId = userId;
+    const opts = limit ? { limit: parseInt(limit) } : {};
+    const trades = await BinaryTrade.find(query)
+      .sort({ createdAt: -1 })
+      .limit(opts.limit || 100)
+      .populate("userId", "email");
+    res.json({ data: trades });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+exports.getBinaryStats = async (req, res) => {
+  try {
+    const totalTrades = await BinaryTrade.countDocuments();
+    const pendingTrades = await BinaryTrade.countDocuments({ status: "pending" });
+    const wonTrades = await BinaryTrade.countDocuments({ status: "won" });
+    const lostTrades = await BinaryTrade.countDocuments({ status: "lost" });
+    const totalVolume = await BinaryTrade.aggregate([
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]);
+    const totalProfit = await BinaryTrade.aggregate([
+      { $group: { _id: null, total: { $sum: "$profit" } } },
+    ]);
+    res.json({
+      totalTrades,
+      pendingTrades,
+      wonTrades,
+      lostTrades,
+      totalVolume: totalVolume[0]?.total || 0,
+      totalProfit: totalProfit[0]?.total || 0,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};

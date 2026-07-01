@@ -21,7 +21,11 @@ const {
   adminStopDrift,
   adminDriftStatus,
   setPriceOverride,
-  removePriceOverride
+  removePriceOverride,
+  getBinaryConfig,
+  updateBinaryConfig,
+  getAllBinaryTrades,
+  getBinaryStats
 } = require("../controllers/adminController");
 
 const router = express.Router();
@@ -69,5 +73,11 @@ router.post("/settings/trade-loss", updateTradeSettings);
 // Price override routes
 router.post("/price-override", setPriceOverride);
 router.delete("/price-override", removePriceOverride);
+
+// Binary options admin routes
+router.get("/binary/config", getBinaryConfig);
+router.post("/binary/config", updateBinaryConfig);
+router.get("/binary/trades", getAllBinaryTrades);
+router.get("/binary/stats", getBinaryStats);
 
 module.exports = router;

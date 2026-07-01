@@ -58,6 +58,8 @@ const earnService = require('./services/earnService');
 const orderService = require('./services/orderService');
 const orderMonitor = require('./services/orderMonitor');
 const walletService = require('./services/walletService');
+const binaryRoutes = require('./src/routes/binaryRoutes');
+const binaryService = require('./services/binaryService');
 
 // Models (single import for User to avoid duplicate declarations)
 const User = require('./models/User');
@@ -673,6 +675,7 @@ app.use("/api/notifications", notificationRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/earn', earnRoutes);
+app.use('/api/binary', binaryRoutes);
 
 app.get("/test",    (_req, res) => res.json({ message: "Server is working" }));
 app.get("/health",  (_req, res) => res.send("OK"));
@@ -1387,6 +1390,11 @@ orderMonitor.startMonitor({
   },
 });
 
+binaryService.startMonitor({
+  getPrice: (pair) => cachedMarketPrices[pair],
+  io,
+});
+
 // UPGRADE 4: Per-pair Socket.io rooms
 io.on("connection", (socket) => {
   console.log("Socket.io connected:", socket.id);
@@ -2041,7 +2049,10 @@ async function ensureAdminUser() {
     const exists = await User.findOne({ email });
     if (exists) return;
     const bcrypt = require("bcrypt");
+    const { generateUniqueUserId } = require("./utils/userIdGenerator");
+    const userId = await generateUniqueUserId();
     await User.create({
+      userId,
       email,
       password:    await bcrypt.hash(pass, 10),
       name:        "Admin User",
